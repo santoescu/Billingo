@@ -1,32 +1,18 @@
-# Imagen base PHP 8.2
 ###############################################
-# STAGE 1: Construcción de assets con Node
+# Imagen PHP 8.2 CLI
 ###############################################
-FROM node:18 AS build-assets
-
-WORKDIR /app
-
-# Copiar solo archivos necesarios para NPM
-COPY package.json package-lock.json vite.config.js ./
-COPY resources ./resources
-
-RUN npm install
-RUN npm run build
-
-
+FROM php:8.2-cli
 
 ###############################################
-# STAGE 2: Imagen PHP + Laravel
-###############################################
-FROM php:8.2-fpm
-
-# Instalar dependencias del sistema
 # Dependencias del sistema
+###############################################
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     zip \
     unzip \
+    nodejs \
+    npm \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
@@ -34,43 +20,71 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libzstd-dev \
     pkg-config \
-    && docker-php-ext-install mbstring zip exif pcntl bcmath gd
+    && docker-php-ext-install \
+        mbstring \
+        zip \
+        exif \
+        pcntl \
+        bcmath \
+        gd
 
-# Instalar la extensión MongoDB
-# Instalar extensión MongoDB
-RUN pecl install mongodb && \
-    echo "extension=mongodb.so" > /usr/local/etc/php/conf.d/mongodb.ini
+###############################################
+# MongoDB
+###############################################
+RUN pecl install mongodb \
+    && docker-php-ext-enable mongodb
 
-# Instalar Node.js 18 para Vite
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
-
-# Instalar Composer
+###############################################
+# Composer
+###############################################
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-# Directorio de la app
+###############################################
+# Directorio
+###############################################
 WORKDIR /var/www/html
 
-# Copiar archivos del proyecto
-# Copiar resto del proyecto
+###############################################
+# Copiar proyecto
+###############################################
 COPY . .
 
-# Copiar assets construidos desde el Stage 1
-COPY --from=build-assets /app/public/build ./public/build
+###############################################
+# Instalar Composer
+###############################################
+RUN composer install \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader
 
-# Instalar dependencias de Laravel
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+###############################################
+# Instalar Node
+###############################################
+RUN npm install
 
-# Construir Vite
-RUN npm install && npm run build
+###############################################
+# Compilar Vite
+###############################################
+RUN npm run build
 
+###############################################
+# Optimizar Laravel
+###############################################
+RUN php artisan config:cache || true
+RUN php artisan route:cache || true
+RUN php artisan view:cache || true
+
+###############################################
 # Permisos
-RUN chmod -R 777 storage bootstrap/cache
+###############################################
+RUN chmod -R 775 storage bootstrap/cache
 
-# Puerto de Cloud Run
-# Cloud Run escucha en el 8080
+###############################################
+# Puerto
+###############################################
 EXPOSE 8080
 
-# Servir Laravel
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public"]
-
+###############################################
+# Ejecutar Laravel
+###############################################
+CMD ["sh","-c","php -S 0.0.0.0:${PORT:-8080} -t public"]
