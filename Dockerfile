@@ -31,8 +31,8 @@ RUN apt-get update && apt-get install -y \
 ###############################################
 # MongoDB
 ###############################################
-RUN pecl install mongodb \
-    && docker-php-ext-enable mongodb
+RUN pecl install mongodb && \
+    echo "extension=mongodb.so" > /usr/local/etc/php/conf.d/mongodb.ini
 
 ###############################################
 # Composer
