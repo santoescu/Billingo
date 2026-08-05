@@ -1,8 +1,24 @@
 # Imagen base PHP 8.2
 ###############################################
-# Imagen PHP + Laravel
+# STAGE 1: Construcción de assets con Node
 ###############################################
-FROM php:8.2-cli
+FROM node:18 AS build-assets
+
+WORKDIR /app
+
+# Copiar solo archivos necesarios para NPM
+COPY package.json package-lock.json vite.config.js ./
+COPY resources ./resources
+
+RUN npm install
+RUN npm run build
+
+
+
+###############################################
+# STAGE 2: Imagen PHP + Laravel
+###############################################
+FROM php:8.2-fpm
 
 # Instalar dependencias del sistema
 # Dependencias del sistema
@@ -39,15 +55,17 @@ WORKDIR /var/www/html
 # Copiar resto del proyecto
 COPY . .
 
+# Copiar assets construidos desde el Stage 1
+COPY --from=build-assets /app/public/build ./public/build
+
 # Instalar dependencias de Laravel
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
 # Construir Vite
-RUN npm install
-RUN npm run build
+RUN npm install && npm run build
 
 # Permisos
-RUN chmod -R 775 storage bootstrap/cache
+RUN chmod -R 777 storage bootstrap/cache
 
 # Puerto de Cloud Run
 # Cloud Run escucha en el 8080
@@ -55,4 +73,3 @@ EXPOSE 8080
 
 # Servir Laravel
 CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public"]
-
