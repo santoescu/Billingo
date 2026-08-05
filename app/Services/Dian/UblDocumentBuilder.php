@@ -205,7 +205,7 @@ class UblDocumentBuilder
         $prefijoPuntoFacturacion = $payload['resolucion']['prefijo'] ?? $payload['prefijo'] ?? null;
 
         $root->appendChild($this->buildSupplierParty($company, $prefijoPuntoFacturacion, $payload['supplier_overrides'] ?? []));
-        $root->appendChild($this->buildCustomerParty($customerParty));
+        $root->appendChild($this->buildCustomerParty($company, $customerParty));
 
         $paymentMeansList = $payload['payment_means_list'] ?? array_filter([$payload['payment_means'] ?? null]);
         foreach ($paymentMeansList as $paymentMeans) {
@@ -701,15 +701,30 @@ class UblDocumentBuilder
     /**
      * Construye cac:AccountingCustomerParty (receptor del documento).
      *
+     * @param  Company  $company  Empresa emisora (se necesita su NIT para cac:PartyIdentification cuando el receptor es persona natural).
      * @param  array  $customerParty  Datos del receptor (ver resolveCustomerParty()).
      * @return DOMElement Nodo cac:AccountingCustomerParty construido (aún no adjunto al árbol).
      */
-    private function buildCustomerParty(array $customerParty): DOMElement
+    private function buildCustomerParty(Company $company, array $customerParty): DOMElement
     {
         $node = $this->doc->createElementNS(self::CAC_NS, 'cac:AccountingCustomerParty');
-        $this->appendCbc($node, 'AdditionalAccountID', ($customerParty['tipo_persona'] ?? null) === '1' ? '1' : '2');
+        $additionalAccountId = ($customerParty['tipo_persona'] ?? null) === '1' ? '1' : '2';
+        $this->appendCbc($node, 'AdditionalAccountID', $additionalAccountId);
 
         $party = $this->doc->createElementNS(self::CAC_NS, 'cac:Party');
+
+        // La DIAN exige (regla FAK61) que cuando el receptor es persona
+        // natural (AdditionalAccountID=2) se informe además el NIT del
+        // emisor en cac:PartyIdentification -- si no, rechaza el documento
+        // por "grupo no informado".
+        if ($additionalAccountId === '2') {
+            $partyIdentification = $this->doc->createElementNS(self::CAC_NS, 'cac:PartyIdentification');
+            $id = $this->appendCbc($partyIdentification, 'ID', $company->identificacion);
+            $id->setAttribute('schemeID', '6');
+            $id->setAttribute('schemeName', '31');
+            $party->appendChild($partyIdentification);
+        }
+
         $partyName = $this->doc->createElementNS(self::CAC_NS, 'cac:PartyName');
         $this->appendCbc($partyName, 'Name', $customerParty['razon_social'] ?? '');
         $party->appendChild($partyName);
