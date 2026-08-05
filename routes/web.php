@@ -144,11 +144,4 @@ Route::middleware(['auth'])->group(function () {
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');
     });
 });
-Route::get('/env-test', function () {
-    return [
-        'DB_CONNECTION' => env('DB_CONNECTION'),
-        'DB_DATABASE'   => env('DB_DATABASE'),
-        'DB_URI'        => env('DB_URI'),
-    ];
-});
 require __DIR__.'/auth.php';
