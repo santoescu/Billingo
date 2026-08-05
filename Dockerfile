@@ -72,4 +72,4 @@ RUN chmod -R 777 storage bootstrap/cache
 EXPOSE 8080
 
 # Servir Laravel
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public"]
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public server.php"]
