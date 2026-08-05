@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" {{ $attributes }}>
+    <path d="M50 20 H138 L170 52 V188 Q170 200 158 200 H62 Q50 200 50 188 V32 Q50 20 62 20 Z" fill="var(--logo-page, #18181b)" />
+    <path d="M138 20 L170 52 H150 Q138 52 138 40 Z" fill="#166534" />
+    <text x="112" y="128" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="76" fill="var(--logo-text, #ffffff)" text-anchor="middle">B</text>
+    <rect x="72" y="150" width="76" height="9" rx="4.5" fill="#166534" />
+    <rect x="72" y="168" width="50" height="9" rx="4.5" fill="var(--logo-line, #3f3f46)" />
+</svg>

@@ -1,0 +1,795 @@
+<?php
+
+namespace App\Services\Dian;
+
+use App\Models\Company;
+use App\Models\DocumentoEmitido;
+use App\Models\Product;
+use App\Models\Resolution;
+use App\Models\StockMovement;
+use App\Models\ThirdParty;
+use DateTimeImmutable;
+use DateTimeZone;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
+use RuntimeException;
+use SimpleXMLElement;
+use ZipArchive;
+
+/**
+ * Punto de entrada único para emitir un documento electrónico (factura, nota
+ * crédito o nota débito): resuelve la numeración, arma y firma el XML UBL,
+ * lo envía a la DIAN, y guarda el resultado como un DocumentoEmitido. Tanto
+ * la web como la API usan este mismo servicio para no duplicar la lógica de
+ * facturación.
+ */
+class IssueDocumentService
+{
+    private const FACTURA_CODES = ['01', '02', '03', '04', '05'];
+    private const NOTA_CREDITO_CODE = '91';
+    private const NOTA_DEBITO_CODE = '92';
+
+    /**
+     * Códigos de la DIAN ("StatusCode") que indican que todavía no hay un
+     * resultado definitivo (ni aceptado ni rechazado): 98 = "Intente más
+     * tarde" (SendBillSync, procesando), 66 = "TrackId no existe en los
+     * registros de la DIAN" (GetStatus, aún no indexado del lado de ellos).
+     */
+    private const PENDING_STATUS_CODES = ['98', '66'];
+
+    /**
+     * Fragmento del ErrorMessage de la DIAN que marca la "Regla: 90": el
+     * documento ya fue procesado antes (no es un rechazo real del contenido,
+     * solo indica que ya existe una versión autorizada del lado de la DIAN).
+     */
+    private const ALREADY_PROCESSED_RULE = 'Regla: 90';
+
+    public function __construct(
+        private DocumentJsonMapper $mapper,
+        private UblDocumentBuilder $builder,
+        private UblDocumentSigner $signer,
+        private DianSoapClient $client,
+    ) {
+    }
+
+    /**
+     * Arma, firma y envía un documento a la DIAN, y guarda el resultado. Si ya existe un
+     * documento con el mismo emisor + tipo + numeral + ambiente: si quedó aceptado, no se
+     * vuelve a procesar (se devuelve tal cual, ya está autorizado); si quedó rechazado (o
+     * en error/pendiente), se reconstruye con los datos nuevos y se actualiza ese mismo
+     * registro en vez de crear uno nuevo (puede que el cliente o los ítems hayan cambiado).
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $request  Cuerpo de la petición ({"tipo_documento": "...", "document": {...}}).
+     * @return DocumentoEmitido Documento guardado, con el resultado de la DIAN.
+     */
+    public function issue(Company $company, array $request): DocumentoEmitido
+    {
+        $payload = $this->mapper->map($company, $request);
+        $tipoDocumento = $payload['tipo_documento'];
+        $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+        $resolution = $this->resolveResolution($company, $tipoDocumento, $ambiente, $payload['prefix'] ?? null);
+        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.Numeral" o "document.secuencial" (junto con "document.PREFIX") con el número del documento.');
+
+        $existente = DocumentoEmitido::where('company_id', (string) $company->_id)
+            ->where('tipo_documento', $tipoDocumento)
+            ->where('numeral', $numeral)
+            ->where('ambiente', $ambiente)
+            ->first();
+
+        if ($existente && $existente->status === DocumentoEmitido::STATUS_ACCEPTED) {
+            return $existente;
+        }
+
+        $secuencial = $this->syncResolutionNumbering($resolution, $numeral);
+        $fechaEmision = $this->resolveIssueDateTime($payload);
+        $fechaVencimiento = $this->resolveDueDate($payload);
+
+        $buildPayload = $payload;
+        $buildPayload['number'] = $numeral;
+        $buildPayload['prefijo'] = $resolution->prefix;
+        $buildPayload['issue_date'] = $fechaEmision->format('Y-m-d');
+        $buildPayload['issue_time'] = $fechaEmision->format('H:i:sP');
+
+        if (in_array($tipoDocumento, self::FACTURA_CODES, true)) {
+            $buildPayload['clave_tecnica'] = $resolution->technical_key;
+            $buildPayload['resolucion'] = [
+                'numero' => $resolution->resolution_number,
+                'prefijo' => $resolution->prefix,
+                'rango_desde' => $resolution->range_from,
+                'rango_hasta' => $resolution->range_to,
+                'valido_desde' => $resolution->valid_from?->format('Y-m-d'),
+                'valido_hasta' => $resolution->valid_to?->format('Y-m-d'),
+            ];
+        } else {
+            $buildPayload['referencias'] = $this->resolveReferencias($company, $payload['referencias'] ?? []);
+        }
+
+        $unsignedXml = $this->builder->build($company, $buildPayload);
+        $signedXml = $this->signer->sign($company, $unsignedXml);
+        $parsedXml = $this->parseSignedXml($signedXml);
+        $uuid = (string) $parsedXml->UUID;
+        $totales = $this->extractTotals($parsedXml);
+
+        $this->syncProducts($company, $payload['lineas'] ?? []);
+
+        $documentoData = [
+            'company_id' => (string) $company->_id,
+            'tipo_documento' => $tipoDocumento,
+            'resolution_id' => (string) $resolution->_id,
+            'prefix' => $resolution->prefix,
+            'numeral' => $numeral,
+            'secuencial' => $secuencial,
+            'cliente_id' => $payload['cliente_id'] ?? null,
+            'payload' => $payload,
+            'xml' => $signedXml,
+            'uuid' => $uuid,
+            'status' => DocumentoEmitido::STATUS_PENDING,
+            'status_message' => null,
+            'response' => null,
+            'ambiente' => $ambiente,
+            'issue_date' => $fechaEmision,
+            'subtotal' => $totales['subtotal'],
+            'tax_total' => $totales['tax_total'],
+            'total' => $totales['total'],
+            'currency' => $payload['moneda'] ?? 'COP',
+            'payment_means_id' => $payload['payment_means']['id'] ?? null,
+            'payment_means_code' => $payload['payment_means']['codigo'] ?? null,
+            'referencias' => $buildPayload['referencias'] ?? null,
+            'notes' => $payload['notas'] ?? null,
+        ];
+
+        if ($fechaVencimiento) {
+            $documentoData['due_date'] = $fechaVencimiento;
+        }
+
+        if ($existente) {
+            $existente->update($documentoData);
+            $documento = $existente;
+        } else {
+            $documento = DocumentoEmitido::create($documentoData);
+        }
+
+        $fileName = $numeral . '.xml';
+        $zipContent = $this->zipXml($fileName, $signedXml);
+
+        try {
+            $results = $this->client->sendBillSync($company, $fileName, $zipContent);
+        } catch (RuntimeException $e) {
+            $documento->update([
+                'status' => DocumentoEmitido::STATUS_ERROR,
+                'status_message' => ['resumen' => $e->getMessage(), 'reglas' => []],
+            ]);
+
+            return $documento;
+        }
+
+        // Regla 90: la DIAN rechaza el reenvío porque este documento ya fue
+        // procesado antes -- no se reprocesa. Se consulta GetStatus con el
+        // XmlDocumentKey que trajo esta misma respuesta; si esa versión ya
+        // está vigente (autorizada), se trae el XML real con
+        // GetXmlByDocumentKey y el documento se sincroniza con eso (puede
+        // que acá tuviéramos otro cliente/ítems distintos a lo que la DIAN
+        // ya tiene). Si la consulta no confirma que esté vigente, se sigue
+        // el flujo normal de abajo con la respuesta original (rechazo).
+        if ($this->isAlreadyProcessedRule($results) && ! empty($results['xml_document_key'])) {
+            if ($this->syncWithAlreadyProcessedDocument($company, $documento, $results['xml_document_key'])) {
+                return $documento;
+            }
+        }
+
+        // Si SendBillSync ya dio un resultado definitivo (aceptado o
+        // rechazado, distinto de regla 90), esa ES la respuesta final -- no
+        // hace falta consultar nada más. Solo si quedó pendiente (98/66) se
+        // intenta GetStatus, por si ya tiene la respuesta lista; si tampoco
+        // la tiene o la consulta falla, se sigue con el resultado pendiente
+        // de SendBillSync.
+        if (in_array($results['status_code'] ?? null, self::PENDING_STATUS_CODES, true)) {
+            try {
+                $results = $this->client->getStatus($company, $uuid);
+            } catch (RuntimeException $e) {
+                // Se mantiene el resultado (pendiente) de SendBillSync.
+            }
+        }
+
+        $isPending = in_array($results['status_code'] ?? null, self::PENDING_STATUS_CODES, true);
+        $isValid = $results['is_valid'] ?? false;
+
+        $documento->update([
+            'status' => match (true) {
+                $isPending => DocumentoEmitido::STATUS_PENDING,
+                $isValid => DocumentoEmitido::STATUS_ACCEPTED,
+                default => DocumentoEmitido::STATUS_REJECTED,
+            },
+            'status_message' => $this->buildStatusMessage($results),
+            'response' => $results['response_xml'] ?? $results['raw_response'] ?? null,
+            'fecha_expedicion' => $isPending ? null : $this->resolveFechaExpedicion($results),
+        ]);
+
+        if (! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
+            $this->discountInventory($company, $payload['lineas'] ?? [], $numeral);
+        }
+
+        return $documento;
+    }
+
+    /**
+     * Detecta si la respuesta de la DIAN trae la "Regla: 90" (documento ya
+     * procesado antes) en su lista de mensajes de error.
+     *
+     * @param  array  $results  Resultado de DianSoapClient::sendBillSync().
+     * @return bool True si la DIAN marcó la regla 90.
+     */
+    private function isAlreadyProcessedRule(array $results): bool
+    {
+        foreach ($results['error_messages'] ?? [] as $errorMessage) {
+            if (str_contains($errorMessage, self::ALREADY_PROCESSED_RULE)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Sincroniza el documento con la versión que la DIAN ya tiene autorizada
+     * (regla 90): trae el XML real con GetXmlByDocumentKey usando el
+     * xml_document_key de la respuesta de SendBillSync, y reemplaza TODO el
+     * registro con eso (uuid, xml, totales, payload completo -- cliente,
+     * líneas, notas, medio de pago) -- sin volver a firmar ni reenviar nada.
+     * Es la versión que quedó autorizada del lado de la DIAN, no
+     * necesariamente la que armamos localmente con los datos de esta petición.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  DocumentoEmitido  $documento  Documento a sincronizar.
+     * @param  string  $xmlDocumentKey  xml_document_key de la respuesta de SendBillSync.
+     * @return bool True si se pudo traer el XML y sincronizar; false si hay que seguir el flujo normal.
+     */
+    private function syncWithAlreadyProcessedDocument(Company $company, DocumentoEmitido $documento, string $xmlDocumentKey): bool
+    {
+        try {
+            $xmlInfo = $this->client->getXmlByDocumentKey($company, $xmlDocumentKey);
+        } catch (RuntimeException $e) {
+            Log::warning('GetXmlByDocumentKey falló al sincronizar un documento con regla 90.', [
+                'company_id' => (string) $company->_id,
+                'xml_document_key' => $xmlDocumentKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        if (empty($xmlInfo['response_xml'])) {
+            Log::warning('GetXmlByDocumentKey respondió sin XML al sincronizar un documento con regla 90.', [
+                'company_id' => (string) $company->_id,
+                'xml_document_key' => $xmlDocumentKey,
+                'xml_info' => $xmlInfo,
+            ]);
+
+            return false;
+        }
+
+        $parsedXml = $this->parseSignedXml($xmlInfo['response_xml']);
+        $totales = $this->extractTotals($parsedXml);
+        $dianPayload = $this->buildPayloadFromDianXml($parsedXml);
+        $clienteId = $this->resolveClienteIdFromDianPayload($company, $dianPayload['accounting_customer_party']);
+
+        // Los productos de las líneas reales de la DIAN se crean si no
+        // existen todavía (igual que el flujo normal); los que ya existen se
+        // dejan quietos. El stock NO se toca acá -- este documento ya estaba
+        // autorizado desde antes, así que ya se descontó (o no) en su
+        // momento; solo el flujo normal (sin regla 90) descuenta inventario.
+        $this->syncProducts($company, $dianPayload['lineas']);
+
+        $payload = $documento->payload ?? [];
+        $payload['moneda'] = $dianPayload['moneda'];
+        $payload['issue_date'] = $dianPayload['issue_date'];
+        $payload['issue_time'] = $dianPayload['issue_time'];
+        $payload['notas'] = $dianPayload['notas'];
+        $payload['accounting_customer_party'] = $dianPayload['accounting_customer_party'];
+        $payload['payment_means'] = $dianPayload['payment_means'];
+        $payload['lineas'] = $dianPayload['lineas'];
+        $payload['cliente_id'] = $clienteId;
+
+        // El XML del documento ya se trajo arriba (GetXmlByDocumentKey); el
+        // "response" (reglas de rechazo/notificación) se trae aparte con
+        // GetStatus -- si esa consulta falla, se arma un mensaje mínimo con
+        // lo poco que ya se sabe, sin tumbar la sincronización.
+        try {
+            $statusResults = $this->client->getStatus($company, $xmlDocumentKey);
+        } catch (RuntimeException $e) {
+            $statusResults = null;
+        }
+
+        $update = [
+            'status' => DocumentoEmitido::STATUS_ACCEPTED,
+            'status_message' => $statusResults
+                ? $this->buildStatusMessage($statusResults)
+                : ['resumen' => $xmlInfo['message'] ?? null, 'reglas' => []],
+            'response' => $statusResults
+                ? ($statusResults['response_xml'] ?? $statusResults['raw_response'] ?? null)
+                : null,
+            'fecha_expedicion' => $statusResults
+                ? $this->resolveFechaExpedicion($statusResults)
+                : new DateTimeImmutable('now', new DateTimeZone('America/Bogota')),
+            'xml' => $xmlInfo['response_xml'],
+            'uuid' => (string) $parsedXml->UUID,
+            'subtotal' => $totales['subtotal'],
+            'tax_total' => $totales['tax_total'],
+            'total' => $totales['total'],
+            'currency' => $dianPayload['moneda'],
+            'notes' => $dianPayload['notas'],
+            'payment_means_id' => $dianPayload['payment_means']['id'] ?? null,
+            'payment_means_code' => $dianPayload['payment_means']['codigo'] ?? null,
+            'payload' => $payload,
+            'cliente_id' => $clienteId,
+        ];
+
+        if ($dianPayload['issue_date']) {
+            $update['issue_date'] = new DateTimeImmutable(
+                $dianPayload['issue_date'] . ' ' . ($dianPayload['issue_time'] ?? '00:00:00'),
+                new DateTimeZone('America/Bogota')
+            );
+        }
+
+        if (! empty($dianPayload['payment_means']['fecha_vencimiento'])) {
+            $update['due_date'] = new DateTimeImmutable(
+                $dianPayload['payment_means']['fecha_vencimiento'],
+                new DateTimeZone('America/Bogota')
+            );
+        }
+
+        $documento->update($update);
+
+        return true;
+    }
+
+    /**
+     * Reconstruye el shape interno de "payload" (moneda, fechas, cliente, líneas,
+     * notas, medio de pago) a partir del XML real que la DIAN tiene autorizado,
+     * para sincronizar el documento con lo que quedó vigente del lado de ellos.
+     *
+     * @param  SimpleXMLElement  $xml  XML de la DIAN, parseado sin prefijos (ver parseSignedXml()).
+     * @return array Payload reconstruido, mismo shape que arma DocumentJsonMapper::map().
+     */
+    private function buildPayloadFromDianXml(SimpleXMLElement $xml): array
+    {
+        $customerParty = $xml->AccountingCustomerParty->Party ?? null;
+        $customerTaxScheme = $customerParty->PartyTaxScheme ?? null;
+        $customerAddress = $customerParty->PhysicalLocation->Address ?? null;
+
+        $accountingCustomerParty = [
+            'razon_social' => (string) ($customerParty->PartyName->Name ?? ''),
+            'tipo_identificacion' => (string) ($customerTaxScheme->CompanyID['schemeName'] ?? '31'),
+            'identificacion' => (string) ($customerTaxScheme->CompanyID ?? ''),
+            'dv' => (string) ($customerTaxScheme->CompanyID['schemeID'] ?? '') ?: null,
+            'tipo_persona' => (string) ($xml->AccountingCustomerParty->AdditionalAccountID ?? '') === '1' ? '1' : '2',
+            'responsabilidades_fiscales' => (string) ($customerTaxScheme->TaxLevelCode ?? ''),
+            'direccion' => (string) ($customerAddress->AddressLine->Line ?? ''),
+            'ciudad_codigo' => (string) ($customerAddress->ID ?? ''),
+            'departamento_codigo' => (string) ($customerAddress->CountrySubentityCode ?? ''),
+            'telefono' => (string) ($customerParty->Contact->Telephone ?? '') ?: null,
+            'email' => (string) ($customerParty->Contact->ElectronicMail ?? '') ?: null,
+        ];
+
+        $lineas = [];
+        foreach ($xml->InvoiceLine ?? $xml->CreditNoteLine ?? $xml->DebitNoteLine ?? [] as $line) {
+            $impuestos = [];
+            foreach ($line->TaxTotal->TaxSubtotal ?? [] as $subtotal) {
+                $impuestos[] = [
+                    'tipo' => (string) ($subtotal->TaxCategory->TaxScheme->ID ?? '01'),
+                    'nombre' => (string) ($subtotal->TaxCategory->TaxScheme->Name ?? '') ?: null,
+                    'porcentaje' => (float) ($subtotal->TaxCategory->Percent ?? 0),
+                ];
+            }
+
+            $quantityNode = $line->InvoicedQuantity ?? $line->CreditedQuantity ?? $line->DebitedQuantity ?? null;
+
+            $lineas[] = [
+                'codigo' => (string) ($line->Item->SellersItemIdentification->ID ?? '') ?: null,
+                'descripcion' => (string) ($line->Item->Description ?? ''),
+                'cantidad' => (float) ($quantityNode ?? 1),
+                'unidad_medida' => (string) ($quantityNode['unitCode'] ?? 'EA'),
+                'precio_unitario' => (float) ($line->Price->PriceAmount ?? 0),
+                'impuestos' => $impuestos,
+            ];
+        }
+
+        $paymentMeans = null;
+        if (isset($xml->PaymentMeans)) {
+            $paymentMeans = [
+                'id' => (string) ($xml->PaymentMeans->ID ?? '1'),
+                'codigo' => (string) ($xml->PaymentMeans->PaymentMeansCode ?? '10'),
+                'fecha_vencimiento' => (string) ($xml->PaymentMeans->PaymentDueDate ?? '') ?: null,
+                'payment_id' => (string) ($xml->PaymentMeans->PaymentID ?? '') ?: null,
+            ];
+        }
+
+        $notas = [];
+        foreach ($xml->Note ?? [] as $note) {
+            $notas[] = (string) $note;
+        }
+
+        return [
+            'moneda' => (string) ($xml->DocumentCurrencyCode ?? 'COP'),
+            'issue_date' => (string) ($xml->IssueDate ?? '') ?: null,
+            'issue_time' => (string) ($xml->IssueTime ?? '') ?: null,
+            'notas' => $notas,
+            'accounting_customer_party' => $accountingCustomerParty,
+            'payment_means' => $paymentMeans,
+            'lineas' => $lineas,
+        ];
+    }
+
+    /**
+     * Busca el tercero que corresponde al receptor real que quedó en el XML
+     * autorizado de la DIAN (por identificación + empresa); si no existe
+     * todavía, lo crea con los datos reales del XML (igual que hace
+     * DocumentJsonMapper con el flujo normal), para que quede vinculado como
+     * cliente aunque nunca se hubiera registrado antes.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $accountingCustomerParty  Datos del receptor reconstruidos del XML.
+     * @return string|null Id del tercero encontrado o creado, o null si el XML no traía identificación.
+     */
+    private function resolveClienteIdFromDianPayload(Company $company, array $accountingCustomerParty): ?string
+    {
+        if (empty($accountingCustomerParty['identificacion'])) {
+            return null;
+        }
+
+        $cliente = ThirdParty::where('company_id', (string) $company->_id)
+            ->where('identificacion', $accountingCustomerParty['identificacion'])
+            ->first();
+
+        if ($cliente) {
+            $roles = collect($cliente->roles ?? [])->push('cliente')->unique()->values()->all();
+            $cliente->update(['roles' => $roles]);
+
+            return (string) $cliente->_id;
+        }
+
+        $cliente = ThirdParty::create([
+            'company_id' => (string) $company->_id,
+            'identificacion' => $accountingCustomerParty['identificacion'],
+            'identification_type' => $accountingCustomerParty['tipo_identificacion'] ?? '31',
+            'dv' => $accountingCustomerParty['dv'] ?? null,
+            'person_type' => $accountingCustomerParty['tipo_persona'] ?? '2',
+            'name' => $accountingCustomerParty['razon_social'] ?? '',
+            'fiscal_responsibilities' => $accountingCustomerParty['responsabilidades_fiscales'] ?? null,
+            'address' => $accountingCustomerParty['direccion'] ?? null,
+            'city_code' => $accountingCustomerParty['ciudad_codigo'] ?? null,
+            'department_code' => $accountingCustomerParty['departamento_codigo'] ?? null,
+            'phone' => $accountingCustomerParty['telefono'] ?? null,
+            'email' => $accountingCustomerParty['email'] ?? null,
+            'roles' => ['cliente'],
+        ]);
+
+        return (string) $cliente->_id;
+    }
+
+    /**
+     * Busca la resolución activa de la empresa para el tipo de documento y ambiente indicados.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  string  $tipoDocumento  Código DIAN del tipo de documento.
+     * @param  string  $ambiente  Ambiente DIAN (1=producción, 2=pruebas).
+     * @param  string|null  $prefix  Prefijo para desambiguar si hay varias resoluciones activas.
+     * @return Resolution Resolución activa encontrada.
+     */
+    private function resolveResolution(Company $company, string $tipoDocumento, string $ambiente, ?string $prefix): Resolution
+    {
+        $documentTypes = in_array($tipoDocumento, self::FACTURA_CODES, true) ? self::FACTURA_CODES : [$tipoDocumento];
+
+        $query = Resolution::where('company_id', (string) $company->_id)
+            ->whereIn('document_type', $documentTypes)
+            ->where('environment', $ambiente)
+            ->active();
+
+        if ($prefix !== null) {
+            $query->where('prefix', $prefix);
+        }
+
+        $resolution = $query->get()->first(fn (Resolution $resolution) => ! $resolution->isExpired() && ! $resolution->isExhausted());
+
+        if (! $resolution) {
+            throw new InvalidArgumentException('No hay una resolución activa configurada para este tipo de documento y ambiente.');
+        }
+
+        return $resolution;
+    }
+
+    /**
+     * Valida que el número pedido por el caller esté dentro del rango autorizado de la
+     * resolución (si tiene rango acotado), y adelanta el contador interno de la
+     * resolución para que quede en sincronía con la numeración que ya controla el caller.
+     *
+     * @param  Resolution  $resolution  Resolución de la empresa para este tipo de documento.
+     * @param  string  $numeral  Número completo pedido por el caller (prefijo + consecutivo).
+     * @return string Consecutivo (solo la parte numérica) extraído del numeral.
+     */
+    private function syncResolutionNumbering(Resolution $resolution, string $numeral): string
+    {
+        $consecutivo = (int) preg_replace('/\D/', '', $numeral);
+
+        if ($resolution->range_to !== null && ($consecutivo < (int) $resolution->range_from || $consecutivo > (int) $resolution->range_to)) {
+            throw new InvalidArgumentException("El número \"{$numeral}\" está fuera del rango autorizado de la resolución ({$resolution->range_from}-{$resolution->range_to}).");
+        }
+
+        if ($consecutivo >= (int) $resolution->current_number) {
+            $resolution->update(['current_number' => $consecutivo + 1]);
+        }
+
+        return (string) $consecutivo;
+    }
+
+    /**
+     * Resuelve la fecha/hora de emisión: si el caller mandó "document.IssueDate"
+     * (y opcionalmente "document.IssueTime"), se combinan; si no mandó nada, se
+     * usa el momento en que se está procesando el documento. El mismo valor se
+     * usa tanto para el XML como para el DocumentoEmitido, para que ambos
+     * queden siempre en sincronía.
+     *
+     * @param  array  $payload  Payload ya mapeado por DocumentJsonMapper.
+     * @return DateTimeImmutable Fecha/hora de emisión resuelta (zona Bogotá).
+     */
+    private function resolveIssueDateTime(array $payload): DateTimeImmutable
+    {
+        if (empty($payload['issue_date'])) {
+            return new DateTimeImmutable('now', new DateTimeZone('America/Bogota'));
+        }
+
+        $time = $payload['issue_time'] ?? '00:00:00';
+
+        return new DateTimeImmutable($payload['issue_date'] . ' ' . $time, new DateTimeZone('America/Bogota'));
+    }
+
+    /**
+     * Resuelve la fecha de vencimiento ("DueDate"): si el caller no la manda directo,
+     * se toma de "PaymentMeans[0].PaymentDueDate" (ya mapeada por DocumentJsonMapper); si
+     * no viene en ninguno de los dos, el campo simplemente no se guarda.
+     *
+     * @param  array  $payload  Payload ya mapeado por DocumentJsonMapper.
+     * @return DateTimeImmutable|null Fecha de vencimiento resuelta (zona Bogotá), o null si no vino.
+     */
+    private function resolveDueDate(array $payload): ?DateTimeImmutable
+    {
+        if (empty($payload['fecha_vencimiento'])) {
+            return null;
+        }
+
+        return new DateTimeImmutable($payload['fecha_vencimiento'], new DateTimeZone('America/Bogota'));
+    }
+
+    /**
+     * Completa los datos de referencia a la factura original de una nota (UUID, fecha),
+     * buscándolos en nuestros propios documentos emitidos si solo se indicó "factura_id".
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $referencias  Datos de referencia enviados en el payload.
+     * @return array Datos de referencia completos.
+     */
+    private function resolveReferencias(Company $company, array $referencias): array
+    {
+        if (empty($referencias['factura_id']) || ! empty($referencias['factura_cufe'])) {
+            return $referencias;
+        }
+
+        $factura = DocumentoEmitido::where('company_id', (string) $company->_id)
+            ->where('numeral', $referencias['factura_id'])
+            ->whereIn('tipo_documento', self::FACTURA_CODES)
+            ->first();
+
+        if (! $factura) {
+            throw new InvalidArgumentException("No se encontró la factura \"{$referencias['factura_id']}\" para referenciar en la nota.");
+        }
+
+        $referencias['factura_cufe'] = $factura->uuid;
+        $referencias['factura_fecha'] ??= $factura->issue_date?->setTimezone('America/Bogota')->format('Y-m-d');
+
+        return $referencias;
+    }
+
+    /**
+     * Arma el mensaje DIAN que se guarda en "status_message": el resumen
+     * (StatusMessage/StatusDescription) más el detalle de reglas que la DIAN
+     * haya devuelto (ErrorMessage) -- tanto si el documento fue rechazado
+     * (reglas de rechazo) como si fue aceptado con observaciones (reglas de
+     * notificación), para poder mostrarlo tal cual en documents.show.
+     *
+     * @param  array  $results  Resultado de DianSoapClient::sendBillSync().
+     * @return array{resumen: string|null, reglas: array} Mensaje DIAN estructurado.
+     */
+    private function buildStatusMessage(array $results): array
+    {
+        return [
+            'resumen' => $results['status_message'] ?: ($results['status_description'] ?? null),
+            'reglas' => $results['error_messages'] ?? [],
+        ];
+    }
+
+    /**
+     * Resuelve la fecha real en que la DIAN expidió el documento: se lee del
+     * IssueDate/IssueTime del ApplicationResponse que trae GetStatus (el
+     * response_xml), que es la fecha oficial de expedición; si no se pudo
+     * leer, se usa el momento en que se está procesando la respuesta.
+     *
+     * @param  array  $results  Resultado de DianSoapClient::getStatus() (o sendBillSync() si esa consulta falló).
+     * @return DateTimeImmutable Fecha de expedición resuelta (zona Bogotá).
+     */
+    private function resolveFechaExpedicion(array $results): DateTimeImmutable
+    {
+        if (! empty($results['response_xml'])) {
+            try {
+                $applicationResponse = $this->parseSignedXml($results['response_xml']);
+                $issueDate = (string) ($applicationResponse->IssueDate ?? '');
+                $issueTime = (string) ($applicationResponse->IssueTime ?? '00:00:00');
+
+                if ($issueDate !== '') {
+                    return new DateTimeImmutable($issueDate . ' ' . $issueTime, new DateTimeZone('America/Bogota'));
+                }
+            } catch (\Exception $e) {
+                // Se cae al valor por defecto de abajo.
+            }
+        }
+
+        return new DateTimeImmutable('now', new DateTimeZone('America/Bogota'));
+    }
+
+    /**
+     * Parsea un XML UBL ya firmado sin prefijos de namespace, para poder leer
+     * sus nodos (UUID, totales) por nombre simple.
+     *
+     * @param  string  $signedXml  XML UBL firmado.
+     * @return SimpleXMLElement Documento parseado sin prefijos.
+     */
+    private function parseSignedXml(string $signedXml): SimpleXMLElement
+    {
+        $withoutPrefixes = preg_replace('/(<\/?)[a-zA-Z0-9]+:/', '$1', $signedXml);
+
+        return new SimpleXMLElement($withoutPrefixes);
+    }
+
+    /**
+     * Lee los totales del documento (LegalMonetaryTotal o RequestedMonetaryTotal,
+     * más la suma de los TaxTotal a nivel de documento) para guardarlos junto
+     * al DocumentoEmitido.
+     *
+     * @param  SimpleXMLElement  $xml  Documento UBL parseado sin prefijos (ver parseSignedXml()).
+     * @return array{subtotal: float, tax_total: float, total: float} Totales del documento.
+     */
+    private function extractTotals(SimpleXMLElement $xml): array
+    {
+        $monetaryTotal = $xml->LegalMonetaryTotal ?? $xml->RequestedMonetaryTotal ?? null;
+
+        $taxTotal = 0.0;
+        foreach ($xml->TaxTotal as $documentTaxTotal) {
+            $taxTotal += (float) $documentTaxTotal->TaxAmount;
+        }
+
+        return [
+            'subtotal' => (float) ($monetaryTotal->LineExtensionAmount ?? 0),
+            'tax_total' => $taxTotal,
+            'total' => (float) ($monetaryTotal->PayableAmount ?? 0),
+        ];
+    }
+
+    /**
+     * Crea en el catálogo de productos de la empresa los que vengan en las
+     * líneas del documento y todavía no existan (buscados por "code"), sin
+     * duplicar los que ya están. No toca precio/nombre de los que ya existen:
+     * el catálogo lo sigue administrando la empresa desde su propia pantalla.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $lineas  Líneas del documento (shape interno de UblDocumentBuilder).
+     */
+    private function syncProducts(Company $company, array $lineas): void
+    {
+        foreach ($lineas as $linea) {
+            $codigo = $linea['codigo'] ?? null;
+
+            if (! $codigo) {
+                continue;
+            }
+
+            Product::firstOrCreate(
+                ['company_id' => (string) $company->_id, 'code' => $codigo],
+                [
+                    'description' => $linea['descripcion'] ?? $codigo,
+                    'barcode' => $linea['codigo_barras'] ?? null,
+                    'unit_price' => $linea['precio_unitario'] ?? 0,
+                    'unit_code' => $linea['unidad_medida'] ?? 'EA',
+                    'tracks_inventory' => false,
+                    'stock' => 0,
+                    'warehouse_stocks' => [],
+                    'status' => 'active',
+                ]
+            );
+        }
+    }
+
+    /**
+     * Descuenta del inventario los productos de las líneas que manejen
+     * inventario (tracks_inventory), y registra el movimiento en el kardex.
+     * Solo se llama una vez que la DIAN aceptó el documento.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $lineas  Líneas del documento (shape interno de UblDocumentBuilder).
+     * @param  string  $numeral  Número del documento, para el motivo del movimiento.
+     */
+    private function discountInventory(Company $company, array $lineas, string $numeral): void
+    {
+        foreach ($lineas as $linea) {
+            $codigo = $linea['codigo'] ?? null;
+
+            if (! $codigo) {
+                continue;
+            }
+
+            $product = Product::where('company_id', (string) $company->_id)->where('code', $codigo)->first();
+
+            if (! $product || ! $product->tracks_inventory) {
+                continue;
+            }
+
+            $cantidad = (float) ($linea['cantidad'] ?? 0);
+            $stocks = $product->warehouse_stocks ?? [];
+            $warehouseId = $linea['bodega_id'] ?? null;
+            $balanceAfter = null;
+
+            if ($warehouseId) {
+                // Bodega elegida en el documento: se descuenta solo de esa
+                // entrada, no de "la primera que haya" (eso era un parche
+                // temporal mientras no existía esta selección en la UI).
+                foreach ($stocks as &$entry) {
+                    if (($entry['warehouse_id'] ?? null) === $warehouseId) {
+                        $entry['stock'] = (float) ($entry['stock'] ?? 0) - $cantidad;
+                        $balanceAfter = $entry['stock'];
+
+                        break;
+                    }
+                }
+                unset($entry);
+                $product->warehouse_stocks = $stocks;
+            }
+
+            $product->stock = (float) $product->stock - $cantidad;
+            $product->save();
+
+            StockMovement::create([
+                'company_id' => (string) $company->_id,
+                'product_id' => (string) $product->_id,
+                // Sin bodega elegida: se descuenta del total sin tocar
+                // ninguna bodega puntual, y el saldo del kardex es el
+                // "sin asignar" que queda (no una bodega específica).
+                'warehouse_id' => $warehouseId,
+                'type' => 'out',
+                'quantity' => $cantidad,
+                'balance_after' => $warehouseId ? $balanceAfter : $product->unassigned_stock,
+                'reason' => 'document:' . $numeral,
+            ]);
+        }
+    }
+
+    /**
+     * Comprime un XML en memoria a un .zip, tal como lo espera SendBillSync.
+     *
+     * @param  string  $fileName  Nombre del archivo XML dentro del zip.
+     * @param  string  $xmlContent  Contenido del XML.
+     * @return string Contenido binario del .zip.
+     */
+    private function zipXml(string $fileName, string $xmlContent): string
+    {
+        $tmpPath = tempnam(sys_get_temp_dir(), 'dian_doc_');
+
+        $zip = new ZipArchive();
+        $zip->open($tmpPath, ZipArchive::OVERWRITE);
+        $zip->addFromString($fileName, $xmlContent);
+        $zip->close();
+
+        $content = file_get_contents($tmpPath);
+        unlink($tmpPath);
+
+        return $content;
+    }
+}

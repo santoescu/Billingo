@@ -1,0 +1,35 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "dependencies": {
+        "@preline/accordion": "^4.2.0",
+        "@preline/copy-markup": "^4.2.0",
+        "@preline/dropdown": "^4.2.0",
+        "@preline/file-upload": "^4.2.0",
+        "@preline/input-number": "^4.2.0",
+        "@preline/overlay": "^4.2.0",
+        "@preline/select": "^4.2.0",
+        "@preline/tabs": "^4.2.0",
+        "@tailwindcss/vite": "^4.0.7",
+        "autoprefixer": "^10.4.20",
+        "axios": "^1.7.4",
+        "concurrently": "^9.0.1",
+        "datatables.net-dt": "^2.3.8",
+        "dropzone": "^6.0.0-beta.2",
+        "jquery": "^4.0.0",
+        "laravel-vite-plugin": "^1.0",
+        "lodash": "^4.18.1",
+        "preline": "^4.2.0",
+        "tailwindcss": "^4.0.7",
+        "vite": "^6.0"
+    },
+    "optionalDependencies": {
+        "@rollup/rollup-linux-x64-gnu": "4.9.5",
+        "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
+        "lightningcss-linux-x64-gnu": "^1.29.1"
+    }
+}
