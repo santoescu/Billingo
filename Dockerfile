@@ -1,20 +1,6 @@
 # Imagen base PHP 8.2
 ###############################################
-# STAGE 1: Construcción de assets con Node
-###############################################
-FROM node:18 AS build-assets
-
-WORKDIR /app
-
-COPY package.json package-lock.json vite.config.js ./
-COPY resources ./resources
-
-RUN npm install
-
-
-
-###############################################
-# STAGE 2: Imagen PHP + Laravel
+# Imagen PHP + Laravel
 ###############################################
 FROM php:8.2-cli
 
@@ -52,9 +38,6 @@ WORKDIR /var/www/html
 # Copiar archivos del proyecto
 # Copiar resto del proyecto
 COPY . .
-
-# Copiar assets construidos desde el Stage 1
-COPY --from=build-assets /app/public/build ./public/build
 
 # Instalar dependencias de Laravel
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader
