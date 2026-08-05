@@ -12,16 +12,32 @@
             ->implode(', ');
     };
 
-    // Todos los precios de cada producto, para el modal "Ver precios" -- los
-    // tipos de precio sin valor en un producto muestran "-".
+    // Precios de cada producto, para el modal "Ver precios" -- solo los
+    // tipos de precio que sí tienen un valor asignado en ese producto.
     $productPricesMap = $products->mapWithKeys(function ($product) use ($priceTypesById) {
         $extraByType = collect($product->extra_prices ?? [])->keyBy('price_type_id');
 
         $rows = $priceTypesById->map(function ($priceType) use ($extraByType) {
             $entry = $extraByType->get((string) $priceType->_id);
 
-            return ['name' => $priceType->name, 'price' => $entry ? (float) $entry['price'] : null];
-        })->values();
+            return $entry ? ['name' => $priceType->name, 'price' => (float) $entry['price']] : null;
+        })->filter()->values();
+
+        return [(string) $product->_id => $rows];
+    });
+
+    // Bodegas de cada producto, para el modal "Ver bodegas" -- mismo
+    // criterio que $productPricesMap: solo las bodegas donde el producto
+    // sí tiene stock asignado (nada de mostrar todas las bodegas con "-").
+    $productWarehousesMap = $products->mapWithKeys(function ($product) use ($warehousesById) {
+        $rows = collect($product->warehouse_stocks ?? [])
+            ->map(function ($entry) use ($warehousesById) {
+                $warehouse = $warehousesById->get($entry['warehouse_id'] ?? null);
+
+                return $warehouse ? ['name' => $warehouse->name, 'stock' => (float) $entry['stock']] : null;
+            })
+            ->filter()
+            ->values();
 
         return [(string) $product->_id => $rows];
     });
@@ -125,6 +141,11 @@
                                         </td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
                                             {{ $warehouseNamesFor($product) ?: '—' }}
+                                            @if ($product->tracks_inventory)
+                                                <button type="button" class="block text-xs text-accent hover:underline" onclick="showProductWarehouses('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
+                                                    {{ __('View all warehouses') }}
+                                                </button>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-4 text-right">
                                             <div class="flex justify-end gap-1">
@@ -280,6 +301,25 @@
         </div>
     </div>
 
+    <!-- Modal: bodegas de un producto -->
+    <div id="product-warehouses-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-warehouses-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-md sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="product-warehouses-modal-label" class="font-bold text-gray-800 dark:text-white"></h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#product-warehouses-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="product-warehouses-modal-body" class="p-4 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Panel deslizante único: agregar/editar tipo de precio -->
     <div id="price-type-panel" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-md w-full z-80 bg-white border-e border-gray-200 dark:bg-neutral-800 dark:border-neutral-700" role="dialog" tabindex="-1" aria-labelledby="price-type-panel-label">
         <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
@@ -325,6 +365,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Modal: importar productos desde Excel -->
     <div id="product-import-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-import-modal-label">
@@ -655,6 +696,7 @@
                 const basicSelectConfigJson = @json($basicSelectConfig);
                 const searchableSelectConfigJson = @json($searchableSelectConfig);
                 const productPricesMap = @json($productPricesMap);
+                const productWarehousesMap = @json($productWarehousesMap);
                 const inventoryTabs = ['products', 'warehouses', 'price-types'];
 
                 window.showInventoryTab = function (tab) {
@@ -736,6 +778,10 @@
                         HSOverlay.open('#warehouse-products-modal');
                     }
                 };
+
+                function formatMoneyCop(value) {
+                    return '$' + Number(value ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
 
                 let warehouseStockLineIndex = 0;
 
@@ -982,7 +1028,7 @@
 
                     const body = document.getElementById('product-prices-modal-body');
                     if (rows.length === 0) {
-                        body.innerHTML = `<p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('No price types have been created yet.') }}</p>`;
+                        body.innerHTML = `<p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('This product has no price types assigned yet.') }}</p>`;
                     } else {
                         body.innerHTML = `
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
@@ -990,7 +1036,7 @@
                                     ${rows.map((row) => `
                                         <tr>
                                             <td class="px-3 py-2 text-sm text-gray-800 dark:text-neutral-200">${escapeHtml(row.name)}</td>
-                                            <td class="px-3 py-2 text-sm text-end text-gray-600 dark:text-neutral-400">${row.price === null ? '—' : '$' + row.price.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            <td class="px-3 py-2 text-sm text-end text-gray-600 dark:text-neutral-400">${formatMoneyCop(row.price)}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -1001,6 +1047,35 @@
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
                         HSOverlay.open('#product-prices-modal');
+                    }
+                };
+
+                window.showProductWarehouses = function (productId, productName) {
+                    const rows = productWarehousesMap[productId] || [];
+
+                    document.getElementById('product-warehouses-modal-label').textContent = productName;
+
+                    const body = document.getElementById('product-warehouses-modal-body');
+                    if (rows.length === 0) {
+                        body.innerHTML = `<p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('This product has no stock in any warehouse yet.') }}</p>`;
+                    } else {
+                        body.innerHTML = `
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                                    ${rows.map((row) => `
+                                        <tr>
+                                            <td class="px-3 py-2 text-sm text-gray-800 dark:text-neutral-200">${escapeHtml(row.name)}</td>
+                                            <td class="px-3 py-2 text-sm text-end text-gray-600 dark:text-neutral-400">${row.stock}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#product-warehouses-modal');
                     }
                 };
 
