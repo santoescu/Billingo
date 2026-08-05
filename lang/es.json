@@ -862,7 +862,7 @@
     "Switch to \"without reference\"": "Cambiar a \"sin referencia\"",
     "Search existing client": "Buscar cliente existente",
     "Search by name or identification": "Busca por nombre o identificación",
-    "No client found with that name. Fill in the fields below to create a new one.": "No se encontró ningún cliente con ese nombre. Llena los campos de abajo para crear uno nuevo.",
+    "No client found with that name. Fill in the fields below to create a new one.": "No se encontró ningún cliente con ese nombre, Llena los campos de abajo para crear uno nuevo.",
     "Document issued and accepted by the DIAN.": "Documento emitido y aceptado por la DIAN.",
     "The document was sent, but the DIAN did not accept it yet. Check the details.": "El documento fue enviado, pero la DIAN aún no lo ha aceptado. Revisa los detalles.",
     "Could not issue the document.": "No se pudo emitir el documento.",
