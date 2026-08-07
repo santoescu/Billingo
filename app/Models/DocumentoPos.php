@@ -1,0 +1,118 @@
+<?php
+
+namespace App\Models;
+
+use MongoDB\Laravel\Eloquent\Model;
+
+/**
+ * Una venta del POS: colección totalmente separada de "documentos_emitidos"
+ * (esa es solo para documentos electrónicos reales que la DIAN autorizó).
+ * Toda venta del POS crea SIEMPRE una fila acá, numerada con la resolución
+ * "FV" (talonario) elegida al abrir el turno (ver CashShift). Si además el
+ * cajero marcó "emitir factura electrónica" para esa venta puntual, se crea
+ * TAMBIÉN un DocumentoEmitido real (numerado con la resolución electrónica
+ * del turno) y se enlaza acá vía "documento_emitido_id" -- así la venta
+ * queda visible tanto en el listado del POS como en el de facturación
+ * electrónica, para poder comparar cuánto se vendió por cada canal.
+ */
+class DocumentoPos extends Model
+{
+    protected $connection = 'mongodb';
+    protected $table = 'documentos_pos';
+
+    protected $fillable = [
+        'company_id',
+        'shift_id',
+        'resolution_id',
+        'prefix',
+        'numeral',
+        'secuencial',
+        'cliente_id',
+        'payload',
+        'issue_date',
+        'subtotal',
+        'tax_total',
+        'total',
+        'currency',
+        'payment_means_id',
+        'payment_means_code',
+        // Medio de pago propio de la empresa que eligió el cajero (ver
+        // PaymentMethod), denormalizado por si luego se renombra o se borra
+        // el catálogo -- "payment_means_code" arriba queda con el código
+        // DIAN equivalente (si tenía uno mapeado) para efectos de caja/XML.
+        'payment_method_id',
+        'payment_method_name',
+        'notes',
+        'documento_emitido_id',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'payload' => 'array',
+            'issue_date' => 'datetime',
+        ];
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function cliente()
+    {
+        return $this->belongsTo(ThirdParty::class, 'cliente_id');
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(CashShift::class, 'shift_id');
+    }
+
+    public function resolution()
+    {
+        return $this->belongsTo(Resolution::class);
+    }
+
+    public function documentoEmitido()
+    {
+        return $this->belongsTo(DocumentoEmitido::class, 'documento_emitido_id');
+    }
+
+    public function getTotalFormattedAttribute()
+    {
+        return '$' . number_format((float) $this->total, 2, '.', ',');
+    }
+
+    public function getIsElectronicAttribute(): bool
+    {
+        return (bool) $this->documento_emitido_id;
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        if (! $this->documento_emitido_id) {
+            return __('Sales invoice');
+        }
+
+        return match ($this->documentoEmitido?->status) {
+            DocumentoEmitido::STATUS_ACCEPTED => __('Accepted'),
+            DocumentoEmitido::STATUS_REJECTED => __('Rejected'),
+            DocumentoEmitido::STATUS_ERROR => __('Error'),
+            default => __('Pending'),
+        };
+    }
+
+    public function getStatusBadgeClassesAttribute(): string
+    {
+        if (! $this->documento_emitido_id) {
+            return 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300';
+        }
+
+        return match ($this->documentoEmitido?->status) {
+            DocumentoEmitido::STATUS_ACCEPTED => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+            DocumentoEmitido::STATUS_REJECTED, DocumentoEmitido::STATUS_ERROR => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+            default => 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
+        };
+    }
+}

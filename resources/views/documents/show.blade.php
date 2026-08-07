@@ -1,6 +1,6 @@
 @php
     $documentTypeLabels = [
-        '01' => __('Invoice'),
+        '01' => __('Electronic sales invoice'),
         '02' => __('Invoice (export)'),
         '03' => __('Invoice (contingency, paper)'),
         '04' => __('Invoice (DIAN contingency)'),

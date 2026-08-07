@@ -3,6 +3,8 @@
     // (para el owner son todos los módulos activos de la empresa; para
     // los demás, solo aquellos donde tiene un rol asignado).
     $myModules = session('selected_company.modules', []);
+    $hasInvoicing = array_key_exists('invoicing', $myModules);
+    $hasPos = array_key_exists('pos', $myModules);
 
     $sections = [
         // Rutas globales, sin sección/etiqueta.
@@ -19,33 +21,43 @@
         ],
 
         // Módulo de emisión de documentos (facturación): solo si la empresa
-        // activa lo tiene contratado y el usuario tiene acceso.
+        // activa lo tiene contratado y el usuario tiene acceso. Clientes,
+        // inventario y resoluciones NO van acá -- los comparten facturación
+        // electrónica y POS por igual (ver sección "Company" más abajo).
         [
             'label' => __('Document issuance'),
-            'items' => array_key_exists('invoicing', $myModules) ? [
-                [
-                    'name' => __('Clients'),
-                    'icon' => 'user-group',
-                    'url' => route('clients.index'),
-                    'current' => request()->routeIs('clients.*'),
-                ],
-                [
-                    'name' => __('Inventory'),
-                    'icon' => 'cube',
-                    'url' => route('products.index'),
-                    'current' => request()->routeIs('products.*') || request()->routeIs('warehouses.*'),
-                ],
-                [
-                    'name' => __('Resolutions'),
-                    'icon' => 'document-check',
-                    'url' => route('dian.resolutions.index'),
-                    'current' => request()->routeIs('dian.resolutions.*'),
-                ],
+            'items' => $hasInvoicing ? [
                 [
                     'name' => __('Issued documents'),
                     'icon' => 'document-text',
                     'url' => route('documents.index'),
                     'current' => request()->routeIs('documents.*'),
+                ],
+            ] : [],
+        ],
+
+        // Módulo de punto de venta (POS): solo si está contratado y el
+        // usuario tiene acceso.
+        [
+            'label' => __('Point of sale'),
+            'items' => array_key_exists('pos', $myModules) ? [
+                [
+                    'name' => __('Sell'),
+                    'icon' => 'shopping-cart',
+                    'url' => route('pos.create'),
+                    'current' => request()->routeIs('pos.create') || request()->routeIs('pos.checkout'),
+                ],
+                [
+                    'name' => __('Sales'),
+                    'icon' => 'receipt-percent',
+                    'url' => route('pos.sales.index'),
+                    'current' => request()->routeIs('pos.sales.*'),
+                ],
+                [
+                    'name' => __('Payment methods'),
+                    'icon' => 'credit-card',
+                    'url' => route('pos.payment-methods.index'),
+                    'current' => request()->routeIs('pos.payment-methods.*'),
                 ],
             ] : [],
         ],
@@ -72,17 +84,40 @@
             ] : [],
         ],
 
-        // Administración de la empresa activa (no depende de ningún módulo).
+        // Administración de la empresa activa (no depende de ningún módulo
+        // en sí). Clientes, inventario y resoluciones sí dependen de que la
+        // empresa tenga facturación electrónica O POS (uno de los dos, o
+        // ambos) -- los usa cualquiera de los dos, así que no van atadas a
+        // un solo módulo; si la empresa solo tiene otro módulo (nómina,
+        // recepción...) no aparecen.
         [
             'label' => __('Company'),
-            'items' => session('selected_company') ? [
+            'items' => session('selected_company') ? array_values(array_filter([
+                ($hasInvoicing || $hasPos) ? [
+                    'name' => __('Clients'),
+                    'icon' => 'user-group',
+                    'url' => route('clients.index'),
+                    'current' => request()->routeIs('clients.*'),
+                ] : null,
+                ($hasInvoicing || $hasPos) ? [
+                    'name' => __('Inventory'),
+                    'icon' => 'cube',
+                    'url' => route('products.index'),
+                    'current' => request()->routeIs('products.*') || request()->routeIs('warehouses.*'),
+                ] : null,
+                ($hasInvoicing || $hasPos) ? [
+                    'name' => __('Resolutions'),
+                    'icon' => 'document-check',
+                    'url' => route('dian.resolutions.index'),
+                    'current' => request()->routeIs('dian.resolutions.*'),
+                ] : null,
                 [
                     'name' => __('Members'),
                     'icon' => 'users',
                     'url' => route('companies.members.index'),
                     'current' => request()->routeIs('companies.members.*'),
                 ],
-            ] : [],
+            ])) : [],
         ],
 
         // Administración global del sistema: solo superadmins.

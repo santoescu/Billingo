@@ -48,6 +48,7 @@ class ThirdPartyController extends Controller
         if ($existing) {
             $roles = collect($existing->roles ?? [])->push($role)->unique()->values()->all();
             $existing->update(['roles' => $roles]);
+            $thirdParty = $existing;
 
             session()->flash('toast', [
                 'type' => 'success',
@@ -57,7 +58,7 @@ class ThirdPartyController extends Controller
             $data['company_id'] = (string) $company->_id;
             $data['roles'] = [$role];
 
-            ThirdParty::create($data);
+            $thirdParty = ThirdParty::create($data);
 
             session()->flash('toast', [
                 'type' => 'success',
@@ -65,7 +66,37 @@ class ThirdPartyController extends Controller
             ]);
         }
 
+        // El modal de crear cliente del POS (pos/sell.blade.php) manda esta
+        // misma petición por fetch para no salir de la pantalla de venta --
+        // le devolvemos el tercero creado/existente en vez de redirigir.
+        if ($request->wantsJson()) {
+            return response()->json(['client' => $this->mapThirdPartyForJs($thirdParty)]);
+        }
+
         return redirect()->route($this->routeName($role, 'index'));
+    }
+
+    /**
+     * Mismo shape que DocumentoEmitidoController::mapClientForJs(), para que
+     * el JS de selección de cliente (compartido entre el formulario de
+     * documentos y la pantalla de venta del POS) reciba siempre la misma
+     * estructura sin importar si vino de una búsqueda o de crear uno nuevo.
+     */
+    private function mapThirdPartyForJs(ThirdParty $thirdParty): array
+    {
+        return [
+            'id' => (string) $thirdParty->_id,
+            'identification_type' => $thirdParty->identification_type,
+            'identificacion' => $thirdParty->identificacion,
+            'name' => $thirdParty->name,
+            'person_type' => $thirdParty->person_type,
+            'fiscal_responsibilities' => $thirdParty->fiscal_responsibilities,
+            'address' => $thirdParty->address,
+            'department_code' => $thirdParty->department_code,
+            'city_code' => $thirdParty->city_code,
+            'phone' => $thirdParty->phone,
+            'email' => $thirdParty->email,
+        ];
     }
 
     public function update(Request $request, string $thirdParty)

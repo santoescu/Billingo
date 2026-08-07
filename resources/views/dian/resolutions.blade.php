@@ -7,15 +7,21 @@
     // (nacional, exportación...), así que el 01 se muestra genérico como
     // "Factura" en vez de atarlo a un subtipo específico.
     $documentTypeLabels = [
-        '01' => __('Invoice'),
+        '01' => __('Electronic sales invoice'),
         '02' => __('Invoice (export)'),
         '03' => __('Invoice (contingency, paper)'),
         '04' => __('Invoice (DIAN contingency)'),
         '91' => __('Credit note'),
         '92' => __('Debit note'),
+        'FV' => __('Sales invoice'),
     ];
 
     $basicSelectConfig = \App\Support\SelectConfig::basic();
+
+    // La sincronización con la DIAN solo aplica a facturación electrónica;
+    // una empresa que solo tenga POS únicamente usa prefijos manuales
+    // (Factura de venta), no rangos autorizados por la DIAN.
+    $hasInvoicing = array_key_exists('invoicing', session('selected_company.modules', []));
 @endphp
 
 <x-layouts.app :title="__('Resolutions')">
@@ -36,14 +42,16 @@
                 <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
                     <div class="py-3 px-4 flex justify-end items-center gap-3">
                         <flux:button type="button" variant="filled" icon="plus" data-hs-overlay="#note-numbering-modal">
-                            {{ __('Add note prefixes') }}
+                            {{ __('Add prefixes') }}
                         </flux:button>
-                        <form method="POST" action="{{ route('dian.resolutions.sync') }}">
-                            @csrf
-                            <flux:button type="submit" variant="primary" icon="arrow-path" :disabled="! $dianConfigured">
-                                {{ __('Sync from DIAN') }}
-                            </flux:button>
-                        </form>
+                        @if ($hasInvoicing)
+                            <form method="POST" action="{{ route('dian.resolutions.sync') }}">
+                                @csrf
+                                <flux:button type="submit" variant="primary" icon="arrow-path" :disabled="! $dianConfigured">
+                                    {{ __('Sync from DIAN') }}
+                                </flux:button>
+                            </form>
+                        @endif
                     </div>
 
                     <div class="overflow-hidden">
@@ -119,7 +127,7 @@
 
     <div id="note-numbering-modal" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-lg w-full z-80 bg-white border-s border-gray-200 dark:bg-neutral-800 dark:border-neutral-700" role="dialog" tabindex="-1" aria-labelledby="note-numbering-modal-label">
         <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
-            <h3 id="note-numbering-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Add note prefixes') }}</h3>
+            <h3 id="note-numbering-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Add prefixes') }}</h3>
             <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#note-numbering-modal">
                 <span class="sr-only">Close</span>
                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -129,12 +137,13 @@
             </button>
         </div>
         <div class="overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-            <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('The DIAN does not authorize numbering ranges for credit/debit notes: define your own prefix and starting number.') }}</p>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('The DIAN does not authorize numbering ranges for credit/debit notes or non-electronic sales invoices: define your own prefix and starting number.') }}</p>
             <form method="POST" action="{{ route('dian.resolutions.manual') }}" class="space-y-4">
                 @csrf
                 <div>
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select name="document_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                        <option value="FV">{{ __('Sales invoice') }}</option>
                         <option value="91">91 - {{ __('Credit note') }}</option>
                         <option value="92">92 - {{ __('Debit note') }}</option>
                     </select>

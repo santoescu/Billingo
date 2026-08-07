@@ -161,6 +161,11 @@ class Company extends Model
         return $this->hasMany(Resolution::class);
     }
 
+    public function cashShifts()
+    {
+        return $this->hasMany(CashShift::class);
+    }
+
     /**
      * Código de cuenta que se usa en los servicios de la DIAN: es el mismo
      * NIT/identificación de la empresa, no hace falta pedirlo aparte.
@@ -184,6 +189,16 @@ class Company extends Model
         return $this->hasMany(DocumentoEmitido::class);
     }
 
+    public function documentosPos()
+    {
+        return $this->hasMany(DocumentoPos::class);
+    }
+
+    public function paymentMethods()
+    {
+        return $this->hasMany(PaymentMethod::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where(function ($query) {
@@ -192,4 +207,5 @@ class Company extends Model
                 ->orWhere('status', '');
         });
     }
+
 }

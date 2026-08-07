@@ -48,14 +48,17 @@ class DianController extends Controller
     /**
      * Las notas crédito/débito no tienen un rango de numeración autorizado
      * por la DIAN (solo aplica a facturas): la propia empresa define su
-     * numeración aquí, sin sincronizar nada con la DIAN.
+     * numeración aquí, sin sincronizar nada con la DIAN. Lo mismo aplica a
+     * "Factura de venta" (código interno 'FV', no es un código DIAN real):
+     * el soporte de toda venta del POS (ver IssueDocumentService::issuePosSale())
+     * -- misma numeración manual que las notas, sin límite de rango.
      */
     public function storeManualResolution(Request $request)
     {
         $company = $this->currentCompany($request);
 
         $data = $request->validate([
-            'document_type' => ['required', 'in:91,92'], // 91=Nota Crédito, 92=Nota Débito (código DIAN)
+            'document_type' => ['required', 'in:91,92,FV'], // 91=Nota Crédito, 92=Nota Débito, FV=Factura de venta (interno, no es código DIAN)
             'prefix' => ['required', 'string', 'max:10'],
             'range_from' => ['required', 'integer', 'min:1'],
         ]);
@@ -64,9 +67,13 @@ class DianController extends Controller
             'company_id' => (string) $company->_id,
             'document_type' => $data['document_type'],
             'prefix' => $data['prefix'],
-            'range_from' => $data['range_from'],
+            // (int) explícito: la regla 'integer' de validate() solo valida
+            // el formato, no castea el tipo -- sin esto queda guardado como
+            // string y claimNextNumber() (compara por igualdad exacta con
+            // Mongo, sensible al tipo) nunca hace match.
+            'range_from' => (int) $data['range_from'],
             'range_to' => null,
-            'current_number' => $data['range_from'],
+            'current_number' => (int) $data['range_from'],
             'status' => 'active',
             'environment' => $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS,
             'is_manual' => true,

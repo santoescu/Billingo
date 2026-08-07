@@ -29,4 +29,9 @@ return [
         'roles' => ['administrador', 'analista', 'auditor'],
     ],
 
+    'pos' => [
+        'name' => 'Punto de venta',
+        'roles' => ['administrador', 'cajero', 'auditor'],
+    ],
+
 ];

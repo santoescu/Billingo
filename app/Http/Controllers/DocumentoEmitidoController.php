@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CashShift;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\DocumentoEmitido;
+use App\Models\DocumentoPos;
 use App\Models\FiscalResponsibility;
 use App\Models\MeasurementUnit;
 use App\Models\PaymentMeansCode;
+use App\Models\PaymentMethod;
 use App\Models\PriceType;
 use App\Models\Product;
 use App\Models\Resolution;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
 use App\Services\Dian\IssueDocumentService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use RuntimeException;
@@ -75,12 +79,25 @@ class DocumentoEmitidoController extends Controller
         $departments = Department::orderBy('descripcion')->get();
         $fiscalResponsibilities = FiscalResponsibility::orderBy('codigo')->get();
 
+        // Todos los clientes de la empresa, para el modal "buscar en todos
+        // los clientes" (con tabla + buscador propio) -- aparte de la
+        // búsqueda incremental mientras se escribe (clientSearch()).
+        $clients = $company->clients()->orderBy('name')->get()->map($this->mapClientForJs(...));
+
+        // Tipos de precio de la empresa, para el selector "aplicar precio a
+        // todas las líneas" -- los precios de cada producto en sí se siguen
+        // trayendo por AJAX (productSearch()), esto solo es la lista de
+        // tipos disponibles.
+        $priceTypes = $company->priceTypes()->orderBy('name')->get();
+
         return view('documents.create', compact(
             'company',
             'paymentMeansCodes',
             'measurementUnits',
             'departments',
             'fiscalResponsibilities',
+            'clients',
+            'priceTypes',
         ));
     }
 
@@ -175,20 +192,31 @@ class DocumentoEmitidoController extends Controller
             ->get();
 
         return response()->json([
-            'clients' => $clients->map(fn ($client) => [
-                'id' => (string) $client->_id,
-                'identification_type' => $client->identification_type,
-                'identificacion' => $client->identificacion,
-                'name' => $client->name,
-                'person_type' => $client->person_type,
-                'fiscal_responsibilities' => $client->fiscal_responsibilities,
-                'address' => $client->address,
-                'department_code' => $client->department_code,
-                'city_code' => $client->city_code,
-                'phone' => $client->phone,
-                'email' => $client->email,
-            ])->values(),
+            'clients' => $clients->map($this->mapClientForJs(...))->values(),
         ]);
+    }
+
+    /**
+     * Traduce un ThirdParty (rol cliente) al shape que consume el JS del
+     * formulario de emisión -- usado tanto en la búsqueda incremental
+     * (clientSearch()) como en el modal "buscar en todos los clientes"
+     * (create()), para no duplicar la lista de campos en dos lados.
+     */
+    private function mapClientForJs($client): array
+    {
+        return [
+            'id' => (string) $client->_id,
+            'identification_type' => $client->identification_type,
+            'identificacion' => $client->identificacion,
+            'name' => $client->name,
+            'person_type' => $client->person_type,
+            'fiscal_responsibilities' => $client->fiscal_responsibilities,
+            'address' => $client->address,
+            'department_code' => $client->department_code,
+            'city_code' => $client->city_code,
+            'phone' => $client->phone,
+            'email' => $client->email,
+        ];
     }
 
     /**
@@ -204,18 +232,21 @@ class DocumentoEmitidoController extends Controller
         $company = $this->currentCompany($request);
 
         $query = trim((string) $request->query('q', ''));
-        if ($query === '') {
-            return response()->json(['products' => []]);
-        }
 
+        // Con texto se filtra por código/barras/descripción, igual que
+        // siempre; sin texto se listan los primeros productos igual (para
+        // el modal "buscar en todos los productos", que arranca mostrando
+        // algo antes de que el usuario escriba nada).
         $products = $company->products()->active()
-            ->where(function ($builder) use ($query) {
-                $builder->where('code', 'like', '%' . $query . '%')
-                    ->orWhere('barcode', 'like', '%' . $query . '%')
-                    ->orWhere('description', 'like', '%' . $query . '%');
+            ->when($query !== '', function ($builder) use ($query) {
+                $builder->where(function ($builder) use ($query) {
+                    $builder->where('code', 'like', '%' . $query . '%')
+                        ->orWhere('barcode', 'like', '%' . $query . '%')
+                        ->orWhere('description', 'like', '%' . $query . '%');
+                });
             })
             ->orderBy('description')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         $priceTypeIds = $products->flatMap(fn ($product) => collect($product->extra_prices ?? [])->pluck('price_type_id'))->unique()->values()->all();
@@ -259,6 +290,7 @@ class DocumentoEmitidoController extends Controller
                     'unit_code' => $product->unit_code,
                     'unit_price' => (float) $product->unit_price,
                     'tracks_inventory' => (bool) $product->tracks_inventory,
+                    'stock' => (float) $product->stock,
                     'prices' => $prices,
                     'warehouses' => $warehouses,
                 ];
@@ -295,10 +327,11 @@ class DocumentoEmitidoController extends Controller
     /**
      * Resuelve las resoluciones vigentes para un tipo de documento dado, en
      * el ambiente DIAN actual de la empresa. Compartido entre create()
-     * (carga inicial) y createOptions() (AJAX al cambiar el tipo de
-     * documento en el formulario).
+     * (carga inicial), createOptions() (AJAX al cambiar el tipo de documento
+     * en el formulario) y, público, CashShiftController/PosController (para
+     * ofrecer las resoluciones 'FV'/'01' al abrir un turno del POS).
      */
-    private function resolutionsFor(Company $company, string $tipoDocumento): \Illuminate\Support\Collection
+    public function resolutionsFor(Company $company, string $tipoDocumento): \Illuminate\Support\Collection
     {
         $environment = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
         $documentTypes = in_array($tipoDocumento, self::FACTURA_CODES, true) ? self::FACTURA_CODES : [$tipoDocumento];
@@ -317,6 +350,39 @@ class DocumentoEmitidoController extends Controller
      * del formulario, y lo emite con IssueDocumentService.
      */
     public function store(Request $request, IssueDocumentService $service)
+    {
+        try {
+            $documento = $this->issueFromRequest($request, $service);
+        } catch (InvalidArgumentException|RuntimeException $e) {
+            return back()->withErrors(['message' => $e->getMessage()])->withInput();
+        } catch (Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['message' => __('Could not issue the document.')])->withInput();
+        }
+
+        session()->flash('toast', [
+            'type' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED ? 'success' : 'error',
+            'message' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED
+                ? __('Document issued and accepted by the DIAN.')
+                : __('The document was sent, but the DIAN did not accept it yet. Check the details.'),
+        ]);
+
+        return redirect()->route('documents.show', $documento->_id);
+    }
+
+    /**
+     * Valida el request, resuelve la resolución, reclama el siguiente
+     * número y emite el documento -- el mismo pipeline que usa store(), pero
+     * sin la redirección/flash propias del flujo web. Usado por la pantalla
+     * normal de facturación electrónica; el POS tiene su propio flujo (ver
+     * issuePosSale() más abajo), porque una venta del POS no llega con
+     * "tipo_documento"/"resolution_id" en el request -- la numeración ya
+     * quedó fija al abrir el turno de caja.
+     *
+     * @throws InvalidArgumentException|RuntimeException Errores de validación de negocio (resolución agotada, resolución inválida, etc.), pensados para mostrarse tal cual al usuario.
+     */
+    public function issueFromRequest(Request $request, IssueDocumentService $service): DocumentoEmitido
     {
         $company = $this->currentCompany($request);
 
@@ -383,32 +449,129 @@ class DocumentoEmitidoController extends Controller
             ->first();
 
         if (! $resolution) {
-            return back()->withErrors(['message' => __('The selected resolution is not valid.')])->withInput();
+            throw new InvalidArgumentException(__('The selected resolution is not valid.'));
         }
 
         $data['prefix'] = $resolution->prefix;
-        $data['secuencial'] = $resolution->current_number ?: $resolution->range_from;
+        // Reclama el número de forma atómica (compare-and-swap, ver
+        // Resolution::claimNextNumber()) en vez de solo leer current_number:
+        // necesario para que cajas/pestañas concurrentes (p. ej. el módulo
+        // POS) nunca terminen usando el mismo consecutivo.
+        $data['secuencial'] = $resolution->claimNextNumber();
 
         $document = $this->buildDocumentJson($company, $data);
 
-        try {
-            $documento = $service->issue($company, ['document' => $document]);
-        } catch (InvalidArgumentException|RuntimeException $e) {
-            return back()->withErrors(['message' => $e->getMessage()])->withInput();
-        } catch (Throwable $e) {
-            report($e);
+        return $service->issue($company, ['document' => $document]);
+    }
 
-            return back()->withErrors(['message' => __('Could not issue the document.')])->withInput();
-        }
+    /**
+     * Valida el request y arma + emite la venta del POS: SIEMPRE crea el
+     * documento_pos (numerado con la resolución 'FV' del turno abierto), y
+     * si el cajero marcó "emitir factura electrónica" para esta venta
+     * puntual, además arma y envía la factura electrónica real (numerada
+     * con la resolución de facturación electrónica del turno) y la enlaza.
+     * No hay "tipo_documento"/"resolution_id" en el request -- a diferencia
+     * de issueFromRequest(), la numeración ya quedó fija al abrir el turno
+     * (ver CashShiftController::store()), así que no hay nada que elegir
+     * por venta.
+     *
+     * @throws InvalidArgumentException|RuntimeException Errores de validación de negocio, pensados para mostrarse tal cual al usuario.
+     */
+    public function issuePosSale(Request $request, Company $company, CashShift $shift, IssueDocumentService $service): DocumentoPos
+    {
+        $data = $request->validate([
+            // Sin selector de tipo de operación en la pantalla de venta
+            // simplificada -- siempre es una venta estándar (10).
+            'tipo_operacion' => ['nullable', 'string', 'max:5'],
+            'issue_date' => ['nullable', 'date'],
+            'issue_time' => ['nullable', 'string', 'max:20'],
 
-        session()->flash('toast', [
-            'type' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED ? 'success' : 'error',
-            'message' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED
-                ? __('Document issued and accepted by the DIAN.')
-                : __('The document was sent, but the DIAN did not accept it yet. Check the details.'),
+            'cliente_tipo_identificacion' => ['required', 'string', 'max:2'],
+            'cliente_identificacion' => ['required', 'string', 'max:20'],
+            'cliente_nombre' => ['required', 'string', 'max:255'],
+            // Dirección/ciudad/departamento ya NO son obligatorios acá: una
+            // venta del POS se crea siempre como talonario primero (nunca
+            // electrónica de una vez), así que un cliente mínimo ("Consumidor
+            // final", solo nombre) es válido -- esos datos completos solo se
+            // exigen más adelante, al emitir esa venta como factura
+            // electrónica (ver PosController::issueElectronic()).
+            'cliente_tipo_persona' => ['nullable', 'string', 'in:1,2'],
+            'cliente_responsabilidades' => ['nullable', 'array'],
+            'cliente_direccion' => ['nullable', 'string', 'max:255'],
+            'cliente_departamento_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_ciudad_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'cliente_email' => ['nullable', 'email', 'max:255'],
+
+            'payment_means_id' => ['nullable', 'array'],
+            'payment_means_id.*' => ['nullable', 'string', 'in:1,2'],
+            'payment_method_id' => ['nullable', 'array'],
+            'payment_method_id.*' => ['nullable', 'string'],
+            'payment_due_date' => ['nullable', 'array'],
+            'payment_due_date.*' => ['nullable', 'date'],
+
+            'cargo_tipo' => ['nullable', 'array'],
+            'cargo_tipo.*' => ['nullable', 'string', 'in:cargo,descuento'],
+            'cargo_motivo' => ['nullable', 'array'],
+            'cargo_motivo.*' => ['nullable', 'string', 'max:255'],
+            'cargo_valor_tipo' => ['nullable', 'array'],
+            'cargo_valor_tipo.*' => ['nullable', 'string', 'in:porcentaje,fijo'],
+            'cargo_valor' => ['nullable', 'array'],
+            'cargo_valor.*' => ['nullable', 'numeric', 'min:0'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.codigo' => ['required', 'string', 'max:50'],
+            'items.*.codigo_barras' => ['nullable', 'string', 'max:50'],
+            'items.*.descripcion' => ['required', 'string', 'max:500'],
+            'items.*.unidad_medida' => ['nullable', 'string', 'max:10'],
+            'items.*.cantidad' => ['required', 'numeric', 'min:0.01'],
+            'items.*.precio_unitario' => ['required', 'numeric', 'min:0'],
+            'items.*.bodega_id' => ['nullable', 'string'],
+            'items.*.descuento_valor_tipo' => ['nullable', 'string', 'in:porcentaje,fijo'],
+            'items.*.descuento_valor' => ['nullable', 'numeric', 'min:0'],
+            'items.*.descuento_motivo' => ['nullable', 'string', 'max:255'],
+            'items.*.impuestos' => ['nullable', 'array'],
+            'items.*.impuestos.*.tipo' => ['required_with:items.*.impuestos', 'string', 'max:5'],
+            'items.*.impuestos.*.porcentaje' => ['required_with:items.*.impuestos', 'numeric', 'min:0'],
+            'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        return redirect()->route('documents.show', $documento->_id);
+        if (! $shift->fvResolution) {
+            throw new InvalidArgumentException(__('The cash shift has no valid sales invoice resolution.'));
+        }
+
+        // El formulario del POS ya no elige el código DIAN directo: elige
+        // uno de los medios de pago propios de la empresa (ver
+        // PaymentMethod), y acá se traduce a su código DIAN equivalente
+        // (puede no tener uno mapeado -- solo hace falta si esta venta se
+        // termina emitiendo electrónica después, ver
+        // PosController::issueElectronic()).
+        $paymentMethodIds = array_filter($data['payment_method_id'] ?? []);
+        $paymentMethods = $company->paymentMethods()->whereIn('_id', $paymentMethodIds)->get()->keyBy(fn (PaymentMethod $m) => (string) $m->_id);
+        $data['payment_means_code'] = collect($data['payment_method_id'] ?? [])
+            ->map(fn (?string $id) => $id ? $paymentMethods->get($id)?->dian_payment_means_code : null)
+            ->all();
+
+        $data['tipo_documento'] = '01';
+        $data['tipo_operacion'] = $data['tipo_operacion'] ?? '10';
+        $data['cliente_tipo_persona'] = $data['cliente_tipo_persona'] ?? '2';
+        $data['prefix'] = $shift->fvResolution->prefix;
+        $data['secuencial'] = 0;
+
+        // Toda venta del POS se crea SIEMPRE como factura de venta primero
+        // (nunca electrónica de una vez): si el cajero decide emitirla
+        // electrónica, eso se hace aparte desde el modal de resultado (ver
+        // PosController::issueElectronic()), una vez que esta venta ya
+        // existe.
+        $documentoPos = $service->issuePosSale($company, ['document' => $this->buildDocumentJson($company, $data)], $shift->fvResolution, $shift);
+
+        $firstPaymentMethod = $paymentMethods->get($data['payment_method_id'][0] ?? null);
+        $documentoPos->update([
+            'payment_method_id' => $firstPaymentMethod ? (string) $firstPaymentMethod->_id : null,
+            'payment_method_name' => $firstPaymentMethod?->name,
+        ]);
+
+        return $documentoPos;
     }
 
     /**
@@ -419,8 +582,11 @@ class DocumentoEmitidoController extends Controller
      * @param  Company  $company  Empresa emisora (dueña de la sesión activa).
      * @param  array  $data  Datos ya validados de la petición.
      * @return array Bloque "document" en el mismo shape que espera la API.
+     *
+     * Público (no privado) para que PosController arme el mismo JSON en el
+     * checkout del POS sin duplicar esta lógica.
      */
-    private function buildDocumentJson(Company $company, array $data): array
+    public function buildDocumentJson(Company $company, array $data): array
     {
         $document = [
             'DocumentType' => $data['tipo_documento'],
@@ -437,9 +603,9 @@ class DocumentoEmitidoController extends Controller
                 'CompanyID' => $data['cliente_identificacion'],
                 'TypeCompanyID' => $data['cliente_tipo_identificacion'],
                 'TaxLevelCode' => implode(';', $data['cliente_responsabilidades'] ?? []),
-                'direccion' => $data['cliente_direccion'],
-                'cityCode' => $data['cliente_ciudad_codigo'],
-                'CountrySubentityCode' => $data['cliente_departamento_codigo'],
+                'direccion' => $data['cliente_direccion'] ?? null,
+                'cityCode' => $data['cliente_ciudad_codigo'] ?? null,
+                'CountrySubentityCode' => $data['cliente_departamento_codigo'] ?? null,
                 'telefono' => $data['cliente_telefono'] ?? null,
                 'email' => $data['cliente_email'] ?? null,
             ],
@@ -630,6 +796,44 @@ class DocumentoEmitidoController extends Controller
             'customerDepartmentName',
             'customerCityName',
         ));
+    }
+
+    /**
+     * Recibo en PDF (formato angosto, tipo ticket) para descargar -- usado
+     * sobre todo por el checkout del POS, pero disponible para cualquier
+     * documento ya emitido. Reusa los mismos datos que documents.show(), sin
+     * el detalle completo (XML, respuesta de la DIAN, etc.).
+     */
+    public function receiptPdf(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+
+        $paymentMeansCode = $documento->payment_means_code
+            ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
+            : null;
+
+        // El efectivo recibido solo existe si el checkout venía del POS con
+        // pago en efectivo -- para un documento emitido normal (o al
+        // recargar/reimprimir el mismo recibo más tarde) no hay nada que
+        // mostrar ahí.
+        $cashReceived = session('pos_cash_received');
+        $isElectronic = true;
+        $uuid = $documento->uuid;
+
+        $pdf = Pdf::loadView('documents.receipt-pdf', compact(
+            'company',
+            'documento',
+            'paymentMeansCode',
+            'cashReceived',
+            'isElectronic',
+            'uuid',
+        ))->setPaper([0, 0, 226.77, 800], 'portrait'); // ~80mm de ancho, alto libre
+
+        return $pdf->download('recibo-' . $documento->numeral . '.pdf');
     }
 
     /**

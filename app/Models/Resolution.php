@@ -105,15 +105,45 @@ class Resolution extends Model
 
     public function nextInvoiceNumber(): string
     {
-        $number = (int) ($this->current_number ?: $this->range_from);
+        return trim($this->prefix . $this->claimNextNumber(), '-');
+    }
 
-        if ($this->range_to !== null && $number > (int) $this->range_to) {
-            throw new \RuntimeException('El rango autorizado de la resolución DIAN se agotó.');
+    /**
+     * Reclama el siguiente número disponible de forma atómica (compare-and-
+     * swap: relee el valor actual y solo lo actualiza si nadie más lo movió
+     * mientras tanto, reintentando si hubo carrera). El "leer y luego
+     * guardar" que había antes (ver historial) dejaba una ventana en la que
+     * dos peticiones concurrentes -- el caso típico de un POS con varias
+     * cajas cobrando al mismo tiempo -- podían leer el mismo número y las
+     * dos terminar usándolo, duplicando la numeración ante la DIAN.
+     */
+    public function claimNextNumber(): int
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->refresh();
+            $current = (int) ($this->current_number ?: $this->range_from);
+
+            if ($this->range_to !== null && $current > (int) $this->range_to) {
+                throw new \RuntimeException('El rango autorizado de la resolución DIAN se agotó.');
+            }
+
+            $query = static::where('_id', $this->_id);
+            if ($this->current_number === null) {
+                $query->whereNull('current_number');
+            } else {
+                $query->where('current_number', $current);
+            }
+
+            $updated = $query->update(['current_number' => $current + 1]);
+
+            if ($updated > 0) {
+                $this->current_number = $current + 1;
+
+                return $current;
+            }
         }
 
-        $this->update(['current_number' => $number + 1]);
-
-        return trim($this->prefix . $number, '-');
+        throw new \RuntimeException('No se pudo reclamar el siguiente número de la resolución (demasiada concurrencia); intenta de nuevo.');
     }
 
     /**

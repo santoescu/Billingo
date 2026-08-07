@@ -2,8 +2,10 @@
 
 namespace App\Services\Dian;
 
+use App\Models\CashShift;
 use App\Models\Company;
 use App\Models\DocumentoEmitido;
+use App\Models\DocumentoPos;
 use App\Models\Product;
 use App\Models\Resolution;
 use App\Models\StockMovement;
@@ -49,6 +51,7 @@ class IssueDocumentService
         private UblDocumentBuilder $builder,
         private UblDocumentSigner $signer,
         private DianSoapClient $client,
+        private DocumentTotalsCalculator $totals,
     ) {
     }
 
@@ -82,6 +85,137 @@ class IssueDocumentService
         }
 
         $secuencial = $this->syncResolutionNumbering($resolution, $numeral);
+
+        return $this->buildSignSubmitAndPersist($company, $payload, $tipoDocumento, $resolution, $numeral, $secuencial, $ambiente, $existente);
+    }
+
+    /**
+     * Crea una venta del POS: SIEMPRE en la colección "documentos_pos"
+     * (totalmente separada de "documentos_emitidos" -- esa es solo para
+     * documentos electrónicos reales), numerada con la Resolution manual
+     * tipo 'FV' ("Factura de venta") que se eligió al abrir el turno de
+     * caja. No se construye ni se firma ni se envía nada a la DIAN acá: solo
+     * se calculan los totales (mismo cálculo que usaría la factura real, ver
+     * DocumentTotalsCalculator) y se descuenta el inventario, igual que
+     * cualquier venta. Si después el cajero decide emitirla como factura
+     * electrónica (ver modal de resultado del POS), eso se hace aparte con
+     * issuePosSaleElectronic(), una vez que esta venta ya existe.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $request  Mismo shape que espera issue() ({"document": {...}}).
+     * @param  Resolution  $resolution  Resolución manual tipo 'FV' del turno.
+     * @param  CashShift  $shift  Turno bajo el que se hace la venta (para poder emitirla electrónica después, ver issueElectronic()).
+     * @return DocumentoPos Venta guardada.
+     */
+    public function issuePosSale(Company $company, array $request, Resolution $resolution, CashShift $shift): DocumentoPos
+    {
+        $payload = $this->mapper->map($company, $request);
+
+        $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
+
+        $numero = $resolution->claimNextNumber();
+        $numeral = trim($resolution->prefix . $numero, '-');
+
+        $documento = DocumentoPos::create([
+            'company_id' => (string) $company->_id,
+            'shift_id' => (string) $shift->_id,
+            'resolution_id' => (string) $resolution->_id,
+            'prefix' => $resolution->prefix,
+            'numeral' => $numeral,
+            'secuencial' => (string) $numero,
+            'cliente_id' => $payload['cliente_id'] ?? null,
+            'payload' => $payload,
+            'issue_date' => $this->resolveIssueDateTime($payload),
+            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            'total' => $calculo['totales']['payable_amount'],
+            'currency' => $payload['moneda'] ?? 'COP',
+            'payment_means_id' => $payload['payment_means']['id'] ?? null,
+            'payment_means_code' => $payload['payment_means']['codigo'] ?? null,
+            'notes' => $payload['notas'] ?? null,
+        ]);
+
+        $this->syncProducts($company, $payload['lineas'] ?? []);
+        $this->discountInventory($company, $payload['lineas'] ?? [], $numeral);
+
+        return $documento;
+    }
+
+    /**
+     * Arma, firma y envía un documento a la DIAN usando una resolución ya
+     * elegida por el caller (en vez de resolverla por tipo_documento como
+     * hace issue()).
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $request  Mismo shape que espera issue() ({"document": {...}}).
+     * @param  Resolution  $resolution  Resolución DIAN ya elegida/validada por el caller.
+     * @param  bool  $skipInventoryDiscount  True si el inventario ya se descontó (venta del POS: se descontó al crear el DocumentoPos).
+     * @return DocumentoEmitido Documento electrónico emitido.
+     */
+    public function issueWithResolution(Company $company, array $request, Resolution $resolution, bool $skipInventoryDiscount = false): DocumentoEmitido
+    {
+        $payload = $this->mapper->map($company, $request);
+        $tipoDocumento = $payload['tipo_documento'];
+        $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+
+        $numero = $resolution->claimNextNumber();
+        $numeral = trim($resolution->prefix . $numero, '-');
+
+        return $this->buildSignSubmitAndPersist(
+            $company, $payload, $tipoDocumento, $resolution, $numeral, (string) $numero, $ambiente, null,
+            skipInventoryDiscount: $skipInventoryDiscount,
+        );
+    }
+
+    /**
+     * Emite la factura electrónica de una venta del POS ya creada: reusa
+     * directamente "$documentoPos->payload" (ya mapeado cuando se creó la
+     * venta, ver issuePosSale()) en vez de volver a mapear el request
+     * original -- así el documento electrónico queda con exactamente los
+     * mismos datos (cliente, líneas, totales) que ya se guardaron en la
+     * venta, sin depender de que el caller reconstruya el request. El
+     * inventario no se vuelve a descontar (ya se descontó al crear la
+     * venta).
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  DocumentoPos  $documentoPos  Venta ya creada (talonario).
+     * @param  Resolution  $resolution  Resolución de facturación electrónica del turno.
+     * @return DocumentoEmitido Documento electrónico emitido.
+     */
+    public function issuePosSaleElectronic(Company $company, DocumentoPos $documentoPos, Resolution $resolution): DocumentoEmitido
+    {
+        $payload = $documentoPos->payload;
+        $tipoDocumento = $payload['tipo_documento'] ?? '01';
+        $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+
+        $numero = $resolution->claimNextNumber();
+        $numeral = trim($resolution->prefix . $numero, '-');
+
+        return $this->buildSignSubmitAndPersist(
+            $company, $payload, $tipoDocumento, $resolution, $numeral, (string) $numero, $ambiente, null,
+            skipInventoryDiscount: true,
+        );
+    }
+
+    /**
+     * Construye, firma y envía el XML a la DIAN, y persiste el resultado --
+     * extraído de issue() para que también lo use issueWithResolution()
+     * (resolución ya elegida por el caller, sin resolverla por
+     * tipo_documento). El descuento de inventario sigue viviendo acá (mismas
+     * condiciones de siempre), pero se puede omitir explícitamente cuando ya
+     * se descontó antes (ver $skipInventoryDiscount).
+     */
+    private function buildSignSubmitAndPersist(
+        Company $company,
+        array $payload,
+        string $tipoDocumento,
+        Resolution $resolution,
+        string $numeral,
+        string $secuencial,
+        string $ambiente,
+        ?DocumentoEmitido $existente,
+        bool $skipInventoryDiscount = false,
+    ): DocumentoEmitido {
         $fechaEmision = $this->resolveIssueDateTime($payload);
         $fechaVencimiento = $this->resolveDueDate($payload);
 
@@ -206,7 +340,7 @@ class IssueDocumentService
             'fecha_expedicion' => $isPending ? null : $this->resolveFechaExpedicion($results),
         ]);
 
-        if (! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
+        if (! $skipInventoryDiscount && ! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
             $this->discountInventory($company, $payload['lineas'] ?? [], $numeral);
         }
 
@@ -516,9 +650,18 @@ class IssueDocumentService
             throw new InvalidArgumentException("El número \"{$numeral}\" está fuera del rango autorizado de la resolución ({$resolution->range_from}-{$resolution->range_to}).");
         }
 
-        if ($consecutivo >= (int) $resolution->current_number) {
-            $resolution->update(['current_number' => $consecutivo + 1]);
-        }
+        // Update condicionado (en vez de leer current_number y decidir en
+        // PHP si tocaba avanzarlo) para que sea atómico: si dos llamadas
+        // concurrentes sincronizan numerales distintos, cada una solo
+        // avanza el contador si sigue siendo menor que su propio
+        // consecutivo en el momento exacto del update, no en el momento en
+        // que se leyó.
+        Resolution::where('_id', $resolution->_id)
+            ->where(function ($query) use ($consecutivo) {
+                $query->where('current_number', '<=', $consecutivo)
+                    ->orWhereNull('current_number');
+            })
+            ->update(['current_number' => $consecutivo + 1]);
 
         return (string) $consecutivo;
     }

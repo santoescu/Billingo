@@ -1,5 +1,16 @@
 <script>
     window.initWorkflowDataTable = function(selector, searchSelector, options = {}) {
+        // "livewire:navigated" se dispara tanto en la carga inicial de la
+        // página como en cada navegación SPA -- sin este chequeo, una
+        // vista que escucha DOMContentLoaded Y livewire:navigated (para
+        // que la tabla se reconstruya al volver por SPA) termina llamando
+        // esto dos veces en la primera carga, y DataTables truena con
+        // "Cannot reinitialise DataTable". Se destruye la instancia previa
+        // (si la hay) antes de crear una nueva, en vez de dejar que falle.
+        if ($.fn.DataTable.isDataTable(selector)) {
+            $(selector).DataTable().destroy();
+        }
+
         const table = $(selector).DataTable({
             dom: 't<"workflow-datatable-footer flex flex-col gap-2 py-3 px-4 sm:flex-row sm:items-center sm:justify-between"<"workflow-datatable-info-wrap"><"workflow-datatable-pagination">>',
             pageLength: options.pageLength || 50,
@@ -12,7 +23,11 @@
             },
         });
 
-        $(searchSelector).on('keyup', function () {
+        // Evento con namespace + .off() antes de .on(): si initWorkflowDataTable()
+        // se llama otra vez sobre el mismo input (misma razón que el destroy()
+        // de arriba), no se acumulan binds duplicados apuntando cada uno a una
+        // instancia distinta de la tabla.
+        $(searchSelector).off('keyup.workflowDataTable').on('keyup.workflowDataTable', function () {
             table.search(this.value).draw();
         });
 

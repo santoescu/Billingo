@@ -1,6 +1,6 @@
 @php
     $documentTypeLabels = [
-        '01' => __('Invoice'),
+        '01' => __('Electronic sales invoice'),
         '91' => __('Credit note'),
         '92' => __('Debit note'),
     ];
@@ -80,9 +80,13 @@
         'subheading' => __('Issue an electronic document for this company.'),
     ])
 
-    <div class="mb-6">
-        <a href="{{ route('documents.index') }}" class="text-sm font-medium text-accent hover:underline">&larr; {{ __('Back to issued documents') }}</a>
-    </div>
+    @if ($posMode ?? false)
+        @include('pos.partials.tabs', ['activeTab' => 'sell'])
+    @else
+        <div class="mb-6">
+            <a href="{{ route('documents.index') }}" class="text-sm font-medium text-accent hover:underline">&larr; {{ __('Back to issued documents') }}</a>
+        </div>
+    @endif
 
     @if ($errors->any())
         <div class="mb-6 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
@@ -94,11 +98,11 @@
         </div>
     @endif
 
-    <div id="doc-no-resolution-warning" class="mb-6 rounded-md bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 hidden">
+    <div id="doc-no-resolution-warning" class="mb-6 rounded-md bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-400 hidden {{ ($posMode ?? false) ? '!hidden' : '' }}">
         {{ __('There is no active numbering resolution for this document type in the current environment.') }}
     </div>
 
-    <form id="documentForm" method="POST" action="{{ route('documents.store') }}" class="flex flex-col gap-6">
+    <form id="documentForm" method="POST" action="{{ ($posMode ?? false) ? route('pos.checkout') : route('documents.store') }}" class="flex flex-col gap-6">
         @csrf
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
@@ -106,7 +110,7 @@
                 <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Document') }}</h3>
             </div>
             <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select id="doc-tipo_documento" name="tipo_documento" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         @foreach ($documentTypeLabels as $code => $label)
@@ -114,16 +118,21 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Operation type') }}</label>
                     <select id="doc-tipo_operacion" name="tipo_operacion" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>
-                <div>
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Resolution') }}</label>
                     <select id="doc-resolution" name="resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>
-                <flux:input id="doc-prefix-display" :label="__('Prefix')" value="" readonly disabled />
-                <flux:input id="doc-secuencial-display" :label="__('Number')" value="" readonly disabled />
+                @if ($posMode ?? false)
+                    <flux:input id="doc-prefix-display" :label="__('Prefix')" value="{{ $shift->fvResolution?->prefix }}" readonly disabled />
+                    <flux:input id="doc-secuencial-display" :label="__('Number')" value="{{ $shift->fvResolution ? ($shift->fvResolution->current_number ?: $shift->fvResolution->range_from) : '' }}" readonly disabled />
+                @else
+                    <flux:input id="doc-prefix-display" :label="__('Prefix')" value="" readonly disabled />
+                    <flux:input id="doc-secuencial-display" :label="__('Number')" value="" readonly disabled />
+                @endif
                 <x-date-picker name="issue_date" :label="__('Issue date')" :value="old('issue_date')" readonly />
             </div>
         </div>
@@ -172,9 +181,16 @@
             <div class="p-4 flex flex-col gap-4">
                 <div class="relative">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2" for="doc-cliente-search">{{ __('Search existing client') }}</label>
-                    <input type="text" id="doc-cliente-search" autocomplete="off"
-                        placeholder="{{ __('Search by name or identification') }}"
-                        class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                    <div class="relative">
+                        <input type="text" id="doc-cliente-search" autocomplete="off"
+                            placeholder="{{ __('Search by name or identification') }}"
+                            class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 pe-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                        <button type="button" id="doc-cliente-search-open-modal"
+                            class="absolute inset-y-0 end-0 flex items-center justify-center w-10 text-zinc-400 hover:text-accent focus:outline-hidden"
+                            aria-label="{{ __('Search all clients') }}" title="{{ __('Search all clients') }}">
+                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </button>
+                    </div>
 
                     <div id="doc-cliente-search-results" class="hidden absolute z-20 mt-1 w-full max-h-72 overflow-y-auto bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-white/10 rounded-lg shadow-xl [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
 
@@ -274,13 +290,9 @@
             </div>
         </div>
 
-        <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
-            <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
-                <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Payment') }}</h3>
-                <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addPaymentLine()">{{ __('Add payment') }}</flux:button>
-            </div>
-            <div id="paymentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
-        </div>
+        @if ($posMode ?? false)
+            <input type="hidden" id="pos-emitir-electronica-input" name="emitir_electronica" value="0">
+        @endif
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
             <button type="button" class="w-full px-4 py-3 flex justify-between items-center" onclick="toggleChargesSection()">
@@ -299,9 +311,38 @@
         </div>
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
-            <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                 <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Lines') }}</h3>
-                <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addDocumentLine()">{{ __('Add line') }}</flux:button>
+            </div>
+            <div class="hidden lg:flex flex-wrap items-center gap-2 px-3 pt-3 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                <div class="w-56">{{ __('Search product') }}</div>
+                <div class="w-56">{{ __('Description') }}</div>
+                <div class="w-56">{{ __('Warehouse') }}</div>
+                <div class="w-32">{{ __('Quantity') }}</div>
+                @if ($priceTypes->isNotEmpty())
+                    <div class="w-48 hs-dropdown [--auto-close:false] relative">
+                        <button type="button" id="doc-bulk-price-type-btn" class="hs-dropdown-toggle inline-flex items-center gap-1 hover:text-accent focus:outline-hidden" title="{{ __('Apply price type to all lines') }}">
+                            {{ __('Unit price') }}
+                            <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 w-64 bg-white border border-zinc-200 rounded-lg shadow-xl p-3 space-y-2 dark:bg-neutral-800 dark:border-neutral-700">
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Apply price type to all lines') }}</p>
+                            <div class="flex flex-col">
+                                @foreach ($priceTypes as $priceType)
+                                    <button type="button" class="doc-bulk-price-type-option text-start px-2 py-1.5 text-sm rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10" data-price-type-id="{{ (string) $priceType->_id }}">
+                                        {{ $priceType->name }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="w-48">{{ __('Unit price') }}</div>
+                @endif
+                <div class="w-40">{{ __('Discount') }}</div>
+                <div class="flex-1">{{ __('Taxes') }}</div>
+                <div class="w-24 text-end">{{ __('Subtotal') }}</div>
+                <div class="w-10"></div>
             </div>
             <div id="documentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
             <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-700 flex justify-end items-center gap-3">
@@ -310,13 +351,74 @@
             </div>
         </div>
 
+        <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
+                <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Payment') }}</h3>
+                <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addPaymentLine()">{{ __('Add payment') }}</flux:button>
+            </div>
+
+            <div id="paymentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
+
+            @if ($posMode ?? false)
+                <div id="pos-cash-section" class="hidden p-4 border-t border-gray-200 dark:border-neutral-700 flex flex-wrap items-end gap-4">
+                    <div class="w-48">
+                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-efectivo-display">{{ __('Cash received') }}</label>
+                        <div class="relative">
+                            <input type="hidden" id="pos-efectivo-hidden" name="efectivo_recibido" value="">
+                            <input type="text" inputmode="decimal" id="pos-efectivo-display"
+                                class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
+                            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
+                                <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-48">
+                        <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Change') }}</span>
+                        <span id="pos-change-display" class="block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        @if ($posMode ?? false)
+            <div id="pos-checkout-error" class="hidden rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"></div>
+        @endif
+
         <div class="flex justify-end gap-3">
             <a href="{{ route('documents.index') }}">
                 <flux:button type="button" variant="filled">{{ __('Cancel') }}</flux:button>
             </a>
-            <flux:button type="submit" variant="primary">{{ __('Issue document') }}</flux:button>
+            <flux:button type="submit" variant="primary" id="documentSubmitBtn">{{ __('Issue document') }}</flux:button>
         </div>
     </form>
+
+    @if ($posMode ?? false)
+        <div id="pos-result-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="pos-result-modal-label">
+            <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+                <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                    <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                        <h3 id="pos-result-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Sale completed') }}</h3>
+                        <span id="pos-result-numeral" class="text-sm text-zinc-500 dark:text-zinc-400"></span>
+                    </div>
+                    <div class="p-4">
+                        <div id="pos-result-message" class="mb-3 rounded-md p-3 text-sm hidden"></div>
+                        <iframe id="pos-result-preview" class="w-full rounded-lg border border-gray-200 dark:border-neutral-700" style="height: 50vh;" title="{{ __('Receipt preview') }}"></iframe>
+                    </div>
+                    <div class="p-4 pt-0 grid grid-cols-2 gap-2">
+                        <flux:button type="button" id="pos-result-issue-electronic-btn" variant="primary" icon="bolt" class="col-span-2 hidden" onclick="window.posIssueElectronic()">
+                            {{ __('Issue electronic invoice') }}
+                        </flux:button>
+                        <flux:button type="button" variant="filled" icon="printer" onclick="window.posPrintReceipt()">{{ __('Print') }}</flux:button>
+                        <flux:button type="button" variant="filled" icon="arrow-down-tray" onclick="window.posDownloadReceipt()">{{ __('Download') }}</flux:button>
+                        <a href="{{ route('pos.sales.index') }}" class="col-span-2">
+                            <flux:button type="button" variant="filled" icon="receipt-percent" class="w-full">{{ __('Go to sales') }}</flux:button>
+                        </a>
+                        <flux:button type="button" variant="primary" class="col-span-2" onclick="window.posNewSale()">{{ __('New sale') }}</flux:button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div id="validate-uuid-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="validate-uuid-modal-label">
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-3xl sm:w-full m-3 sm:mx-auto">
@@ -336,6 +438,89 @@
         </div>
     </div>
 
+    <!-- Modal: buscar en todos los clientes -->
+    <div id="all-clients-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="all-clients-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-3xl sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="all-clients-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Search all clients') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#all-clients-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-4 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    @if ($clients->isEmpty())
+                        <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('You have no registered clients yet.') }}</p>
+                    @else
+                        <div class="relative mb-3">
+                            <label class="sr-only">{{ __('Search') }}</label>
+                            <input type="text" id="all-clients-search" placeholder="{{ __('Search') }}" autocomplete="off"
+                                class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                        </div>
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700" id="all-clients-table">
+                            <thead>
+                                <tr>
+                                    <th class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Name') }}</th>
+                                    <th class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Identification') }}</th>
+                                    <th class="px-3 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                                @foreach ($clients as $client)
+                                    <tr>
+                                        <td class="px-3 py-2 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ $client['name'] }}</td>
+                                        <td class="px-3 py-2 text-sm text-gray-600 dark:text-neutral-400">{{ $client['identificacion'] }}</td>
+                                        <td class="px-3 py-2 text-end">
+                                            <button type="button" class="text-xs font-medium text-accent hover:underline" onclick="selectClientFromModal('{{ $client['id'] }}')">
+                                                {{ __('Select this client') }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: buscar en todos los productos (para cualquier línea) -->
+    <div id="all-products-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="all-products-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-3xl sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="all-products-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Search all products') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#all-products-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-4 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    <div class="relative mb-3">
+                        <label class="sr-only">{{ __('Search') }}</label>
+                        <input type="text" id="all-products-search" placeholder="{{ __('Code, barcode or description') }}" autocomplete="off"
+                            class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                    </div>
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Barcode') }}</th>
+                                <th class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Code') }}</th>
+                                <th class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
+                                <th class="px-3 py-2 text-end text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Stock') }}</th>
+                                <th class="px-3 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="all-products-tbody" class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+                    </table>
+                    <p id="all-products-empty" class="hidden text-sm text-neutral-500 dark:text-neutral-400">{{ __('No products found.') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <template id="paymentLineTemplate">
         <div class="payment-line p-4 grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end">
             <div>
@@ -347,11 +532,19 @@
             </div>
             <div>
                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Payment method') }}</label>
-                <select name="payment_means_code[__INDEX__]" data-hs-select='{!! $searchableSelectConfig !!}' class="hidden">
-                    @foreach ($paymentMeansCodes as $paymentMeansCode)
-                        <option value="{{ $paymentMeansCode->codigo }}" @selected($paymentMeansCode->codigo === '10')>{{ $paymentMeansCode->medio }}</option>
-                    @endforeach
-                </select>
+                @if ($posMode ?? false)
+                    <select name="payment_method_id[__INDEX__]" class="payment-code-select hidden" data-hs-select='{!! $searchableSelectConfig !!}'>
+                        @foreach ($paymentMethods as $paymentMethod)
+                            <option value="{{ $paymentMethod->_id }}" data-dian-code="{{ $paymentMethod->dian_payment_means_code }}">{{ $paymentMethod->name }}</option>
+                        @endforeach
+                    </select>
+                @else
+                    <select name="payment_means_code[__INDEX__]" class="payment-code-select hidden" data-hs-select='{!! $searchableSelectConfig !!}'>
+                        @foreach ($paymentMeansCodes as $paymentMeansCode)
+                            <option value="{{ $paymentMeansCode->codigo }}" data-dian-code="{{ $paymentMeansCode->codigo }}" @selected($paymentMeansCode->codigo === '10')>{{ $paymentMeansCode->medio }}</option>
+                        @endforeach
+                    </select>
+                @endif
             </div>
             <x-date-picker name="payment_due_date[__INDEX__]" :label="__('Due date')" :allow-empty="true" />
             <button type="button" class="h-10 text-gray-400 hover:text-red-600 focus:outline-hidden dark:hover:text-red-400" onclick="removePaymentLine(this)">
@@ -388,27 +581,26 @@
         <div class="document-line p-3 space-y-2">
             <input type="hidden" class="line-unidad" name="items[__INDEX__][unidad_medida]" value="EA">
 
-            <div class="flex flex-wrap items-end gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <div class="relative w-56">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Search product') }}</label>
-                    <input type="text" class="line-product-search w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent" autocomplete="off" placeholder="{{ __('Code, barcode or description') }}">
+                    <input type="text" class="line-product-search w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs h-10 py-2 px-3 pe-9 focus:outline-hidden focus:ring-2 focus:ring-accent" autocomplete="off" placeholder="{{ __('Code, barcode or description') }}">
+                    <button type="button" class="line-product-search-open-modal absolute inset-y-0 end-0 flex items-center justify-center w-9 text-zinc-400 hover:text-accent focus:outline-hidden" aria-label="{{ __('Search all products') }}" title="{{ __('Search all products') }}">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </button>
                     <div class="line-product-results hidden absolute z-10 mt-1 w-64 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-56 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:bg-neutral-800 dark:border-neutral-700 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
                     <input type="hidden" class="line-codigo" name="items[__INDEX__][codigo]">
                     <input type="hidden" class="line-barcode" name="items[__INDEX__][codigo_barras]">
                 </div>
 
                 <div class="w-56">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Description') }}</label>
-                    <flux:input class:input="line-descripcion" name="items[__INDEX__][descripcion]" required />
+                    <flux:input class:input="line-descripcion" name="items[__INDEX__][descripcion]" />
                 </div>
 
                 <div class="w-56">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Warehouse') }}</label>
                     <select class="line-bodega hidden" name="items[__INDEX__][bodega_id]" data-hs-select='{!! $basicSelectConfig !!}' disabled></select>
                 </div>
 
                 <div class="w-32">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Quantity') }}</label>
                     <div class="line-cantidad-wrapper bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 rounded-lg h-10" data-hs-input-number='{"step": 1, "min": 0}'>
                         <div class="w-full h-full flex justify-between items-center gap-x-1">
                             <div class="grow px-3">
@@ -427,7 +619,6 @@
                 </div>
 
                 <div class="w-48">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Unit price') }}</label>
                     <div class="relative">
                         <input type="hidden" class="line-precio" name="items[__INDEX__][precio_unitario]" value="0">
                         <input type="text" inputmode="decimal" class="line-precio-display h-10 py-2 px-3 ps-6 pe-9 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
@@ -442,7 +633,6 @@
                 </div>
 
                 <div class="w-40">
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Discount') }}</label>
                     <div class="relative">
                         <input type="hidden" class="line-descuento-valor" name="items[__INDEX__][descuento_valor]" value="0">
                         <input type="hidden" class="line-descuento-tipo" name="items[__INDEX__][descuento_valor_tipo]" value="porcentaje">
@@ -461,7 +651,6 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Taxes') }}</label>
                     <div class="flex flex-col items-start gap-1">
                         <div class="line-taxes-body flex flex-col gap-1"></div>
 
@@ -508,11 +697,10 @@
                 </div>
 
                 <div class="w-24 text-end">
-                    <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Subtotal') }}</span>
                     <span class="line-subtotal block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
                 </div>
 
-                <button type="button" class="flex size-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" onclick="removeDocumentLine(this)">
+                <button type="button" class="line-delete-btn flex size-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none" aria-label="{{ __('Delete') }}" onclick="removeDocumentLine(this)" disabled>
                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                 </button>
             </div>
@@ -533,10 +721,13 @@
         </div>
     </template>
 
+    @include('partials.datatable-pagination')
+
     @push('scripts')
         <script>
             (function () {
                 const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
+                const allClientsById = @json($clients->keyBy('id'));
                 let lineIndex = 0;
                 let paymentLineIndex = 0;
                 let chargeLineIndex = 0;
@@ -607,6 +798,16 @@
                 }
 
                 function fillPrefixSecuencial() {
+                    // En modo POS el prefijo/número siempre son los de la
+                    // resolución "FV" del turno (ya vienen pintados desde el
+                    // servidor, ver "$shift->fvResolution" en el blade) -- acá
+                    // no hay nada que actualizar; si se dejara correr, pisaría
+                    // esos valores con los de la resolución de facturación
+                    // electrónica (la que sí carga este select, oculto en POS).
+                    if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
+                        return;
+                    }
+
                     const resolutionSelect = document.getElementById('doc-resolution');
                     const option = resolutionSelect.selectedOptions[0];
                     document.getElementById('doc-prefix-display').value = option?.dataset.prefix || '';
@@ -643,11 +844,14 @@
                     const requiresFullReference = referenceRequiredOperationTypes.includes(tipoOperacion);
                     const requiresPeriod = periodOperationTypes.includes(tipoOperacion);
 
-                    document.getElementById('doc-reference-section').classList.toggle('hidden', ! requiresFullReference && ! requiresPeriod);
-                    document.getElementById('doc-referencia_factura_id-wrapper').classList.toggle('hidden', ! requiresFullReference);
-                    document.getElementById('doc-factura-manual-fields').classList.toggle('hidden', ! requiresFullReference);
-                    document.getElementById('doc-validate-uuid-btn').classList.toggle('hidden', ! requiresFullReference);
-                    document.getElementById('doc-referencia_periodo-wrapper').classList.toggle('hidden', ! requiresPeriod);
+                    // En modo POS esta sección entera no existe en el DOM
+                    // (ver "$posMode" en el blade) -- no hay nada que
+                    // mostrar u ocultar.
+                    document.getElementById('doc-reference-section')?.classList.toggle('hidden', ! requiresFullReference && ! requiresPeriod);
+                    document.getElementById('doc-referencia_factura_id-wrapper')?.classList.toggle('hidden', ! requiresFullReference);
+                    document.getElementById('doc-factura-manual-fields')?.classList.toggle('hidden', ! requiresFullReference);
+                    document.getElementById('doc-validate-uuid-btn')?.classList.toggle('hidden', ! requiresFullReference);
+                    document.getElementById('doc-referencia_periodo-wrapper')?.classList.toggle('hidden', ! requiresPeriod);
 
                     rebuildConceptCodes();
 
@@ -669,6 +873,22 @@
                     rebuildSelect(document.getElementById('doc-tipo_operacion'), operationTypes.map(({ code, label }) => ({ value: code, label: code + ' - ' + label })));
                     updateReferenceVisibility();
 
+                    // En modo POS la resolución no se elige por documento (ya
+                    // quedó fija al abrir el turno), así que no hay nada que
+                    // recargar acá -- evita además pisar el prefijo/número
+                    // que el servidor ya pintó (ver fillPrefixSecuencial()).
+                    if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
+                        return;
+                    }
+
+                    await reloadResolutionOptions(tipoDocumento);
+                }
+
+                // Separado de applyDocumentType() para poder recargar solo
+                // las resoluciones (sin tocar tipo_operacion) -- no aplica en
+                // modo POS (ver "$posMode" en el blade): ahí la resolución ya
+                // quedó fija al abrir el turno, este selector ni se muestra.
+                async function reloadResolutionOptions(tipoDocumento) {
                     const resolutionSelect = document.getElementById('doc-resolution');
                     rebuildSelect(resolutionSelect, [{ value: '', label: '{{ __('Loading...') }}' }]);
 
@@ -1149,6 +1369,39 @@
                             closeResults();
                         }
                     });
+
+                    // Botón de lupa dentro del campo: abre un modal con la
+                    // tabla de TODOS los clientes (con su propio buscador),
+                    // sin tocar la búsqueda incremental de arriba.
+                    const openAllClientsBtn = document.getElementById('doc-cliente-search-open-modal');
+                    if (openAllClientsBtn) {
+                        openAllClientsBtn.addEventListener('click', () => {
+                            if (window.HSOverlay) {
+                                HSOverlay.autoInit();
+                                HSOverlay.open('#all-clients-modal');
+                            }
+                        });
+                    }
+
+                    if (window.$ && $.fn.DataTable && document.getElementById('all-clients-table') && ! $.fn.DataTable.isDataTable('#all-clients-table')) {
+                        initWorkflowDataTable('#all-clients-table', '#all-clients-search', { pageLength: 10 });
+                    }
+
+                    window.selectClientFromModal = function (clientId) {
+                        const client = allClientsById[clientId];
+                        if (! client) {
+                            return;
+                        }
+
+                        applyClientToFields(client, departmentSelect);
+                        searchInput.value = client.name;
+                        statusEl.innerHTML = '';
+                        closeResults();
+
+                        if (window.HSOverlay) {
+                            HSOverlay.close('#all-clients-modal');
+                        }
+                    };
                 }
 
                 function initLineSelects(row) {
@@ -1209,6 +1462,192 @@
 
                 function formatMoney(value) {
                     return '$' + value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
+                // Solo existe en modo POS (ver "$posMode" en el blade) --
+                // recalcula el cambio cada vez que cambia el total de la
+                // venta o lo que escribió el cajero en "efectivo recibido".
+                function updatePosChange() {
+                    const hidden = document.getElementById('pos-efectivo-hidden');
+                    const changeDisplay = document.getElementById('pos-change-display');
+                    if (! hidden || ! changeDisplay) {
+                        return;
+                    }
+
+                    const total = parseFloat(document.getElementById('documentLinesTotal').dataset.raw) || 0;
+                    const recibido = parseFloat(hidden.value) || 0;
+                    changeDisplay.textContent = formatMoney(Math.max(recibido - total, 0));
+                }
+
+                // La venta del POS se manda por fetch (no un submit normal de
+                // formulario): así la página se queda quieta y, en vez de
+                // navegar a otra pantalla, se abre el modal de resultado con
+                // la vista previa del recibo y las acciones (emitir
+                // electrónica, imprimir, descargar, nueva venta). Se crea
+                // SIEMPRE como factura de venta primero -- "Emitir factura
+                // electrónica" en el modal es una acción aparte, después de
+                // que la venta ya existe (ver PosController::issueElectronic()).
+                function initPosAjaxCheckout() {
+                    const form = document.getElementById('documentForm');
+                    const modal = document.getElementById('pos-result-modal');
+                    if (! form || ! modal) {
+                        return;
+                    }
+
+                    const submitBtn = document.getElementById('documentSubmitBtn');
+                    const messageBox = document.getElementById('pos-result-message');
+                    const numeralLabel = document.getElementById('pos-result-numeral');
+                    const preview = document.getElementById('pos-result-preview');
+                    const issueElectronicBtn = document.getElementById('pos-result-issue-electronic-btn');
+
+                    let currentSale = null;
+
+                    function showFormError(message) {
+                        const box = document.getElementById('pos-checkout-error');
+                        box.textContent = message;
+                        box.classList.remove('hidden');
+                        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+
+                    form.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+
+                        const formData = new FormData(form);
+
+                        try {
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                headers: { 'Accept': 'application/json' },
+                                body: formData,
+                            });
+                            const data = await response.json();
+
+                            if (! response.ok) {
+                                throw new Error(data.message || '{{ __('Could not issue the document.') }}');
+                            }
+
+                            currentSale = data;
+                            numeralLabel.textContent = data.numeral;
+                            messageBox.classList.add('hidden');
+                            preview.src = data.receipt_url + '?inline=1';
+                            issueElectronicBtn.classList.toggle('hidden', ! data.can_issue_electronic);
+                            issueElectronicBtn.disabled = false;
+                            issueElectronicBtn.textContent = '{{ __('Issue electronic invoice') }}';
+
+                            if (window.HSOverlay) {
+                                HSOverlay.autoInit();
+                                HSOverlay.open('#pos-result-modal');
+                            }
+                        } catch (error) {
+                            showFormError(error.message || '{{ __('Could not issue the document.') }}');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = '{{ __('Issue document') }}';
+                        }
+                    });
+
+                    window.posIssueElectronic = async function () {
+                        if (! currentSale) {
+                            return;
+                        }
+
+                        issueElectronicBtn.disabled = true;
+                        issueElectronicBtn.textContent = '{{ __('Processing...') }}';
+
+                        try {
+                            const response = await fetch(currentSale.issue_electronic_url, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                },
+                            });
+                            const data = await response.json();
+
+                            if (! response.ok) {
+                                throw new Error(data.message || '{{ __('Could not issue the electronic invoice.') }}');
+                            }
+
+                            messageBox.className = 'mb-3 rounded-md p-3 text-sm ' + (data.accepted
+                                ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                : 'bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400');
+                            messageBox.textContent = data.accepted
+                                ? '{{ __('Sale completed and accepted by the DIAN.') }}'
+                                : '{{ __('The sale was sent, but the DIAN did not accept the electronic invoice yet.') }}';
+                            issueElectronicBtn.classList.add('hidden');
+                            preview.src = currentSale.receipt_url + '?inline=1';
+                        } catch (error) {
+                            messageBox.className = 'mb-3 rounded-md p-3 text-sm bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400';
+                            messageBox.textContent = error.message || '{{ __('Could not issue the electronic invoice.') }}';
+                            issueElectronicBtn.disabled = false;
+                            issueElectronicBtn.textContent = '{{ __('Issue electronic invoice') }}';
+                        }
+
+                        messageBox.classList.remove('hidden');
+                    };
+
+                    window.posDownloadReceipt = function () {
+                        if (currentSale) {
+                            window.location.href = currentSale.receipt_url;
+                        }
+                    };
+
+                    window.posPrintReceipt = function () {
+                        if (currentSale) {
+                            window.open(currentSale.receipt_url + '?inline=1', '_blank');
+                        }
+                    };
+
+                    window.posNewSale = function () {
+                        window.location.href = '{{ route('pos.create') }}';
+                    };
+                }
+
+                // Sin esto, si alguien le da clic varias veces a "Emitir
+                // documento" (por ejemplo porque no ve ningún cambio
+                // mientras la petición está en camino) se mandan varias
+                // ventas duplicadas. Cualquier submit del formulario termina
+                // en un envío real tarde o temprano (el modal de "¿Emitir
+                // factura electrónica?" del POS no tiene forma de cancelar,
+                // solo Sí/No, ambos mandan el formulario), así que es seguro
+                // deshabilitar el botón desde el primer submit.
+                function initSubmitProcessingState() {
+                    const form = document.getElementById('documentForm');
+                    const button = document.getElementById('documentSubmitBtn');
+                    if (! form || ! button) {
+                        return;
+                    }
+
+                    form.addEventListener('submit', () => {
+                        if (button.disabled) {
+                            return;
+                        }
+
+                        button.disabled = true;
+                        button.textContent = '{{ __('Processing...') }}';
+                    });
+                }
+
+                // La última línea de productos siempre queda vacía (esperando
+                // el siguiente producto que se busque -- se agrega sola al
+                // elegir un producto, ver applyProduct()). Si el usuario emite
+                // el documento sin llenarla, no debe mandarse al servidor como
+                // si fuera un ítem real (descripción vacía, cantidad 0): se
+                // quita del formulario justo antes de enviarlo, nunca antes
+                // (mientras se sigue editando, sigue siendo el lugar donde
+                // buscar el próximo producto).
+                function initEmptyLineSubmitCleanup() {
+                    const form = document.getElementById('documentForm');
+                    if (! form) {
+                        return;
+                    }
+
+                    form.addEventListener('submit', () => {
+                        document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
+                            if (row.dataset.productPicked !== 'true') {
+                                row.remove();
+                            }
+                        });
+                    });
                 }
 
                 // El campo visible del precio unitario usa formato colombiano
@@ -1444,7 +1883,84 @@
                     document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
                         total += computeLineSubtotal(row);
                     });
-                    document.getElementById('documentLinesTotal').textContent = formatMoney(total);
+                    const totalEl = document.getElementById('documentLinesTotal');
+                    totalEl.textContent = formatMoney(total);
+                    // Valor crudo para el cálculo de cambio del POS (ver
+                    // bloque "Cash received" más abajo) -- no incluye
+                    // cargos/descuentos de documento, solo la suma de
+                    // líneas, que es el caso normal de una venta rápida.
+                    totalEl.dataset.raw = total;
+                    updatePosChange?.();
+                }
+
+                // Modal "buscar en todos los productos", compartido entre
+                // todas las líneas (no hay un solo <select> con todo el
+                // catálogo -- puede haber miles de productos -- así que se
+                // busca por AJAX igual que el campo incremental de cada
+                // línea, solo que en formato tabla dentro de un modal).
+                function initAllProductsModal() {
+                    const searchInput = document.getElementById('all-products-search');
+                    const tbody = document.getElementById('all-products-tbody');
+                    const emptyMsg = document.getElementById('all-products-empty');
+                    let activeRow = null;
+                    let searchTimeout = null;
+
+                    function renderRows(products) {
+                        tbody.innerHTML = '';
+                        emptyMsg.classList.toggle('hidden', products.length > 0);
+
+                        products.forEach((product) => {
+                            const stockLabel = product.tracks_inventory
+                                ? Number(product.stock ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })
+                                : '<span class="text-xs text-neutral-400">{{ __('Not tracked') }}</span>';
+
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="px-3 py-2 text-sm text-gray-600 dark:text-neutral-400">${dianEscapeHtml(product.barcode) || '—'}</td>
+                                <td class="px-3 py-2 text-sm text-gray-600 dark:text-neutral-400">${dianEscapeHtml(product.code) || '—'}</td>
+                                <td class="px-3 py-2 text-sm font-medium text-gray-800 dark:text-neutral-200">${dianEscapeHtml(product.description)}</td>
+                                <td class="px-3 py-2 text-sm text-end text-gray-600 dark:text-neutral-400">${stockLabel}</td>
+                                <td class="px-3 py-2 text-end">
+                                    <button type="button" class="text-xs font-medium text-accent hover:underline">{{ __('Select this product') }}</button>
+                                </td>
+                            `;
+                            tr.querySelector('button').addEventListener('click', () => {
+                                if (activeRow && activeRow.applyProduct) {
+                                    activeRow.applyProduct(product);
+                                }
+                                if (window.HSOverlay) {
+                                    HSOverlay.close('#all-products-modal');
+                                }
+                            });
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    function fetchProducts(query) {
+                        fetch(productSearchUrl + '?q=' + encodeURIComponent(query), {
+                            headers: { 'Accept': 'application/json' },
+                        })
+                            .then((response) => response.json())
+                            .then((data) => renderRows(data.products || []))
+                            .catch(() => renderRows([]));
+                    }
+
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => fetchProducts(searchInput.value.trim()), 300);
+                    });
+
+                    window.openAllProductsModal = function (row) {
+                        activeRow = row;
+                        searchInput.value = '';
+                        fetchProducts('');
+
+                        if (window.HSOverlay) {
+                            HSOverlay.autoInit();
+                            HSOverlay.open('#all-products-modal');
+                        }
+                        searchInput.focus();
+                    };
                 }
 
                 function initLineProductSearch(row) {
@@ -1493,6 +2009,12 @@
                         unidadInput.value = product.unit_code || 'EA';
                         searchInput.value = (product.code || '') + ' - ' + (product.description || '');
 
+                        // Se guardan los precios del producto en la propia
+                        // fila (no solo en el <select>) para poder aplicar
+                        // "este tipo de precio a todas las líneas" desde el
+                        // selector global, sin tener que volver a pedirlos.
+                        row.productPrices = product.prices || [];
+
                         fillPriceSelect(product.prices || []);
                         setLinePriceValue(row, (product.prices && product.prices.length) ? product.prices[0].price : (product.unit_price || 0));
 
@@ -1509,9 +2031,35 @@
                         })));
                         bodegaSelect.disabled = false;
 
+                        // Sin producto, la línea no se puede borrar: es la
+                        // que queda disponible para seguir buscando (ya no
+                        // hay botón "Agregar línea" aparte).
+                        const deleteBtn = row.querySelector('.line-delete-btn');
+                        if (deleteBtn) {
+                            deleteBtn.disabled = false;
+                        }
+
                         updateCantidadLimits(row);
                         recalcLine(row);
+
+                        // Ya no hay botón "Agregar línea": en cuanto se elige
+                        // un producto en la ÚLTIMA fila, se agrega una fila
+                        // vacía nueva debajo automáticamente (si la fila ya
+                        // no era la última, quiere decir que se está
+                        // cambiando el producto de una línea existente, y ya
+                        // hay una fila vacía más adelante -- no hace falta
+                        // agregar otra).
+                        const allRows = document.querySelectorAll('#documentLinesBody .document-line');
+                        if (row === allRows[allRows.length - 1]) {
+                            const newRow = addDocumentLine();
+                            newRow.querySelector('.line-product-search')?.focus();
+                        }
                     }
+
+                    // Expuesto para que el modal "buscar en todos los
+                    // productos" (compartido entre todas las líneas) pueda
+                    // aplicar el producto elegido a ESTA fila en concreto.
+                    row.applyProduct = applyProduct;
 
                     function renderResults(products) {
                         if (! products.length) {
@@ -1599,6 +2147,15 @@
                         // descuento cuando es de tipo "valor fijo".
                         handleLineDiscountInput(row, row.querySelector('.line-descuento-display').value);
                         recalcLine(row);
+                    });
+
+                    // Botón de lupa dentro del campo: abre el modal
+                    // "buscar en todos los productos" (compartido entre
+                    // todas las líneas), sin tocar la búsqueda incremental
+                    // de arriba. window.openAllProductsModal se define una
+                    // sola vez, fuera de esta función (ver más abajo).
+                    row.querySelector('.line-product-search-open-modal')?.addEventListener('click', () => {
+                        window.openAllProductsModal(row);
                     });
                 }
 
@@ -1770,11 +2327,35 @@
 
                 window.removeDocumentLine = function (button) {
                     const row = button.closest('.document-line');
+                    if (row.dataset.productPicked !== 'true') {
+                        return;
+                    }
                     if (document.querySelectorAll('#documentLinesBody .document-line').length > 1) {
                         row.remove();
                         recalcTotal();
                     }
                 };
+
+                // Solo existe en modo POS -- el bloque "efectivo recibido"
+                // solo tiene sentido si el PRIMER medio de pago es efectivo
+                // (código 10); con cualquier otro medio (tarjeta,
+                // transferencia) no hay nada que cobrar en físico.
+                function updatePosCashSectionVisibility() {
+                    const section = document.getElementById('pos-cash-section');
+                    if (! section) {
+                        return;
+                    }
+
+                    const firstCodeSelect = document.querySelector('#paymentLinesBody .payment-line select.payment-code-select');
+                    const isCash = ! firstCodeSelect || firstCodeSelect.selectedOptions[0]?.dataset.dianCode === '10';
+                    section.classList.toggle('hidden', ! isCash);
+
+                    if (! isCash) {
+                        document.getElementById('pos-efectivo-hidden').value = '';
+                        document.getElementById('pos-efectivo-display').value = '';
+                        updatePosChange();
+                    }
+                }
 
                 window.addPaymentLine = function () {
                     const template = document.getElementById('paymentLineTemplate');
@@ -1791,6 +2372,11 @@
                     }
                     window.initDatePickers?.();
 
+                    const codeSelect = row.querySelector('select.payment-code-select');
+                    codeSelect?.addEventListener('change', updatePosCashSectionVisibility);
+                    codeSelect?.addEventListener('change.hs.select', updatePosCashSectionVisibility);
+                    updatePosCashSectionVisibility();
+
                     return row;
                 };
 
@@ -1798,6 +2384,7 @@
                     const row = button.closest('.payment-line');
                     if (document.querySelectorAll('#paymentLinesBody .payment-line').length > 1) {
                         row.remove();
+                        updatePosCashSectionVisibility();
                     }
                 };
 
@@ -1857,6 +2444,71 @@
                     });
 
                     initClientSearch(departmentSelect);
+
+                    const posEfectivoDisplay = document.getElementById('pos-efectivo-display');
+                    const posEfectivoHidden = document.getElementById('pos-efectivo-hidden');
+                    if (posEfectivoDisplay && posEfectivoHidden) {
+                        posEfectivoDisplay.addEventListener('input', () => {
+                            handleLinePriceInput(null, posEfectivoDisplay.value, posEfectivoHidden, posEfectivoDisplay);
+                            updatePosChange();
+                        });
+                    }
+
+                    // Orden importa: la limpieza de líneas vacías tiene que
+                    // registrarse ANTES que el envío por fetch del POS, para
+                    // que ya haya quitado la línea sin producto del DOM antes
+                    // de que se arme el FormData (los listeners de "submit"
+                    // corren en el orden en que se registraron).
+                    initEmptyLineSubmitCleanup();
+                    initSubmitProcessingState();
+                    initPosAjaxCheckout();
+
+                    initAllProductsModal();
+
+                    // Popover "aplicar tipo de precio a todas las líneas":
+                    // por cada línea que YA tenga producto elegido, si ese
+                    // producto tiene un precio de ese tipo se lo pone; si no
+                    // lo tiene, la línea se deja tal como estaba.
+                    const bulkPriceTypeDropdown = document.getElementById('doc-bulk-price-type-btn')?.closest('.hs-dropdown');
+                    if (bulkPriceTypeDropdown) {
+                        document.querySelectorAll('.doc-bulk-price-type-option').forEach((option) => {
+                            option.addEventListener('click', () => {
+                                const priceTypeId = option.dataset.priceTypeId;
+
+                                document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
+                                    const prices = row.productPrices || [];
+                                    const match = prices.find((price) => String(price.price_type_id) === priceTypeId);
+                                    if (! match) {
+                                        return;
+                                    }
+
+                                    setLinePriceValue(row, match.price);
+                                    const precioSelect = row.querySelector('.line-precio-select');
+                                    if (precioSelect) {
+                                        setSelectValue(precioSelect, String(match.price));
+                                    }
+                                    recalcLine(row);
+                                });
+
+                                if (window.HSDropdown) {
+                                    HSDropdown.close(bulkPriceTypeDropdown);
+                                }
+                            });
+                        });
+
+                        // Mismo motivo que en los popovers de impuestos por
+                        // línea: con "--auto-close:false" Preline deja de
+                        // cerrar el panel solo, así que se cierra a mano con
+                        // clics realmente afuera.
+                        document.addEventListener('click', (event) => {
+                            if (! bulkPriceTypeDropdown.classList.contains('open')) {
+                                return;
+                            }
+                            if (! bulkPriceTypeDropdown.contains(event.target)) {
+                                HSDropdown.close(bulkPriceTypeDropdown);
+                            }
+                        });
+                    }
 
                     if (document.querySelectorAll('#documentLinesBody .document-line').length === 0) {
                         addDocumentLine();

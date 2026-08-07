@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyMemberController;
 use App\Http\Controllers\DianController;
 use App\Http\Controllers\DocumentoEmitidoController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceTypeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
@@ -67,7 +70,7 @@ Route::middleware(['auth'])->group(function () {
         });
     });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('clients')->name('clients.')->group(function () {
             Route::get('/', [ThirdPartyController::class, 'index'])->defaults('role', 'cliente')->name('index');
             Route::post('/', [ThirdPartyController::class, 'store'])->defaults('role', 'cliente')->name('store');
@@ -83,7 +86,7 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('{thirdParty}', [ThirdPartyController::class, 'destroy'])->defaults('role', 'proveedor')->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
             Route::post('/', [ProductController::class, 'store'])->name('store');
@@ -93,21 +96,21 @@ Route::middleware(['auth'])->group(function () {
             Route::post('import', [ProductImportController::class, 'import'])->name('import');
         });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('warehouses')->name('warehouses.')->group(function () {
             Route::post('/', [WarehouseController::class, 'store'])->name('store');
             Route::put('{warehouse}', [WarehouseController::class, 'update'])->name('update');
             Route::delete('{warehouse}', [WarehouseController::class, 'destroy'])->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('price-types')->name('price-types.')->group(function () {
             Route::post('/', [PriceTypeController::class, 'store'])->name('store');
             Route::put('{priceType}', [PriceTypeController::class, 'update'])->name('update');
             Route::delete('{priceType}', [PriceTypeController::class, 'destroy'])->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('documents')->name('documents.')->group(function () {
             Route::get('/', [DocumentoEmitidoController::class, 'index'])->name('index');
             Route::get('create', [DocumentoEmitidoController::class, 'create'])->name('create');
@@ -118,9 +121,28 @@ Route::middleware(['auth'])->group(function () {
             Route::get('create/product-search', [DocumentoEmitidoController::class, 'productSearch'])->name('create-product-search');
             Route::post('/', [DocumentoEmitidoController::class, 'store'])->name('store');
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
+            Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
         });
 
-    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
+    Route::middleware(['company.selected', 'company.role:pos,administrador,cajero,auditor'])
+        ->prefix('pos')->name('pos.')->group(function () {
+            Route::get('/', [PosController::class, 'create'])->name('create');
+            Route::get('shift', [PosController::class, 'shift'])->name('shift');
+            Route::post('checkout', [PosController::class, 'checkout'])->name('checkout');
+            Route::get('sales', [PosController::class, 'sales'])->name('sales.index');
+            Route::get('sales/{sale}', [PosController::class, 'showSale'])->name('sales.show');
+            Route::get('sales/{sale}/receipt.pdf', [PosController::class, 'receiptPdf'])->name('sales.receipt-pdf');
+            Route::post('sales/{sale}/issue-electronic', [PosController::class, 'issueElectronic'])->name('sales.issue-electronic');
+            Route::post('shifts', [CashShiftController::class, 'store'])->name('shifts.store');
+            Route::get('shifts/{shift}', [CashShiftController::class, 'show'])->name('shifts.show');
+            Route::post('shifts/{shift}/close', [CashShiftController::class, 'close'])->name('shifts.close');
+            Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
+            Route::post('payment-methods', [PaymentMethodController::class, 'store'])->name('payment-methods.store');
+            Route::put('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
+            Route::delete('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
+        });
+
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
         ->prefix('dian')->name('dian.')->group(function () {
             Route::get('resolutions', [DianController::class, 'resolutions'])->name('resolutions.index');
             Route::post('resolutions/sync', [DianController::class, 'syncResolutions'])->name('resolutions.sync');
@@ -144,4 +166,5 @@ Route::middleware(['auth'])->group(function () {
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');
     });
 });
+
 require __DIR__.'/auth.php';
