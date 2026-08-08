@@ -27,17 +27,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // y el navegador bloquea la descarga como "redirected through an
         // insecure connection". Solo se confía en cualquier proxy en
         // producción (detrás de un balanceador/CDN real).
-        // Vacío ([]): no se confía en ningún proxy. IMPORTANTE: env() todavía
-        // no está disponible en este punto del bootstrap (siempre devuelve
-        // null acá, antes de que .env termine de cargar), así que no se puede
-        // condicionar esto por ambiente aquí -- y "confiar en '*'" (cualquier
-        // IP) ya es de por sí una mala práctica que la propia documentación
-        // de Laravel desaconseja: cualquiera puede mandar X-Forwarded-Proto:
-        // https y forzar que route()/url() generen enlaces https:// aunque el
-        // sitio se sirva por http, lo que el navegador bloquea como descarga
-        // insegura. Si algún día hay un proxy real en producción (load
-        // balancer/CDN), hay que poner acá su(s) IP(s) exacta(s), no '*'.
-        $middleware->trustProxies(at: []);
+        // getenv('K_SERVICE') (no env(), que todavía no está disponible en
+        // este punto del bootstrap porque .env no terminó de cargar) detecta
+        // si el proceso corre dentro de Cloud Run: Google inyecta esa
+        // variable de entorno automáticamente en el contenedor, y no viene
+        // del .env. En Cloud Run el contenedor sólo es alcanzable a través
+        // del proxy de Google (que reescribe/sanitiza cualquier
+        // X-Forwarded-* que mande el cliente), así que ahí sí es seguro
+        // confiar en '*'. Fuera de Cloud Run (local, otros hosts) no se
+        // confía en ningún proxy.
+        $middleware->trustProxies(at: getenv('K_SERVICE') ? '*' : []);
         $middleware->web(SetUserLocale::class);
         $middleware->alias([
             'company.selected' => EnsureCompanySelected::class,
