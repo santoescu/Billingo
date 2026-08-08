@@ -53,7 +53,7 @@
                     const identificationNumber = numberInput.value.trim();
                     const digitCount = identificationNumber.replace(/\D/g, '').length;
 
-                    if (! identificationType || digitCount < 8) {
+                    if (! identificationType || digitCount < 7) {
                         statusEl?.classList.add('hidden');
                         spinner?.classList.add('hidden');
                         return;

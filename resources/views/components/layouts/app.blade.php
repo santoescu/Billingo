@@ -4,4 +4,5 @@
     </flux:main>
 
     @stack('scripts')
+    <x-numeric-only-script />
 </x-layouts.app.sidebar>

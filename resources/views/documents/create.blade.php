@@ -202,7 +202,7 @@
                         <flux:label>{{ __('Identification type') }}</flux:label>
                         <select id="doc-cliente_tipo_identificacion" name="cliente_tipo_identificacion" data-hs-select='{!! $basicSelectConfig !!}' data-dian-lookup-type class="hidden">
                             @foreach ($identificationTypes as $code => $label)
-                                <option value="{{ $code }}" @selected(old('cliente_tipo_identificacion', '31') === $code)>{{ $code }} - {{ $label }}</option>
+                                <option value="{{ $code }}" @selected(old('cliente_tipo_identificacion', '13') === $code)>{{ $code }} - {{ $label }}</option>
                             @endforeach
                         </select>
                     </flux:field>
