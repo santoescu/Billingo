@@ -169,9 +169,17 @@
                         const title = `${isIn ? '{{ __('Entry') }}' : '{{ __('Exit') }}'} — ${sign}${movement.quantity} ({{ __('at') }} ${formatMoneyCop(movement.unit_cost)})`;
                         const descriptionParts = [movement.reason_label, movement.warehouse_name, `{{ __('Balance') }}: ${movement.balance_after}`].filter(Boolean);
 
+                        // p-2 -m-2 se cancelan visualmente (mismo espacio que antes),
+                        // pero le dan aire al fondo resaltado del hover para que no
+                        // quede pegado al texto -- mismo padding que ya usa el patrón
+                        // de fila clickeable de notifications-bell.blade.php.
+                        const rowClasses = 'relative p-2 -m-2 rounded-lg'
+                            + (movement.url ? ' group hover:bg-gray-100 dark:hover:bg-neutral-700' : '');
+
                         return `
-                            <div class="flex gap-x-3">
-                                <div class="relative last:after:hidden after:absolute after:top-7 after:bottom-0 after:inset-s-3.5 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700">
+                            <div class="flex gap-x-3 ${rowClasses}">
+                                ${movement.url ? `<a class="z-1 absolute inset-0" href="${movement.url}"></a>` : ''}
+                                <div class="relative last:after:hidden after:absolute after:top-7 after:bottom-0 after:start-3.5 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700">
                                     <div class="relative z-10 size-7 flex justify-center items-center">
                                         <div class="size-2 rounded-full ${dotClasses}"></div>
                                     </div>

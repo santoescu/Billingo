@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\DocumentoEmitido;
+use App\Models\DocumentoPos;
 use App\Models\MeasurementUnit;
 use App\Models\PriceType;
 use App\Models\Product;
@@ -130,20 +132,56 @@ class ProductController extends Controller
         $userIds = $movements->pluck('user_id')->filter()->unique()->values()->all();
         $usersById = User::whereIn('_id', $userIds)->get()->keyBy(fn ($user) => (string) $user->_id);
 
+        // Una salida por venta guarda 'document:<numeral>' en "reason" -- para
+        // poder linkear al .show de esa venta hay que resolver ese numeral
+        // contra documentos_pos (venta de POS) O documentos_emitidos (factura
+        // electrónica directa, sin pasar por POS), sin saber de antemano cuál
+        // de los dos es. Se resuelve en batch (no una consulta por movimiento).
+        $saleNumerals = $movements
+            ->map(fn (StockMovement $m) => str_starts_with($m->reason ?? '', 'document:') ? substr($m->reason, strlen('document:')) : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $documentosPosByNumeral = DocumentoPos::where('company_id', (string) $company->_id)
+            ->whereIn('numeral', $saleNumerals)
+            ->get()
+            ->keyBy('numeral');
+
+        $documentosEmitidosByNumeral = DocumentoEmitido::where('company_id', (string) $company->_id)
+            ->whereIn('numeral', $saleNumerals)
+            ->get()
+            ->keyBy('numeral');
+
         return response()->json([
-            'movements' => $movements->map(fn (StockMovement $movement) => [
-                'date_label' => $movement->created_at?->translatedFormat('j \d\e F, Y'),
-                'type' => $movement->type,
-                'quantity' => (float) $movement->quantity,
-                'unit_cost' => (float) ($movement->unit_cost ?? 0),
-                'total_cost' => (float) ($movement->total_cost ?? 0),
-                'balance_after' => (float) $movement->balance_after,
-                'warehouse_name' => $movement->warehouse_id
-                    ? ($warehousesById->get($movement->warehouse_id)?->name ?? __('Unknown warehouse'))
-                    : __('Unassigned'),
-                'reason_label' => $this->humanizeReason($movement->reason),
-                'user_name' => $movement->user_id ? $usersById->get($movement->user_id)?->name : null,
-            ])->values(),
+            'movements' => $movements->map(function (StockMovement $movement) use ($warehousesById, $usersById, $documentosPosByNumeral, $documentosEmitidosByNumeral) {
+                $saleUrl = null;
+
+                if (str_starts_with($movement->reason ?? '', 'document:')) {
+                    $numeral = substr($movement->reason, strlen('document:'));
+
+                    if ($pos = $documentosPosByNumeral->get($numeral)) {
+                        $saleUrl = route('pos.sales.show', ['sale' => (string) $pos->_id]);
+                    } elseif ($emitido = $documentosEmitidosByNumeral->get($numeral)) {
+                        $saleUrl = route('documents.show', ['documento' => (string) $emitido->_id]);
+                    }
+                }
+
+                return [
+                    'date_label' => $movement->created_at?->translatedFormat('j \d\e F, Y'),
+                    'type' => $movement->type,
+                    'quantity' => (float) $movement->quantity,
+                    'unit_cost' => (float) ($movement->unit_cost ?? 0),
+                    'total_cost' => (float) ($movement->total_cost ?? 0),
+                    'balance_after' => (float) $movement->balance_after,
+                    'warehouse_name' => $movement->warehouse_id
+                        ? ($warehousesById->get($movement->warehouse_id)?->name ?? __('Unknown warehouse'))
+                        : __('Unassigned'),
+                    'reason_label' => $this->humanizeReason($movement->reason),
+                    'user_name' => $movement->user_id ? $usersById->get($movement->user_id)?->name : null,
+                    'url' => $saleUrl,
+                ];
+            })->values(),
         ]);
     }
 
