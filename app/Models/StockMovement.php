@@ -15,6 +15,8 @@ class StockMovement extends Model
         'warehouse_id',
         'type',
         'quantity',
+        'unit_cost',
+        'total_cost',
         'balance_after',
         'reason',
         'user_id',

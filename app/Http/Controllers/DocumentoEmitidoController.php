@@ -23,20 +23,10 @@ use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
-/**
- * Consulta (solo lectura) y emisión de documentos electrónicos desde el
- * panel web (facturas): la consulta filtra por la empresa activa y su
- * ambiente DIAN actual; la emisión arma el mismo JSON que espera la API
- * (ver Api\DocumentoController) y usa el mismo IssueDocumentService, para no
- * duplicar la lógica de facturación entre la web y la API.
- */
 class DocumentoEmitidoController extends Controller
 {
     private const FACTURA_CODES = ['01', '02', '03', '04'];
 
-    // Solo factura de venta nacional y de exportación son referenciables desde
-    // una nota: 03/04 (contingencia) comparten rango de numeración pero no
-    // tiene sentido dejarlas como origen de una nota crédito/débito aquí.
     private const REFERENCEABLE_FACTURA_CODES = ['01', '02'];
 
     private const CREATABLE_DOCUMENT_TYPES = ['01', '91', '92'];
@@ -71,23 +61,13 @@ class DocumentoEmitidoController extends Controller
     {
         $company = $this->currentCompany($request);
 
-        // Los productos ya no se cargan aquí de una vez: se buscan por AJAX
-        // mientras se escribe una línea (ver productSearch()), igual que los
-        // clientes (clientSearch()) -- puede haber miles.
         $paymentMeansCodes = PaymentMeansCode::orderBy('medio')->get();
         $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
         $departments = Department::orderBy('descripcion')->get();
         $fiscalResponsibilities = FiscalResponsibility::orderBy('codigo')->get();
 
-        // Todos los clientes de la empresa, para el modal "buscar en todos
-        // los clientes" (con tabla + buscador propio) -- aparte de la
-        // búsqueda incremental mientras se escribe (clientSearch()).
         $clients = $company->clients()->orderBy('name')->get()->map($this->mapClientForJs(...));
 
-        // Tipos de precio de la empresa, para el selector "aplicar precio a
-        // todas las líneas" -- los precios de cada producto en sí se siguen
-        // trayendo por AJAX (productSearch()), esto solo es la lista de
-        // tipos disponibles.
         $priceTypes = $company->priceTypes()->orderBy('name')->get();
 
         return view('documents.create', compact(
@@ -233,10 +213,6 @@ class DocumentoEmitidoController extends Controller
 
         $query = trim((string) $request->query('q', ''));
 
-        // Con texto se filtra por código/barras/descripción, igual que
-        // siempre; sin texto se listan los primeros productos igual (para
-        // el modal "buscar en todos los productos", que arranca mostrando
-        // algo antes de que el usuario escriba nada).
         $products = $company->products()->active()
             ->when($query !== '', function ($builder) use ($query) {
                 $builder->where(function ($builder) use ($query) {
@@ -273,9 +249,6 @@ class DocumentoEmitidoController extends Controller
                     ])
                     ->values();
 
-                // Siempre se incluye "sin asignar" (aunque el producto no
-                // controle inventario), para que el selector de bodega
-                // siempre tenga algo que mostrar en el formulario.
                 $warehouses->push([
                     'warehouse_id' => null,
                     'warehouse_name' => __('Unassigned'),
@@ -453,15 +426,12 @@ class DocumentoEmitidoController extends Controller
         }
 
         $data['prefix'] = $resolution->prefix;
-        // Reclama el número de forma atómica (compare-and-swap, ver
-        // Resolution::claimNextNumber()) en vez de solo leer current_number:
-        // necesario para que cajas/pestañas concurrentes (p. ej. el módulo
-        // POS) nunca terminen usando el mismo consecutivo.
+        
         $data['secuencial'] = $resolution->claimNextNumber();
 
         $document = $this->buildDocumentJson($company, $data);
 
-        return $service->issue($company, ['document' => $document]);
+        return $service->issue($company, ['document' => $document], (string) $request->user()->_id);
     }
 
     /**
@@ -480,8 +450,7 @@ class DocumentoEmitidoController extends Controller
     public function issuePosSale(Request $request, Company $company, CashShift $shift, IssueDocumentService $service): DocumentoPos
     {
         $data = $request->validate([
-            // Sin selector de tipo de operación en la pantalla de venta
-            // simplificada -- siempre es una venta estándar (10).
+            
             'tipo_operacion' => ['nullable', 'string', 'max:5'],
             'issue_date' => ['nullable', 'date'],
             'issue_time' => ['nullable', 'string', 'max:20'],
@@ -489,12 +458,7 @@ class DocumentoEmitidoController extends Controller
             'cliente_tipo_identificacion' => ['required', 'string', 'max:2'],
             'cliente_identificacion' => ['required', 'string', 'max:20'],
             'cliente_nombre' => ['required', 'string', 'max:255'],
-            // Dirección/ciudad/departamento ya NO son obligatorios acá: una
-            // venta del POS se crea siempre como talonario primero (nunca
-            // electrónica de una vez), así que un cliente mínimo ("Consumidor
-            // final", solo nombre) es válido -- esos datos completos solo se
-            // exigen más adelante, al emitir esa venta como factura
-            // electrónica (ver PosController::issueElectronic()).
+            
             'cliente_tipo_persona' => ['nullable', 'string', 'in:1,2'],
             'cliente_responsabilidades' => ['nullable', 'array'],
             'cliente_direccion' => ['nullable', 'string', 'max:255'],
@@ -540,12 +504,6 @@ class DocumentoEmitidoController extends Controller
             throw new InvalidArgumentException(__('The cash shift has no valid sales invoice resolution.'));
         }
 
-        // El formulario del POS ya no elige el código DIAN directo: elige
-        // uno de los medios de pago propios de la empresa (ver
-        // PaymentMethod), y acá se traduce a su código DIAN equivalente
-        // (puede no tener uno mapeado -- solo hace falta si esta venta se
-        // termina emitiendo electrónica después, ver
-        // PosController::issueElectronic()).
         $paymentMethodIds = array_filter($data['payment_method_id'] ?? []);
         $paymentMethods = $company->paymentMethods()->whereIn('_id', $paymentMethodIds)->get()->keyBy(fn (PaymentMethod $m) => (string) $m->_id);
         $data['payment_means_code'] = collect($data['payment_method_id'] ?? [])
@@ -558,11 +516,6 @@ class DocumentoEmitidoController extends Controller
         $data['prefix'] = $shift->fvResolution->prefix;
         $data['secuencial'] = 0;
 
-        // Toda venta del POS se crea SIEMPRE como factura de venta primero
-        // (nunca electrónica de una vez): si el cajero decide emitirla
-        // electrónica, eso se hace aparte desde el modal de resultado (ver
-        // PosController::issueElectronic()), una vez que esta venta ya
-        // existe.
         $documentoPos = $service->issuePosSale($company, ['document' => $this->buildDocumentJson($company, $data)], $shift->fvResolution, $shift);
 
         $firstPaymentMethod = $paymentMethods->get($data['payment_method_id'][0] ?? null);
@@ -661,9 +614,7 @@ class DocumentoEmitidoController extends Controller
                 'ID' => $paymentMeansIds[$i] ?? '1',
                 'PaymentMeansCode' => $paymentMeansCodes[$i] ?? '10',
                 'PaymentDueDate' => $paymentDueDates[$i] ?? null,
-                // La referencia de pago ya no la escribe el usuario: se numera
-                // sucesivamente según la posición entre los medios de pago
-                // realmente enviados (1, 2, 3...).
+                
                 'PaymentID' => (string) (count($paymentMeans) + 1),
             ];
         }
@@ -749,10 +700,7 @@ class DocumentoEmitidoController extends Controller
 
         if (! empty($item['descuento_valor']) && (float) $item['descuento_valor'] > 0) {
             $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
-            // Tope del lado del servidor (no solo visual): un porcentaje
-            // nunca puede pasar de 100, y un valor fijo nunca puede superar
-            // el subtotal de la línea (si no, el total de la línea quedaría
-            // negativo).
+            
             $descuentoValor = $esPorcentaje
                 ? min((float) $item['descuento_valor'], 100)
                 : min((float) $item['descuento_valor'], $baseAmount);
@@ -816,10 +764,6 @@ class DocumentoEmitidoController extends Controller
             ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
             : null;
 
-        // El efectivo recibido solo existe si el checkout venía del POS con
-        // pago en efectivo -- para un documento emitido normal (o al
-        // recargar/reimprimir el mismo recibo más tarde) no hay nada que
-        // mostrar ahí.
         $cashReceived = session('pos_cash_received');
         $isElectronic = true;
         $uuid = $documento->uuid;
@@ -831,7 +775,7 @@ class DocumentoEmitidoController extends Controller
             'cashReceived',
             'isElectronic',
             'uuid',
-        ))->setPaper([0, 0, 226.77, 800], 'portrait'); // ~80mm de ancho, alto libre
+        ))->setPaper([0, 0, 226.77, 800], 'portrait'); 
 
         return $pdf->download('recibo-' . $documento->numeral . '.pdf');
     }

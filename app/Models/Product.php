@@ -20,16 +20,9 @@ class Product extends Model
         'tracks_inventory',
         'stock',
         'warehouse_stocks',
+        'average_cost',
         'status',
     ];
-
-    // OJO: NO castear estos campos como 'array' -- en mongodb/laravel-mongodb
-    // ese cast serializa el valor a un STRING JSON al guardar (no es el cast
-    // nativo de Mongo), lo que rompe las consultas por dot-notation como
-    // "warehouse_stocks.warehouse_id" (ver Warehouse::products()) porque Mongo
-    // ve un string en vez de un arreglo de subdocumentos. Sin cast, el driver
-    // ya devuelve arrays de PHP planos por su propio typeMap (document=>array),
-    // así que no hace falta castear nada para leerlos con array_column()/collect().
 
     public function company()
     {
@@ -53,6 +46,11 @@ class Product extends Model
     public function getUnitPriceFormattedAttribute()
     {
         return '$' . number_format((float) $this->unit_price, 2, ',', '.');
+    }
+
+    public function getAverageCostFormattedAttribute()
+    {
+        return '$' . number_format((float) ($this->average_cost ?? 0), 2, ',', '.');
     }
 
     /**

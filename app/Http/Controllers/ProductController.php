@@ -7,6 +7,7 @@ use App\Models\MeasurementUnit;
 use App\Models\PriceType;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +23,22 @@ class ProductController extends Controller
         $priceTypes = $this->priceTypesOrDefault($company);
 
         return view('products.index', compact('products', 'measurementUnits', 'warehouses', 'priceTypes'));
+    }
+
+    /**
+     * Detalle de un producto: todo lo que tiene en este momento (precios,
+     * stock por bodega, costo promedio) y su kardex completo.
+     */
+    public function show(Request $request, string $product)
+    {
+        $company = $this->currentCompany($request);
+        $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
+
+        $warehouses = $company->warehouses()->orderBy('name')->get();
+        $priceTypes = $this->priceTypesOrDefault($company);
+        $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
+
+        return view('products.show', compact('product', 'warehouses', 'priceTypes', 'measurementUnits'));
     }
 
     /**
@@ -51,6 +68,16 @@ class ProductController extends Controller
         $product = Product::create($data);
 
         if ($product->tracks_inventory) {
+            $validatedCost = $request->validate([
+                'initial_unit_cost' => 'nullable|numeric|min:0',
+            ]);
+            $initialUnitCost = (float) ($validatedCost['initial_unit_cost'] ?? 0);
+
+            if ($initialUnitCost > 0 && (float) $product->stock > 0) {
+                $this->applyWeightedAverageEntry($product, 0.0, (float) $product->stock, $initialUnitCost);
+                $product->save();
+            }
+
             $this->logStockChanges($product, [], 0.0, $request, 'initial');
         }
 
@@ -85,6 +112,62 @@ class ProductController extends Controller
         return redirect()->route('products.index');
     }
 
+    /**
+     * Historial de movimientos (kardex) de un producto, para el panel de
+     * consulta -- se sirve por AJAX en vez de venir horneado en la carga
+     * inicial de /products porque, a diferencia de precios/bodegas (siempre
+     * pocos por producto), el historial de movimientos crece sin límite con
+     * el tiempo.
+     */
+    public function kardex(Request $request, string $product)
+    {
+        $company = $this->currentCompany($request);
+        $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
+
+        $movements = $product->stockMovements()->orderByDesc('created_at')->limit(200)->get();
+
+        $warehousesById = $company->warehouses()->get()->keyBy(fn ($warehouse) => (string) $warehouse->_id);
+        $userIds = $movements->pluck('user_id')->filter()->unique()->values()->all();
+        $usersById = User::whereIn('_id', $userIds)->get()->keyBy(fn ($user) => (string) $user->_id);
+
+        return response()->json([
+            'movements' => $movements->map(fn (StockMovement $movement) => [
+                'date_label' => $movement->created_at?->translatedFormat('j \d\e F, Y'),
+                'type' => $movement->type,
+                'quantity' => (float) $movement->quantity,
+                'unit_cost' => (float) ($movement->unit_cost ?? 0),
+                'total_cost' => (float) ($movement->total_cost ?? 0),
+                'balance_after' => (float) $movement->balance_after,
+                'warehouse_name' => $movement->warehouse_id
+                    ? ($warehousesById->get($movement->warehouse_id)?->name ?? __('Unknown warehouse'))
+                    : __('Unassigned'),
+                'reason_label' => $this->humanizeReason($movement->reason),
+                'user_name' => $movement->user_id ? $usersById->get($movement->user_id)?->name : null,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Traduce el "reason" crudo que se guarda en cada StockMovement (ver
+     * logStockMovement()/storeStockEntry()) a un texto legible para el
+     * kardex. Los prefijos ('document:', 'entry:') pueden traer un sufijo
+     * variable (número de factura, nota de la entrada) que se conserva tal
+     * cual después del prefijo reconocido.
+     */
+    private function humanizeReason(?string $reason): string
+    {
+        $reason ??= '';
+
+        return match (true) {
+            $reason === 'initial' => __('Initial stock'),
+            $reason === 'adjustment' => __('Manual adjustment'),
+            $reason === 'entry' => __('Goods entry'),
+            str_starts_with($reason, 'entry:') => __('Goods entry') . ' — ' . substr($reason, strlen('entry:')),
+            str_starts_with($reason, 'document:') => __('Sale') . ' — ' . substr($reason, strlen('document:')),
+            default => $reason,
+        };
+    }
+
     public function destroy(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
@@ -94,6 +177,103 @@ class ProductController extends Controller
         session()->flash('toast', [
             'type' => 'success',
             'message' => __('Deleted :name', ['name' => __('Product')]),
+        ]);
+
+        return redirect()->route('products.index');
+    }
+
+    /**
+     * Registra una entrada de mercancía CON costo (a diferencia del ajuste
+     * libre de stock del formulario de edición, esta es la única acción que
+     * captura explícitamente cuánto costó lo que entra, y por lo tanto la
+     * única que recalcula average_cost con la fórmula de promedio ponderado).
+     */
+    public function storeStockEntry(Request $request, string $product)
+    {
+        $company = $this->currentCompany($request);
+        $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
+
+        abort_unless($product->tracks_inventory, 422, __('This product does not track inventory.'));
+
+        $data = $request->validate([
+            'warehouse_id' => 'nullable|string',
+            'quantity' => 'required|numeric|min:0.01',
+            'unit_cost' => 'required|numeric|min:0',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $quantity = (float) $data['quantity'];
+        $unitCost = (float) $data['unit_cost'];
+        // El select manda "" para "Sin asignar" (no ausencia del campo);
+        // se normaliza a null para que quede igual que el resto de la app
+        // (logStockChanges/discountInventory usan null para esa bodega
+        // virtual, no string vacío).
+        $warehouseId = $data['warehouse_id'] ?: null;
+
+        $oldQty = (float) ($product->stock ?? 0);
+        $this->applyWeightedAverageEntry($product, $oldQty, $quantity, $unitCost);
+        $product->stock = $oldQty + $quantity;
+
+        if ($warehouseId) {
+            $stocks = $product->warehouse_stocks ?? [];
+            $found = false;
+
+            foreach ($stocks as &$entry) {
+                if (($entry['warehouse_id'] ?? null) === $warehouseId) {
+                    $entry['stock'] = (float) ($entry['stock'] ?? 0) + $quantity;
+                    $found = true;
+
+                    break;
+                }
+            }
+            unset($entry);
+
+            if (! $found) {
+                $stocks[] = ['warehouse_id' => $warehouseId, 'stock' => $quantity];
+            }
+
+            $product->warehouse_stocks = $stocks;
+        }
+
+        $product->save();
+
+        $reason = 'entry' . (! empty($data['note']) ? ':' . $data['note'] : '');
+        $this->logStockMovement($product, $quantity, $reason, $request, $warehouseId, $unitCost);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Stock entry registered.'),
+        ]);
+
+        return redirect()->route('products.index');
+    }
+
+    /**
+     * Corrige el costo promedio de un producto DIRECTAMENTE, sin tocar
+     * cantidades: pensada para productos que ya tenían stock antes de que
+     * existiera el costeo por promedio ponderado (o que se cargaron sin
+     * costo inicial), donde average_cost quedó en 0 y no hay ninguna
+     * "entrada" real que recalcularlo. A propósito NO crea un StockMovement
+     * (no hubo ningún movimiento físico de inventario) para no ensuciar el
+     * kardex con una entrada/salida que nunca pasó.
+     */
+    public function correctAverageCost(Request $request, string $product)
+    {
+        $company = $this->currentCompany($request);
+        $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
+
+        abort_unless($product->tracks_inventory, 422, __('This product does not track inventory.'));
+
+        $data = $request->validate([
+            'average_cost' => 'required|numeric|min:0',
+        ]);
+
+        $product->average_cost = (float) $data['average_cost'];
+        $product->save();
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Average cost updated.'),
         ]);
 
         return redirect()->route('products.index');
@@ -119,11 +299,18 @@ class ProductController extends Controller
             ->map(fn (array $entry) => (float) ($entry['stock'] ?? 0));
         $current[$unassignedKey] = round((float) $product->stock - round($current->sum(), 2), 2);
 
+        // Este camino (ajustes manuales desde el formulario general, sin un
+        // costo capturado explícitamente) no mueve el promedio ponderado: un
+        // aumento se trata como si entrara al costo promedio vigente (no
+        // altera la fórmula) y una disminución simplemente se valoriza a ese
+        // mismo promedio -- así average_cost queda estable ante correcciones.
+        $unitCost = (float) ($product->average_cost ?? 0);
+
         foreach ($previous->keys()->merge($current->keys())->unique() as $key) {
             $delta = round(($current[$key] ?? 0) - ($previous[$key] ?? 0), 2);
 
             if (abs($delta) > 0.00001) {
-                $this->logStockMovement($product, $delta, $reason, $request, $key === $unassignedKey ? null : $key);
+                $this->logStockMovement($product, $delta, $reason, $request, $key === $unassignedKey ? null : $key, $unitCost);
             }
         }
     }
@@ -131,8 +318,11 @@ class ProductController extends Controller
     /**
      * Registra un movimiento puntual en el kardex.
      * $quantity es la variación (positiva = entrada, negativa = salida).
+     * $unitCost es el costo unitario de ESTE movimiento puntual: para
+     * entradas es el costo real de esa compra, para salidas/ajustes es un
+     * snapshot del costo promedio del producto en ese momento.
      */
-    private function logStockMovement(Product $product, float $quantity, string $reason, Request $request, ?string $warehouseId): void
+    private function logStockMovement(Product $product, float $quantity, string $reason, Request $request, ?string $warehouseId, float $unitCost): void
     {
         StockMovement::create([
             'company_id' => $product->company_id,
@@ -140,10 +330,33 @@ class ProductController extends Controller
             'warehouse_id' => $warehouseId,
             'type' => $quantity >= 0 ? 'in' : 'out',
             'quantity' => abs($quantity),
+            'unit_cost' => $unitCost,
+            'total_cost' => round(abs($quantity) * $unitCost, 2),
             'balance_after' => $warehouseId ? $product->stockForWarehouse($warehouseId) : $product->unassigned_stock,
             'reason' => $reason,
             'user_id' => (string) $request->user()->_id,
         ]);
+    }
+
+    /**
+     * Recalcula el costo promedio ponderado del producto por una ENTRADA de
+     * $entryQty unidades a $entryUnitCost cada una. Solo se usa en entradas;
+     * las salidas no modifican average_cost, solo lo leen (ver
+     * IssueDocumentService::discountInventory()).
+     *
+     * @param  float  $oldQty  Stock del producto ANTES de esta entrada -- se
+     * recibe explícito (no se lee de $product->stock) porque en algunos
+     * llamadores $product->stock ya fue mutado al total nuevo antes de poder
+     * recalcular el promedio.
+     */
+    private function applyWeightedAverageEntry(Product $product, float $oldQty, float $entryQty, float $entryUnitCost): void
+    {
+        $oldAvg = (float) ($product->average_cost ?? 0);
+        $newQty = $oldQty + $entryQty;
+
+        $product->average_cost = $newQty > 0.00001
+            ? round((($oldQty * $oldAvg) + ($entryQty * $entryUnitCost)) / $newQty, 4)
+            : $entryUnitCost;
     }
 
     private function validatedData(Request $request): array
@@ -181,9 +394,6 @@ class ProductController extends Controller
             ]);
         }
 
-        // No hay un campo de "precio principal" aparte: el precio general
-        // del producto (el que se usa por defecto en la tabla y al elegirlo
-        // en una línea de documento) es el primero de la lista.
         $data['unit_price'] = $data['extra_prices'][0]['price'];
 
         $data['warehouse_stocks'] = $data['tracks_inventory']

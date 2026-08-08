@@ -12,8 +12,6 @@
             ->implode(', ');
     };
 
-    // Precios de cada producto, para el modal "Ver precios" -- solo los
-    // tipos de precio que sí tienen un valor asignado en ese producto.
     $productPricesMap = $products->mapWithKeys(function ($product) use ($priceTypesById) {
         $extraByType = collect($product->extra_prices ?? [])->keyBy('price_type_id');
 
@@ -26,9 +24,6 @@
         return [(string) $product->_id => $rows];
     });
 
-    // Bodegas de cada producto, para el modal "Ver bodegas" -- mismo
-    // criterio que $productPricesMap: solo las bodegas donde el producto
-    // sí tiene stock asignado (nada de mostrar todas las bodegas con "-").
     $productWarehousesMap = $products->mapWithKeys(function ($product) use ($warehousesById) {
         $rows = collect($product->warehouse_stocks ?? [])
             ->map(function ($entry) use ($warehousesById) {
@@ -42,8 +37,6 @@
         return [(string) $product->_id => $rows];
     });
 
-    // Productos de cada bodega con la cantidad puntual que tienen ahí, para
-    // mostrarlos en el modal sin tener que ir al servidor por ellos.
     $warehouseProductsMap = $warehouses->mapWithKeys(function ($warehouse) use ($products) {
         $warehouseId = (string) $warehouse->_id;
 
@@ -149,6 +142,10 @@
                                         </td>
                                         <td class="px-4 py-4 text-right">
                                             <div class="flex justify-end gap-1">
+                                                <a href="{{ route('products.show', $product->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
+                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                                                </a>
+
                                                 <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product) !!})">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
@@ -156,13 +153,28 @@
                                                     </svg>
                                                 </button>
 
-                                                <form action="{{ route('products.destroy', $product->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}">
-                                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                                <div class="hs-dropdown [--auto-close:true] relative inline-flex">
+                                                    <button type="button" class="hs-dropdown-toggle flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('More actions') }}">
+                                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                                                     </button>
-                                                </form>
+                                                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 flex items-center gap-1 dark:bg-neutral-800 dark:border-neutral-700">
+                                                        @if ($product->tracks_inventory)
+                                                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Register entry') }}" title="{{ __('Register entry') }}" onclick="openStockEntryPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
+                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                                            </button>
+                                                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Fix cost') }}" title="{{ __('Fix cost') }}" onclick="openAverageCostPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }}, {{ (float) ($product->average_cost ?? 0) }})">
+                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                                                            </button>
+                                                        @endif
+                                                        <form action="{{ route('products.destroy', $product->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
+                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -176,10 +188,7 @@
     </div>
 
     <div id="tab-warehouses" class="hidden">
-        {{-- El "hidden" vive en el div de afuera y "flex" en este de adentro
-             a propósito: combinar hidden+flex en el MISMO elemento es poco
-             fiable con Tailwind (el CSS generado puede dejar que gane el
-             display:flex sobre el display:none). --}}
+        
         <div class="flex flex-col gap-6">
             <div class="flex justify-end">
                 <flux:button variant="primary" icon="plus" onclick="openWarehousePanel()">
@@ -347,6 +356,104 @@
         </div>
     </div>
 
+    <!-- Panel deslizante: registrar entrada de mercancía (con costo, único
+         punto donde se recalcula average_cost -- ver ProductController::storeStockEntry()) -->
+    <div id="stock-entry-panel" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-md w-full z-80 bg-white border-e border-gray-200 dark:bg-neutral-800 dark:border-neutral-700" role="dialog" tabindex="-1" aria-labelledby="stock-entry-panel-label">
+        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+            <h3 id="stock-entry-panel-label" class="font-bold text-gray-800 dark:text-white">{{ __('Register stock entry') }}</h3>
+            <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#stock-entry-panel">
+                <span class="sr-only">Close</span>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="overflow-visible p-4">
+            <form id="stockEntryForm" method="POST" class="space-y-6">
+                @csrf
+                <p id="se-product-name" class="font-medium text-gray-800 dark:text-neutral-200"></p>
+
+                <div>
+                    <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Warehouse') }}</label>
+                    <select id="se-warehouse_id" name="warehouse_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                        <option value="">{{ __('Unassigned') }}</option>
+                        @foreach ($warehouses as $warehouse)
+                            <option value="{{ $warehouse->_id }}">{{ $warehouse->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2" for="se-quantity-display">{{ __('Quantity') }}</label>
+                    <input type="text" id="se-quantity-display" inputmode="decimal" placeholder="0"
+                        class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
+                    <input type="hidden" id="se-quantity" name="quantity">
+                </div>
+
+                <div>
+                    <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2" for="se-unit_cost-display">{{ __('Unit cost') }}</label>
+                    <div class="relative">
+                        <input type="text" id="se-unit_cost-display" inputmode="decimal" placeholder="0"
+                            class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                        <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
+                            <span class="text-sm">$</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="se-unit_cost" name="unit_cost">
+                </div>
+
+                <flux:input id="se-note" name="note" :label="__('Note (optional)')" maxlength="255" :placeholder="__('e.g. Purchase invoice #1234')" />
+
+                <div class="flex gap-3">
+                    <flux:spacer />
+                    <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: corregir costo promedio de un producto (sin tocar cantidades
+         ni crear un movimiento en el kardex -- ver ProductController::correctAverageCost()) -->
+    <div id="average-cost-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="average-cost-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-sm sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="average-cost-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Fix average cost') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#average-cost-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <form id="averageCostForm" method="POST" class="p-4 flex flex-col gap-4">
+                    @csrf
+                    <p id="ac-product-name" class="font-medium text-gray-800 dark:text-neutral-200"></p>
+                    <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('This only updates the average cost used to value the existing stock. It does not add or remove units, and it will not appear in the kardex.') }}</p>
+
+                    <div>
+                        <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2" for="ac-average_cost-display">{{ __('Unit cost') }}</label>
+                        <div class="relative">
+                            <input type="text" id="ac-average_cost-display" inputmode="decimal" placeholder="0"
+                                class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                            <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
+                                <span class="text-sm">$</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="ac-average_cost" name="average_cost">
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button type="button" class="py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10" data-hs-overlay="#average-cost-modal">{{ __('Cancel') }}</button>
+                        <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: productos de una bodega -->
     <div id="warehouse-products-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="warehouse-products-modal-label">
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-3xl sm:w-full m-3 sm:mx-auto">
@@ -365,7 +472,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- Modal: importar productos desde Excel -->
     <div id="product-import-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-import-modal-label">
@@ -569,6 +675,19 @@
                         </div>
                     </div>
                     <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('Changing this value later will record a stock adjustment.') }}</p>
+
+                    <div id="pr-initial-cost-wrapper" class="hidden">
+                        <label class="block text-sm font-medium text-zinc-800 dark:text-white mb-2" for="pr-initial_unit_cost-display">{{ __('Unit cost') }}</label>
+                        <div class="relative">
+                            <input type="text" id="pr-initial_unit_cost-display" inputmode="decimal" placeholder="0"
+                                class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                            <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
+                                <span class="text-sm">$</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="pr-initial_unit_cost" name="initial_unit_cost">
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{{ __('Used to set the starting average cost. To add more stock later with its own cost, use "Register entry" from the product list.') }}</p>
+                    </div>
 
                     <div class="flex justify-between items-center">
                         <label class="text-sm font-medium text-zinc-800 dark:text-white">{{ __('Stock by warehouse') }}</label>
@@ -788,6 +907,9 @@
                 function toggleStockField() {
                     const checkbox = document.getElementById('pr-tracks_inventory');
                     document.getElementById('pr-stock_wrapper').classList.toggle('hidden', !checkbox.checked);
+
+                    const isNew = document.getElementById('productForm').dataset.isNew === 'true';
+                    document.getElementById('pr-initial-cost-wrapper').classList.toggle('hidden', !(checkbox.checked && isNew));
                 }
 
                 function recalcUnassignedStock() {
@@ -1079,6 +1201,67 @@
                     }
                 };
 
+                // Mismo parseo que formatCop/rawDecimalValue (líneas 917-930),
+                // aplicado a los dos campos de "registrar entrada" que no son
+                // filas repetibles (por eso no reusan handleExtraPriceInput,
+                // que está acoplado a `.extra-price-*` dentro de una fila).
+                function handleDecimalDisplayInput(typedValue, hiddenId, displayId) {
+                    let str = String(typedValue ?? '').replace(/\./g, '');
+                    const commaIndex = str.indexOf(',');
+                    let intPart, decPart, hasComma;
+                    if (commaIndex === -1) {
+                        intPart = str.replace(/\D/g, '');
+                        decPart = '';
+                        hasComma = false;
+                    } else {
+                        intPart = str.slice(0, commaIndex).replace(/\D/g, '');
+                        decPart = str.slice(commaIndex + 1).replace(/\D/g, '').slice(0, 2);
+                        hasComma = true;
+                    }
+                    document.getElementById(hiddenId).value = rawDecimalValue(intPart, decPart);
+                    document.getElementById(displayId).value = formatCop(intPart, decPart, hasComma);
+                }
+
+                window.openStockEntryPanel = function (productId, productName) {
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#stock-entry-panel');
+                    }
+
+                    const form = document.getElementById('stockEntryForm');
+                    document.getElementById('se-product-name').textContent = productName;
+                    setSelectValue('se-warehouse_id', '');
+                    document.getElementById('se-quantity').value = '';
+                    document.getElementById('se-quantity-display').value = '';
+                    document.getElementById('se-unit_cost').value = '';
+                    document.getElementById('se-unit_cost-display').value = '';
+                    document.getElementById('se-note').value = '';
+
+                    form.action = @json(route('products.stock-entries.store', ['product' => '__ID__'])).replace('__ID__', productId);
+                };
+
+                window.openAverageCostPanel = function (productId, productName, currentAverageCost) {
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#average-cost-modal');
+                    }
+
+                    const form = document.getElementById('averageCostForm');
+                    document.getElementById('ac-product-name').textContent = productName;
+
+                    // Precarga el costo actual (puede ser 0) con el mismo
+                    // parseo que usa setExtraPriceValue para un valor crudo
+                    // con punto decimal viniendo del backend.
+                    const str = String(currentAverageCost ?? 0);
+                    const [intRaw, decRaw] = str.split('.');
+                    const intPart = (intRaw ?? '').replace(/\D/g, '');
+                    const decPart = (decRaw ?? '').replace(/\D/g, '').slice(0, 2);
+                    document.getElementById('ac-average_cost').value = rawDecimalValue(intPart, decPart);
+                    document.getElementById('ac-average_cost-display').value = formatCop(intPart, decPart, decRaw !== undefined);
+
+                    form.action = @json(route('products.average-cost.update', ['product' => '__ID__'])).replace('__ID__', productId);
+                };
+
                 window.openPriceTypePanel = function (priceType) {
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
@@ -1114,6 +1297,7 @@
                     ['stock', '{{ __('Unassigned stock') }}'],
                     ['warehouse_stock', '{{ __('Stock in a warehouse') }}'],
                     ['price', '{{ __('Price') }}'],
+                    ['cost', '{{ __('Unit cost') }}'],
                 ];
                 const existingWarehouseNames = @json($warehouses->pluck('name'));
                 const existingPriceTypeNames = @json($priceTypes->pluck('name'));
@@ -1360,6 +1544,13 @@
                     }
 
                     const form = document.getElementById('productForm');
+                    // El costo inicial solo tiene sentido al CREAR (define el
+                    // primer costo promedio del producto) -- al editar, para
+                    // sumar stock con su propio costo se usa "Register entry",
+                    // que sí queda registrado como un movimiento del kardex.
+                    form.dataset.isNew = product?.id ? 'false' : 'true';
+                    document.getElementById('pr-initial_unit_cost').value = '';
+                    document.getElementById('pr-initial_unit_cost-display').value = '';
 
                     document.getElementById('pr-code').value = product?.code ?? '';
                     document.getElementById('pr-barcode').value = product?.barcode ?? '';
@@ -1425,6 +1616,19 @@
                     checkbox.dataset.bound = 'true';
 
                     checkbox.addEventListener('change', toggleStockField);
+
+                    document.getElementById('se-quantity-display').addEventListener('input', (event) => {
+                        handleDecimalDisplayInput(event.target.value, 'se-quantity', 'se-quantity-display');
+                    });
+                    document.getElementById('se-unit_cost-display').addEventListener('input', (event) => {
+                        handleDecimalDisplayInput(event.target.value, 'se-unit_cost', 'se-unit_cost-display');
+                    });
+                    document.getElementById('pr-initial_unit_cost-display').addEventListener('input', (event) => {
+                        handleDecimalDisplayInput(event.target.value, 'pr-initial_unit_cost', 'pr-initial_unit_cost-display');
+                    });
+                    document.getElementById('ac-average_cost-display').addEventListener('input', (event) => {
+                        handleDecimalDisplayInput(event.target.value, 'ac-average_cost', 'ac-average_cost-display');
+                    });
 
                     document.getElementById('pr-stock_total').addEventListener('input', recalcUnassignedStock);
                     // Los botones +/- no disparan un evento "input" nativo.

@@ -30,9 +30,6 @@ class ProductImportController extends Controller
         $path = "imports/{$token}." . $request->file('file')->getClientOriginalExtension();
         $request->file('file')->storeAs('', $path, 'local');
 
-        // La vista previa usa el valor formateado (tal como se ve en Excel:
-        // "38.000,00", "001", etc.), que es más representativo para el usuario
-        // que el número crudo.
         $rows = $this->readRows(Storage::disk('local')->path($path), formatted: true);
 
         if (empty($rows)) {
@@ -58,10 +55,7 @@ class ProductImportController extends Controller
      */
     public function import(Request $request)
     {
-        // Con archivos grandes (miles de filas) el procesamiento puede tardar
-        // más que el límite por defecto de PHP y cortarse a la mitad -- cuando
-        // eso pasa, PHP devuelve una página de error HTML en vez de JSON, lo
-        // que rompe el fetch() del frontend ("Unexpected token '<'").
+        
         set_time_limit(1800);
 
         $company = $this->currentCompany($request);
@@ -70,7 +64,7 @@ class ProductImportController extends Controller
             'token' => ['required', 'string'],
             'mapping' => ['required', 'array'],
             'mapping.*.column' => ['required', 'integer', 'min:0'],
-            'mapping.*.target' => ['required', 'string', 'in:code,description,barcode,unit_code,tracks_inventory,stock,warehouse_stock,price'],
+            'mapping.*.target' => ['required', 'string', 'in:code,description,barcode,unit_code,tracks_inventory,stock,warehouse_stock,price,cost'],
             'mapping.*.price_type_name' => ['nullable', 'string', 'max:255'],
             'mapping.*.warehouse_name' => ['nullable', 'string', 'max:255'],
         ]);
@@ -78,34 +72,17 @@ class ProductImportController extends Controller
         $path = $this->resolveImportPath($data['token']);
         abort_unless($path, 404);
 
-        // Se leen las dos versiones de cada celda: la cruda (número de PHP,
-        // sin formatear) para columnas numéricas -- así no se corrompen los
-        // separadores de miles/decimales -- y la formateada (tal como Excel
-        // la muestra) para columnas de texto como "Código", que pueden
-        // depender del formato de celda para conservar ceros a la izquierda
-        // (ej. la celda vale 1 pero el formato "000" la muestra como "001").
         $rawRows = array_slice($this->readRows($path, formatted: false), 1);
         $formattedRows = array_slice($this->readRows($path, formatted: true), 1);
         $textTargets = ['code', 'description', 'barcode', 'unit_code', 'tracks_inventory'];
 
-        // Si el mapeo trae al menos una columna de "stock en bodega", el Excel
-        // es la fuente de verdad para ESAS bodegas puntuales -- las demás que
-        // el producto ya tuviera (no mencionadas en el Excel) no se tocan.
         $hasWarehouseMapping = collect($data['mapping'])->contains('target', 'warehouse_stock');
 
-        // Si el Excel no trae NINGUNA columna de inventario (ni "sin asignar",
-        // ni bodega, ni "¿inventariable?"), no se toca nada de inventario al
-        // actualizar un producto existente -- si no, se le pondría stock en 0
-        // y se le apagaría "controla inventario" solo por actualizar el precio.
         $hasInventoryMapping = collect($data['mapping'])
             ->pluck('target')
             ->intersect(['tracks_inventory', 'stock', 'warehouse_stock'])
             ->isNotEmpty();
 
-        // Se traen de una sola vez TODOS los productos cuyo código aparece en
-        // el archivo, en vez de una consulta por fila -- con archivos de miles
-        // de filas, cada ida y vuelta a Atlas suma y es lo que hacía que la
-        // importación se pasara del límite de tiempo.
         $codeColumn = collect($data['mapping'])->firstWhere('target', 'code')['column'] ?? null;
         $codesInFile = $codeColumn === null
             ? []
@@ -135,6 +112,7 @@ class ProductImportController extends Controller
             $unitCode = null;
             $tracksInventory = false;
             $unassignedStock = 0.0;
+            $cost = null;
             $prices = [];
             $warehouseStocks = [];
 
@@ -147,10 +125,6 @@ class ProductImportController extends Controller
                     continue;
                 }
 
-                // Las columnas de texto (código, descripción, etc.) usan el
-                // valor formateado (ver arriba), que ya conserva ceros a la
-                // izquierda y evita notación científica -- las numéricas usan
-                // el valor crudo para no arrastrar separadores mal leídos.
                 $number = ! $isTextTarget && is_numeric($rawValue) ? (float) $rawValue : $this->parseColombianNumber($value);
 
                 match ($map['target']) {
@@ -162,6 +136,7 @@ class ProductImportController extends Controller
                     'stock' => $unassignedStock = $number,
                     'warehouse_stock' => $warehouseStocks[$map['warehouse_name'] ?: __('Warehouse')] = $number,
                     'price' => $prices[$map['price_type_name'] ?: __('Price')] = $number,
+                    'cost' => $cost = $number,
                     default => null,
                 };
             }
@@ -175,9 +150,6 @@ class ProductImportController extends Controller
 
             $product = $existingProducts->get($codigo);
 
-            // El precio (y la descripción) solo son obligatorios para CREAR un
-            // producto nuevo -- si ya existe, este archivo puede traer solo
-            // bodegas o solo precios sin que eso implique borrar lo demás.
             if (! $product && (! $descripcion || empty($prices))) {
                 $skipped++;
                 $skippedReasons[! $descripcion ? 'no_description' : 'no_price'] =
@@ -216,10 +188,6 @@ class ProductImportController extends Controller
 
             $tracksInventory = $tracksInventory || ! empty($newWarehouseEntries);
 
-            // Solo se incluye en la actualización lo que este archivo realmente
-            // trae -- así una importación que solo trae bodegas no borra la
-            // descripción/precio/código de barras que el producto ya tenía,
-            // y viceversa.
             $productData = [];
             if ($descripcion !== null) {
                 $productData['description'] = $descripcion;
@@ -234,10 +202,18 @@ class ProductImportController extends Controller
                 $productData['unit_price'] = $extraPrices[0]['price'];
                 $productData['extra_prices'] = $extraPrices;
             }
+            if ($cost !== null) {
+                // El import es una sincronización absoluta desde la planilla
+                // (igual que "stock", que reemplaza el total, no lo suma) --
+                // por eso el costo importado fija average_cost directo, como
+                // "Fix cost", en vez de recalcularlo con la fórmula de
+                // promedio ponderado (que es para entradas puntuales, ver
+                // ProductController::storeStockEntry()).
+                $productData['average_cost'] = $cost;
+            }
 
             if ($hasInventoryMapping) {
-                // Se fusiona con las bodegas que el producto ya tuviera: solo
-                // se sobrescriben las que vinieron en el Excel.
+                
                 $existingEntries = $product
                     ? collect($product->warehouse_stocks ?? [])->keyBy('warehouse_id')->all()
                     : [];
@@ -245,10 +221,6 @@ class ProductImportController extends Controller
                     ? array_merge($existingEntries, $newWarehouseEntries)
                     : $existingEntries;
 
-                // El total siempre se recalcula a partir de TODAS las bodegas
-                // que el producto queda teniendo (no solo las nuevas de esta
-                // fila), más lo "sin asignar" -- si no, el total quedaba por
-                // debajo de lo que en realidad sumaban las bodegas.
                 $totalStock = $unassignedStock + array_sum(array_column($mergedEntries, 'stock'));
 
                 $productData['warehouse_stocks'] = array_values($mergedEntries);
@@ -260,8 +232,7 @@ class ProductImportController extends Controller
                 $product->update($productData);
                 $updated++;
             } else {
-                // Para crear ya se validó arriba que hay descripción y al
-                // menos un precio; lo demás usa un valor por defecto sensato.
+                
                 $productData['code'] = $codigo;
                 $productData['company_id'] = (string) $company->_id;
                 $productData['barcode'] ??= null;

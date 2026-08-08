@@ -18,32 +18,14 @@ use RuntimeException;
 use SimpleXMLElement;
 use ZipArchive;
 
-/**
- * Punto de entrada único para emitir un documento electrónico (factura, nota
- * crédito o nota débito): resuelve la numeración, arma y firma el XML UBL,
- * lo envía a la DIAN, y guarda el resultado como un DocumentoEmitido. Tanto
- * la web como la API usan este mismo servicio para no duplicar la lógica de
- * facturación.
- */
 class IssueDocumentService
 {
     private const FACTURA_CODES = ['01', '02', '03', '04', '05'];
     private const NOTA_CREDITO_CODE = '91';
     private const NOTA_DEBITO_CODE = '92';
 
-    /**
-     * Códigos de la DIAN ("StatusCode") que indican que todavía no hay un
-     * resultado definitivo (ni aceptado ni rechazado): 98 = "Intente más
-     * tarde" (SendBillSync, procesando), 66 = "TrackId no existe en los
-     * registros de la DIAN" (GetStatus, aún no indexado del lado de ellos).
-     */
     private const PENDING_STATUS_CODES = ['98', '66'];
 
-    /**
-     * Fragmento del ErrorMessage de la DIAN que marca la "Regla: 90": el
-     * documento ya fue procesado antes (no es un rechazo real del contenido,
-     * solo indica que ya existe una versión autorizada del lado de la DIAN).
-     */
     private const ALREADY_PROCESSED_RULE = 'Regla: 90';
 
     public function __construct(
@@ -64,9 +46,11 @@ class IssueDocumentService
      *
      * @param  Company  $company  Empresa emisora.
      * @param  array  $request  Cuerpo de la petición ({"tipo_documento": "...", "document": {...}}).
+     * @param  string|null  $userId  Quién emitió la factura (null si viene de la API con
+     * token de empresa, sin usuario asociado) -- ver discountInventory().
      * @return DocumentoEmitido Documento guardado, con el resultado de la DIAN.
      */
-    public function issue(Company $company, array $request): DocumentoEmitido
+    public function issue(Company $company, array $request, ?string $userId = null): DocumentoEmitido
     {
         $payload = $this->mapper->map($company, $request);
         $tipoDocumento = $payload['tipo_documento'];
@@ -86,7 +70,10 @@ class IssueDocumentService
 
         $secuencial = $this->syncResolutionNumbering($resolution, $numeral);
 
-        return $this->buildSignSubmitAndPersist($company, $payload, $tipoDocumento, $resolution, $numeral, $secuencial, $ambiente, $existente);
+        return $this->buildSignSubmitAndPersist(
+            $company, $payload, $tipoDocumento, $resolution, $numeral, $secuencial, $ambiente, $existente,
+            userId: $userId,
+        );
     }
 
     /**
@@ -136,7 +123,7 @@ class IssueDocumentService
         ]);
 
         $this->syncProducts($company, $payload['lineas'] ?? []);
-        $this->discountInventory($company, $payload['lineas'] ?? [], $numeral);
+        $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, (string) $shift->user_id);
 
         return $documento;
     }
@@ -150,9 +137,10 @@ class IssueDocumentService
      * @param  array  $request  Mismo shape que espera issue() ({"document": {...}}).
      * @param  Resolution  $resolution  Resolución DIAN ya elegida/validada por el caller.
      * @param  bool  $skipInventoryDiscount  True si el inventario ya se descontó (venta del POS: se descontó al crear el DocumentoPos).
+     * @param  string|null  $userId  Quién emitió la factura -- ver discountInventory().
      * @return DocumentoEmitido Documento electrónico emitido.
      */
-    public function issueWithResolution(Company $company, array $request, Resolution $resolution, bool $skipInventoryDiscount = false): DocumentoEmitido
+    public function issueWithResolution(Company $company, array $request, Resolution $resolution, bool $skipInventoryDiscount = false, ?string $userId = null): DocumentoEmitido
     {
         $payload = $this->mapper->map($company, $request);
         $tipoDocumento = $payload['tipo_documento'];
@@ -164,6 +152,7 @@ class IssueDocumentService
         return $this->buildSignSubmitAndPersist(
             $company, $payload, $tipoDocumento, $resolution, $numeral, (string) $numero, $ambiente, null,
             skipInventoryDiscount: $skipInventoryDiscount,
+            userId: $userId,
         );
     }
 
@@ -215,6 +204,7 @@ class IssueDocumentService
         string $ambiente,
         ?DocumentoEmitido $existente,
         bool $skipInventoryDiscount = false,
+        ?string $userId = null,
     ): DocumentoEmitido {
         $fechaEmision = $this->resolveIssueDateTime($payload);
         $fechaVencimiento = $this->resolveDueDate($payload);
@@ -298,31 +288,17 @@ class IssueDocumentService
             return $documento;
         }
 
-        // Regla 90: la DIAN rechaza el reenvío porque este documento ya fue
-        // procesado antes -- no se reprocesa. Se consulta GetStatus con el
-        // XmlDocumentKey que trajo esta misma respuesta; si esa versión ya
-        // está vigente (autorizada), se trae el XML real con
-        // GetXmlByDocumentKey y el documento se sincroniza con eso (puede
-        // que acá tuviéramos otro cliente/ítems distintos a lo que la DIAN
-        // ya tiene). Si la consulta no confirma que esté vigente, se sigue
-        // el flujo normal de abajo con la respuesta original (rechazo).
         if ($this->isAlreadyProcessedRule($results) && ! empty($results['xml_document_key'])) {
             if ($this->syncWithAlreadyProcessedDocument($company, $documento, $results['xml_document_key'])) {
                 return $documento;
             }
         }
 
-        // Si SendBillSync ya dio un resultado definitivo (aceptado o
-        // rechazado, distinto de regla 90), esa ES la respuesta final -- no
-        // hace falta consultar nada más. Solo si quedó pendiente (98/66) se
-        // intenta GetStatus, por si ya tiene la respuesta lista; si tampoco
-        // la tiene o la consulta falla, se sigue con el resultado pendiente
-        // de SendBillSync.
         if (in_array($results['status_code'] ?? null, self::PENDING_STATUS_CODES, true)) {
             try {
                 $results = $this->client->getStatus($company, $uuid);
             } catch (RuntimeException $e) {
-                // Se mantiene el resultado (pendiente) de SendBillSync.
+                
             }
         }
 
@@ -341,7 +317,7 @@ class IssueDocumentService
         ]);
 
         if (! $skipInventoryDiscount && ! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
-            $this->discountInventory($company, $payload['lineas'] ?? [], $numeral);
+            $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, $userId);
         }
 
         return $documento;
@@ -408,11 +384,6 @@ class IssueDocumentService
         $dianPayload = $this->buildPayloadFromDianXml($parsedXml);
         $clienteId = $this->resolveClienteIdFromDianPayload($company, $dianPayload['accounting_customer_party']);
 
-        // Los productos de las líneas reales de la DIAN se crean si no
-        // existen todavía (igual que el flujo normal); los que ya existen se
-        // dejan quietos. El stock NO se toca acá -- este documento ya estaba
-        // autorizado desde antes, así que ya se descontó (o no) en su
-        // momento; solo el flujo normal (sin regla 90) descuenta inventario.
         $this->syncProducts($company, $dianPayload['lineas']);
 
         $payload = $documento->payload ?? [];
@@ -425,10 +396,6 @@ class IssueDocumentService
         $payload['lineas'] = $dianPayload['lineas'];
         $payload['cliente_id'] = $clienteId;
 
-        // El XML del documento ya se trajo arriba (GetXmlByDocumentKey); el
-        // "response" (reglas de rechazo/notificación) se trae aparte con
-        // GetStatus -- si esa consulta falla, se arma un mensaje mínimo con
-        // lo poco que ya se sabe, sin tumbar la sincronización.
         try {
             $statusResults = $this->client->getStatus($company, $xmlDocumentKey);
         } catch (RuntimeException $e) {
@@ -650,12 +617,6 @@ class IssueDocumentService
             throw new InvalidArgumentException("El número \"{$numeral}\" está fuera del rango autorizado de la resolución ({$resolution->range_from}-{$resolution->range_to}).");
         }
 
-        // Update condicionado (en vez de leer current_number y decidir en
-        // PHP si tocaba avanzarlo) para que sea atómico: si dos llamadas
-        // concurrentes sincronizan numerales distintos, cada una solo
-        // avanza el contador si sigue siendo menor que su propio
-        // consecutivo en el momento exacto del update, no en el momento en
-        // que se leyó.
         Resolution::where('_id', $resolution->_id)
             ->where(function ($query) use ($consecutivo) {
                 $query->where('current_number', '<=', $consecutivo)
@@ -772,7 +733,7 @@ class IssueDocumentService
                     return new DateTimeImmutable($issueDate . ' ' . $issueTime, new DateTimeZone('America/Bogota'));
                 }
             } catch (\Exception $e) {
-                // Se cae al valor por defecto de abajo.
+                
             }
         }
 
@@ -859,8 +820,11 @@ class IssueDocumentService
      * @param  Company  $company  Empresa emisora.
      * @param  array  $lineas  Líneas del documento (shape interno de UblDocumentBuilder).
      * @param  string  $numeral  Número del documento, para el motivo del movimiento.
+     * @param  string|null  $userId  Quién vendió: el cajero del turno (venta POS) o quien
+     * emitió la factura (venta directa por el panel web). Null en documentos emitidos por
+     * la API con token de empresa (no hay un usuario asociado a esa petición).
      */
-    private function discountInventory(Company $company, array $lineas, string $numeral): void
+    private function discountInventory(Company $company, array $lineas, string $numeral, ?string $userId = null): void
     {
         foreach ($lineas as $linea) {
             $codigo = $linea['codigo'] ?? null;
@@ -880,10 +844,12 @@ class IssueDocumentService
             $warehouseId = $linea['bodega_id'] ?? null;
             $balanceAfter = null;
 
+            // Snapshot del costo promedio ANTES de mutar: una venta nunca
+            // modifica average_cost, solo lo lee para valorizar la salida.
+            $unitCost = (float) ($product->average_cost ?? 0);
+
             if ($warehouseId) {
-                // Bodega elegida en el documento: se descuenta solo de esa
-                // entrada, no de "la primera que haya" (eso era un parche
-                // temporal mientras no existía esta selección en la UI).
+                
                 foreach ($stocks as &$entry) {
                     if (($entry['warehouse_id'] ?? null) === $warehouseId) {
                         $entry['stock'] = (float) ($entry['stock'] ?? 0) - $cantidad;
@@ -902,14 +868,14 @@ class IssueDocumentService
             StockMovement::create([
                 'company_id' => (string) $company->_id,
                 'product_id' => (string) $product->_id,
-                // Sin bodega elegida: se descuenta del total sin tocar
-                // ninguna bodega puntual, y el saldo del kardex es el
-                // "sin asignar" que queda (no una bodega específica).
                 'warehouse_id' => $warehouseId,
                 'type' => 'out',
                 'quantity' => $cantidad,
+                'unit_cost' => $unitCost,
+                'total_cost' => round($cantidad * $unitCost, 2),
                 'balance_after' => $warehouseId ? $balanceAfter : $product->unassigned_stock,
                 'reason' => 'document:' . $numeral,
+                'user_id' => $userId,
             ]);
         }
     }

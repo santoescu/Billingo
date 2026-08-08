@@ -55,8 +55,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('certificate/validate', [CompanyController::class, 'validateCertificate'])->name('certificate.validate');
     Route::post('companies/{id}/api-token', [CompanyController::class, 'regenerateApiToken'])->name('companies.api-token.regenerate');
 
-    // Habilitación ante la DIAN: se administra por empresa (desde su propio
-    // modal de edición), no depende de cuál sea la "empresa activa" en sesión.
     Route::post('companies/{id}/dian/send-test-set', [DianController::class, 'sendTestSet'])->name('companies.dian.send-test-set');
     Route::post('companies/{id}/dian/test-set-status', [DianController::class, 'testSetStatus'])->name('companies.dian.test-set-status');
 
@@ -90,8 +88,12 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
             Route::post('/', [ProductController::class, 'store'])->name('store');
+            Route::get('{product}', [ProductController::class, 'show'])->name('show');
             Route::put('{product}', [ProductController::class, 'update'])->name('update');
             Route::delete('{product}', [ProductController::class, 'destroy'])->name('destroy');
+            Route::post('{product}/stock-entries', [ProductController::class, 'storeStockEntry'])->name('stock-entries.store');
+            Route::post('{product}/average-cost', [ProductController::class, 'correctAverageCost'])->name('average-cost.update');
+            Route::get('{product}/kardex', [ProductController::class, 'kardex'])->name('kardex');
             Route::post('import/preview', [ProductImportController::class, 'preview'])->name('import.preview');
             Route::post('import', [ProductImportController::class, 'import'])->name('import');
         });
