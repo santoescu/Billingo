@@ -10,6 +10,10 @@
 .env
 .env.backup
 .env.production
+
+# Setup de Docker para desarrollo local, no se comparte con el repo.
+/Dockerfile.dev
+/docker-compose.yml
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
