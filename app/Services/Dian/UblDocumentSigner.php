@@ -10,11 +10,6 @@ use DOMElement;
 use DOMXPath;
 use RuntimeException;
 
-/**
- * Firma digitalmente (XAdES-EPES) el XML UBL 2.1 ya armado por
- * UblDocumentBuilder, agregando el segundo ext:UBLExtension (ds:Signature)
- * que exige la DIAN.
- */
 class UblDocumentSigner
 {
     private const DS_NS = 'http://www.w3.org/2000/09/xmldsig#';

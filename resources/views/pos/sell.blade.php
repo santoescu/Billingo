@@ -14,10 +14,6 @@
         '91' => __('NUIP'),
     ];
 
-    // Armados acá (no inline en @json dentro del <script>): el directive
-    // @json de Blade no procesa bien expresiones multilínea con paréntesis
-    // anidados (closures, arrow functions), así que cualquier dato complejo
-    // para JS se prepara antes en una variable simple.
     $defaultClientJs = [
         'id' => (string) $defaultClient->_id,
         'identification_type' => $defaultClient->identification_type,
@@ -168,7 +164,7 @@
                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Identification type') }}</label>
                             <select id="pos-client-type" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
                                 @foreach ($identificationTypes as $code => $label)
-                                    <option value="{{ $code }}" @selected($code === '13')>{{ $code }} - {{ $label }}</option>
+                                    <option value="{{ $code }}" @selected($code == '13')>{{ $code }} - {{ $label }}</option>
                                 @endforeach
                             </select>
                         </div>

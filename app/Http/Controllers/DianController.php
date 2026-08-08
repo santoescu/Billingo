@@ -12,13 +12,6 @@ use RuntimeException;
 use SimpleXMLElement;
 use ZipArchive;
 
-/**
- * Agrupa todo lo relacionado con los servicios de la DIAN para la empresa
- * activa: por ahora las resoluciones de numeración; más adelante el
- * envío/consulta de documentos electrónicos. El certificado de firma
- * digital se gestiona junto con los demás datos de la empresa (sirve para
- * los tres módulos, no solo para emisión).
- */
 class DianController extends Controller
 {
     /**
@@ -58,7 +51,7 @@ class DianController extends Controller
         $company = $this->currentCompany($request);
 
         $data = $request->validate([
-            'document_type' => ['required', 'in:91,92,FV'], // 91=Nota Crédito, 92=Nota Débito, FV=Factura de venta (interno, no es código DIAN)
+            'document_type' => ['required', 'in:91,92,FV'], 
             'prefix' => ['required', 'string', 'max:10'],
             'range_from' => ['required', 'integer', 'min:1'],
         ]);
@@ -67,10 +60,7 @@ class DianController extends Controller
             'company_id' => (string) $company->_id,
             'document_type' => $data['document_type'],
             'prefix' => $data['prefix'],
-            // (int) explícito: la regla 'integer' de validate() solo valida
-            // el formato, no castea el tipo -- sin esto queda guardado como
-            // string y claimNextNumber() (compara por igualdad exacta con
-            // Mongo, sensible al tipo) nunca hace match.
+            
             'range_from' => (int) $data['range_from'],
             'range_to' => null,
             'current_number' => (int) $data['range_from'],
@@ -150,10 +140,6 @@ class DianController extends Controller
             return redirect()->route('dian.resolutions.index');
         }
 
-        // Los rangos que devuelve la DIAN dependen del ambiente al que se
-        // llamó (habilitación o producción son NITs/rangos distintos), así
-        // que se etiquetan y se comparan solo contra lo ya sincronizado en
-        // ese mismo ambiente.
         $environment = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
 
         $existingNumbers = $company->resolutions()
@@ -246,10 +232,6 @@ class DianController extends Controller
 
         $company->update($data);
 
-        // SendTestSetAsync siempre apunta al ambiente de pruebas de la DIAN
-        // sin importar el ambiente configurado en la empresa (ver
-        // DianSoapClient::sendTestSetAsync()), así que aquí no hace falta
-        // validar/forzar el ambiente de la empresa.
         if (! $company->dian_pin || ! $company->dian_software_id || ! $company->dian_certificate_content) {
             return response()->json(['message' => __('Configure the pin, software ID and certificate for this company first.')], 422);
         }
@@ -297,9 +279,7 @@ class DianController extends Controller
         }
 
         try {
-            // GetStatusZip también se fuerza al ambiente de pruebas: el
-            // zip_key se generó ahí (ver sendTestSetAsync), sin importar el
-            // ambiente configurado en la empresa.
+            
             $results = $client->getStatusZip($company, $company->dian_test_set_zip_key, config('services.dian.endpoint'));
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

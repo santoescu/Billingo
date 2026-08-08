@@ -2,11 +2,7 @@
 
 @php
     $id = 'datepicker-' . $name;
-    // now() usa la zona horaria de la app (UTC, config/app.php) -- hay que
-    // forzar Bogotá aquí porque si no, cerca de la medianoche UTC (7pm en
-    // Colombia) esto precarga la fecha de MAÑANA, y la DIAN rechaza el
-    // documento (regla FAD09e) porque IssueDate no coincide con la fecha
-    // real de la firma.
+    
     $value = $value ?: ($allowEmpty ? '' : now('America/Bogota')->format('Y-m-d'));
 
     $months = [

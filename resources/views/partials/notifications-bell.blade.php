@@ -15,12 +15,6 @@
         </span>
     </button>
 
-    {{-- Este panel se mueve por JS a <body> al iniciar: el sidebar tiene la
-         utilidad `transform` para su animación de deslizamiento, y eso hace
-         que cualquier `position: fixed` anidado adentro deje de posicionarse
-         contra la ventana y quede atrapado/recortado dentro del sidebar. Al
-         vivir en <body> directamente, el panel sí puede extenderse libremente
-         hacia el contenedor de contenido de la derecha. --}}
     <div
         id="notifications-panel"
         class="hidden fixed w-96 z-[100] bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-neutral-900 dark:border-neutral-700"

@@ -1,5 +1,5 @@
 @php
-    // NIT (tipo de identificación 31) es el único tipo que trae DV.
+    
     $nitIdentificationType = '31';
 @endphp
 

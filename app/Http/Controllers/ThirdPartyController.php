@@ -66,9 +66,6 @@ class ThirdPartyController extends Controller
             ]);
         }
 
-        // El modal de crear cliente del POS (pos/sell.blade.php) manda esta
-        // misma petición por fetch para no salir de la pantalla de venta --
-        // le devolvemos el tercero creado/existente en vez de redirigir.
         if ($request->wantsJson()) {
             return response()->json(['client' => $this->mapThirdPartyForJs($thirdParty)]);
         }
@@ -124,8 +121,6 @@ class ThirdPartyController extends Controller
 
         $thirdParty = ThirdParty::where('company_id', (string) $company->_id)->findOrFail($thirdParty);
 
-        // Solo quitamos el rol de este módulo; si el tercero sigue teniendo
-        // otro rol (ej. también es proveedor), el registro se conserva.
         $roles = collect($thirdParty->roles ?? [])->reject(fn ($r) => $r === $role)->values()->all();
 
         if (empty($roles)) {
@@ -166,8 +161,6 @@ class ThirdPartyController extends Controller
 
         $data['fiscal_responsibilities'] = implode(';', $data['fiscal_responsibilities'] ?? []);
 
-        // El dígito de verificación solo aplica a NIT (tipo 31) y siempre se
-        // calcula en el servidor, nunca se confía en lo que mande el cliente.
         $data['dv'] = ($data['identification_type'] ?? null) === '31'
             ? Company::calculateVerificationDigit($data['identificacion'])
             : null;

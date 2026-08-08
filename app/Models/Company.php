@@ -35,18 +35,9 @@ class Company extends Model
         'api_token',
     ];
 
-    // 'dian_environment' guarda directamente el código de la lista oficial
-    // "Ambiente de Destino" de la DIAN (1=Producción, 2=Pruebas), sin
-    // traducción intermedia: así el mismo valor se usa tal cual en
-    // ProfileExecutionID, el schemeID del UUID, y en la fórmula del CUFE.
-    // Sin dato guardado se asume Pruebas (más seguro por defecto: nunca
-    // mandar a producción por accidente solo porque el campo no se llenó).
     const DIAN_AMBIENTE_PRODUCCION = '1';
     const DIAN_AMBIENTE_PRUEBAS = '2';
 
-    // La clave y el propio contenido binario del certificado nunca deben
-    // salir en @json($company)/toArray(): se usan solo del lado del
-    // servidor al armar la solicitud a la DIAN.
     protected $hidden = [
         'dian_certificate_password',
         'dian_certificate_content',

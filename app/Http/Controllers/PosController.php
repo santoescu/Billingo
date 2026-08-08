@@ -19,15 +19,6 @@ use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
-/**
- * Pantalla de venta rápida del POS: grid de productos + carrito simple (ver
- * pos/sell.blade.php), pensada para que un cajero venda rápido sin llenar el
- * formulario completo de facturación. Reusa la validación/armado del
- * documento de DocumentoEmitidoController::issuePosSale(), solo agrega lo
- * propio del POS -- exigir turno de caja abierto, registrar el movimiento de
- * caja de la venta, y mandar al recibo en PDF en vez de a la pantalla de
- * detalle del documento.
- */
 class PosController extends Controller
 {
     public function create(Request $request)
@@ -42,10 +33,6 @@ class PosController extends Controller
 
         $paymentMethods = $company->paymentMethods()->orderBy('name')->get();
 
-        // Mismo catálogo inicial que ProductSearch::productSearch() sin
-        // texto de búsqueda (los primeros productos, para que el grid no
-        // arranque vacío) -- se reusa esa misma ruta AJAX cuando el cajero
-        // escribe en el buscador.
         $products = $company->products()->active()->orderBy('description')->limit(60)->get();
 
         return view('pos.sell', [
@@ -103,11 +90,6 @@ class PosController extends Controller
             ? $documentController->resolutionsFor($company, '01')
             : collect();
 
-        // Un cajero solo ve su propia caja acá (una sola tarjeta, la suya, si
-        // tiene turno abierto); el owner o un administrador del módulo POS
-        // ve TODAS las cajas abiertas de la empresa -- la seguridad de qué
-        // cajas puede ver cada quién se decide acá, del lado del servidor,
-        // no ocultando tarjetas con CSS.
         if ($isAdmin) {
             $openShifts = CashShift::where('company_id', (string) $company->_id)
                 ->open()
@@ -171,14 +153,6 @@ class PosController extends Controller
             return response()->json(['message' => __('Could not issue the document.')], 500);
         }
 
-        // Solo se registra el primer medio de pago para efectos de caja: el
-        // POS de venta rápida no soporta hoy dividir una venta entre varios
-        // medios de pago distintos. Se usa el código DIAN ya resuelto en el
-        // documento (a partir del PaymentMethod elegido, ver
-        // DocumentoEmitidoController::issuePosSale()), no un input crudo --
-        // solo así CashMovement::affectsCashBalance() sabe si de verdad fue
-        // en efectivo (código '10'), sin importar cómo se llame el medio de
-        // pago propio de la empresa.
         CashMovement::create([
             'company_id' => (string) $company->_id,
             'shift_id' => (string) $shift->_id,
@@ -191,11 +165,7 @@ class PosController extends Controller
         ]);
 
         if ($cashReceived !== null) {
-            // Guardado por venta (no flash()): el modal de resultado puede
-            // pedir este mismo recibo varias veces (vista previa, imprimir,
-            // descargar), cada una en una petición HTTP aparte -- flash()
-            // solo sobrevive una petición más, así que se perdería antes de
-            // la segunda o tercera vez que se pide el mismo PDF.
+            
             session()->put('pos_cash_received.' . $documentoPos->_id, $cashReceived);
         }
 
@@ -241,11 +211,6 @@ class PosController extends Controller
             ], 422);
         }
 
-        // La venta rápida del POS permite un cliente mínimo (solo nombre e
-        // identificación, ver pos/sell.blade.php); una factura electrónica sí
-        // necesita dirección/ciudad/departamento completos -- se valida acá,
-        // no al crear la venta, para no frenar la venta talonario por un dato
-        // que solo hace falta si de verdad se termina emitiendo electrónica.
         $cliente = $documentoPos->payload['accounting_customer_party'] ?? [];
         if (empty($cliente['direccion']) || empty($cliente['ciudad_codigo']) || empty($cliente['departamento_codigo'])) {
             return response()->json([
@@ -318,10 +283,6 @@ class PosController extends Controller
             ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
             : null;
 
-        // El efectivo recibido solo existe si el checkout se acaba de hacer
-        // con pago en efectivo -- guardado por venta (ver checkout()), para
-        // que siga apareciendo sin importar cuántas veces se pida este mismo
-        // recibo (vista previa, imprimir, descargar son peticiones aparte).
         $cashReceived = session('pos_cash_received.' . $documento->_id);
         $isElectronic = (bool) $documento->documento_emitido_id;
         $uuid = $documento->documentoEmitido?->uuid;
@@ -333,14 +294,10 @@ class PosController extends Controller
             'cashReceived',
             'isElectronic',
             'uuid',
-        ))->setPaper([0, 0, 226.77, 800], 'portrait'); // ~80mm de ancho, alto libre
+        ))->setPaper([0, 0, 226.77, 800], 'portrait'); 
 
         $filename = 'recibo-' . $documento->numeral . '.pdf';
 
-        // "inline=1": para la vista previa en el modal de resultado del POS
-        // (iframe) y el botón "Imprimir" (pestaña nueva) -- el navegador lo
-        // muestra en vez de forzar la descarga. El botón "Descargar" pega
-        // directo a esta misma URL sin el parámetro.
         return $request->boolean('inline') ? $pdf->stream($filename) : $pdf->download($filename);
     }
 

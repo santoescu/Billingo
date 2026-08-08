@@ -127,7 +127,7 @@
                         <select id="tp-identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' data-dian-lookup-type class="hidden">
                             <option value="">{{ __('Select...') }}</option>
                             @foreach ($identificationTypes as $code => $label)
-                                <option value="{{ $code }}" @selected(old('identification_type', '13') === $code)>{{ $code }} - {{ $label }}</option>
+                                <option value="{{ $code }}" @selected(old('identification_type', '13') == $code)>{{ $code }} - {{ $label }}</option>
                             @endforeach
                         </select>
                     </flux:field>

@@ -6,13 +6,6 @@ use App\Models\Company;
 use App\Models\ThirdParty;
 use InvalidArgumentException;
 
-/**
- * Traduce el JSON de la API (con los mismos nombres de elementos que el XML
- * UBL, bajo la clave "document") al payload interno que ya espera
- * UblDocumentBuilder::build(). El emisor SIEMPRE sale de la Company
- * autenticada (nunca del JSON); el receptor se resuelve o se actualiza en
- * third_parties según lo que venga en "AccountingCustomerParty".
- */
 class DocumentJsonMapper
 {
     /**
@@ -149,10 +142,6 @@ class DocumentJsonMapper
             'email' => $accountingCustomerParty['email'] ?? null,
         ], fn ($value) => $value !== null);
 
-        // El cliente siempre se busca primero: si ya existe, cualquier campo
-        // que NO venga en el JSON se completa con lo que ya hay guardado
-        // (update() solo toca los campos enviados). Si no existe todavía,
-        // hace falta el JSON completo para poder crearlo.
         $cliente = ThirdParty::where('company_id', (string) $company->_id)
             ->where('identificacion', $identificacion)
             ->first();
@@ -166,9 +155,6 @@ class DocumentJsonMapper
                 $this->assertRequiredFieldsForNewClient($otherFields);
             }
 
-            // El DV nunca se confía del caller: solo aplica a NIT (tipo 31) y
-            // siempre se calcula del lado del servidor, igual que para la
-            // propia empresa (ver Company::calculateVerificationDigit()).
             $tipoIdentificacionFinal = $tipoIdentificacion ?? $cliente?->identification_type ?? '31';
             $attributes = array_merge($otherFields, [
                 'company_id' => (string) $company->_id,
@@ -177,15 +163,11 @@ class DocumentJsonMapper
             ]);
 
             if ($cliente) {
-                // Igual que ThirdPartyController::store(): se agrega el rol
-                // "cliente" sin pisar otros roles que ya tuviera (p. ej. si
-                // también es proveedor).
+                
                 $attributes['roles'] = collect($cliente->roles ?? [])->push('cliente')->unique()->values()->all();
                 $cliente->update($attributes);
             } else {
-                // Cliente nuevo: al crearlo con este company_id queda
-                // vinculado a la empresa emisora (relación empresa-cliente),
-                // y con el rol "cliente" para que aparezca en Company::clients().
+                
                 $attributes['roles'] = ['cliente'];
                 $cliente = ThirdParty::create($attributes);
             }

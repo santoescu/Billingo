@@ -11,9 +11,7 @@
     @include('pos.partials.tabs', ['activeTab' => 'shift'])
 
     <div class="flex flex-col gap-6">
-        {{-- El form de apertura y la grilla de cajas son independientes: un
-             administrador puede no tener turno propio abierto y aun así
-             necesitar ver/cerrar las cajas de los demás. --}}
+        
         @if (! $shift)
             <div>
                 <h3 class="mb-3 font-semibold text-gray-800 dark:text-white">{{ __('Your shift') }}</h3>

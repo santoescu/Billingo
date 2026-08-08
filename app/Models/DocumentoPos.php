@@ -4,17 +4,6 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 
-/**
- * Una venta del POS: colección totalmente separada de "documentos_emitidos"
- * (esa es solo para documentos electrónicos reales que la DIAN autorizó).
- * Toda venta del POS crea SIEMPRE una fila acá, numerada con la resolución
- * "FV" (talonario) elegida al abrir el turno (ver CashShift). Si además el
- * cajero marcó "emitir factura electrónica" para esa venta puntual, se crea
- * TAMBIÉN un DocumentoEmitido real (numerado con la resolución electrónica
- * del turno) y se enlaza acá vía "documento_emitido_id" -- así la venta
- * queda visible tanto en el listado del POS como en el de facturación
- * electrónica, para poder comparar cuánto se vendió por cada canal.
- */
 class DocumentoPos extends Model
 {
     protected $connection = 'mongodb';
@@ -36,10 +25,7 @@ class DocumentoPos extends Model
         'currency',
         'payment_means_id',
         'payment_means_code',
-        // Medio de pago propio de la empresa que eligió el cajero (ver
-        // PaymentMethod), denormalizado por si luego se renombra o se borra
-        // el catálogo -- "payment_means_code" arriba queda con el código
-        // DIAN equivalente (si tenía uno mapeado) para efectos de caja/XML.
+        
         'payment_method_id',
         'payment_method_name',
         'notes',

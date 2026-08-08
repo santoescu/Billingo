@@ -1,13 +1,11 @@
 @php
-    // Módulos a los que el usuario tiene acceso en la empresa activa
-    // (para el owner son todos los módulos activos de la empresa; para
-    // los demás, solo aquellos donde tiene un rol asignado).
+    
     $myModules = session('selected_company.modules', []);
     $hasInvoicing = array_key_exists('invoicing', $myModules);
     $hasPos = array_key_exists('pos', $myModules);
 
     $sections = [
-        // Rutas globales, sin sección/etiqueta.
+        
         [
             'label' => null,
             'items' => [
@@ -20,10 +18,6 @@
             ],
         ],
 
-        // Módulo de emisión de documentos (facturación): solo si la empresa
-        // activa lo tiene contratado y el usuario tiene acceso. Clientes,
-        // inventario y resoluciones NO van acá -- los comparten facturación
-        // electrónica y POS por igual (ver sección "Company" más abajo).
         [
             'label' => __('Document issuance'),
             'items' => $hasInvoicing ? [
@@ -36,8 +30,6 @@
             ] : [],
         ],
 
-        // Módulo de punto de venta (POS): solo si está contratado y el
-        // usuario tiene acceso.
         [
             'label' => __('Point of sale'),
             'items' => array_key_exists('pos', $myModules) ? [
@@ -62,16 +54,13 @@
             ] : [],
         ],
 
-        // Módulo de nómina: solo si está contratado y el usuario tiene acceso.
         [
             'label' => __('Payroll'),
             'items' => array_key_exists('payroll', $myModules) ? [
-                // Próximamente...
+                
             ] : [],
         ],
 
-        // Módulo de recepción de documentos: solo si está contratado y el
-        // usuario tiene acceso.
         [
             'label' => __('Document receiving'),
             'items' => array_key_exists('receiving', $myModules) ? [
@@ -84,12 +73,6 @@
             ] : [],
         ],
 
-        // Administración de la empresa activa (no depende de ningún módulo
-        // en sí). Clientes, inventario y resoluciones sí dependen de que la
-        // empresa tenga facturación electrónica O POS (uno de los dos, o
-        // ambos) -- los usa cualquiera de los dos, así que no van atadas a
-        // un solo módulo; si la empresa solo tiene otro módulo (nómina,
-        // recepción...) no aparecen.
         [
             'label' => __('Company'),
             'items' => session('selected_company') ? array_values(array_filter([
@@ -120,7 +103,6 @@
             ])) : [],
         ],
 
-        // Administración global del sistema: solo superadmins.
         [
             'label' => __('Global administration'),
             'items' => auth()->user()?->isGlobalAdmin() ? [
@@ -146,7 +128,6 @@
         ],
     ];
 
-    // Solo nos quedamos con las secciones que sí tienen algo que mostrar.
     $sections = array_values(array_filter($sections, fn ($section) => ! empty($section['items'])));
 
     $appearance = session('appearance', 'light');
@@ -164,10 +145,6 @@
 @include('components.toast')
 @include('components.confirm-dialog')
 
-{{-- Botón flotante de notificaciones: vive fuera del sidebar (que tiene
-     `transform` para su animación) para poder posicionarse con `fixed` de
-     verdad contra la ventana y flotar por encima del contenido, cerca de la
-     esquina donde está el nombre del usuario. --}}
 <div class="fixed z-[100] bottom-4 start-2 lg:start-[272px] hs-overlay-minified:lg:start-[68px] transition-[inset-inline-start] duration-300 ease-in-out">
     @include('partials.notifications-bell')
 </div>
@@ -255,9 +232,6 @@
             <div class="px-2 w-full flex flex-col">
                 <ul class="space-y-1">
 
-                    {{-- Sections: global routes first, then each module (if the
-                         active company has it and the user has access to it),
-                         then company administration and, last, superadmin. --}}
                     @foreach($sections as $index => $section)
                         @if($index > 0)
                             <li class="my-2 border-t border-gray-200 dark:border-neutral-700"></li>
@@ -280,7 +254,7 @@
                                         'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700' => !$link['current'],
                                     ])
                                 >
-                                    {{-- Icon --}}
+                                    
                                     @if(!empty($link['icon']))
                                         <x-dynamic-component :component="'heroicon-o-'.$link['icon']" class="size-4 shrink-0" />
                                     @endif

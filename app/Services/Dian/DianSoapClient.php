@@ -14,21 +14,6 @@ use RuntimeException;
 use SimpleXMLElement;
 use ZipArchive;
 
-/**
- * Cliente SOAP para los servicios de la DIAN, que firma cada petición con
- * WS-Security X.509, siguiendo la configuración de la guía oficial de la
- * DIAN ("Guía Herramienta para el Consumo de Web Services"):
- *
- *   - TransportBinding sobre HTTPS.
- *   - Firma únicamente el header wsa:To, con RSA-SHA256 y canonicalización
- *     exclusiva (exc-c14n), referenciando el certificado como
- *     wsse:BinarySecurityToken completo (Key Identifier Type = "Binary
- *     Security Token"), no por huella digital.
- *   - Orden dentro de wsse:Security: Timestamp, BinarySecurityToken,
- *     Signature (verificado contra una petición real firmada con el
- *     certificado de la empresa y aceptada por la DIAN).
- *   - WS-Addressing obligatorio (UsingAddressing).
- */
 class DianSoapClient
 {
     private const WSA_NS = 'http://www.w3.org/2005/08/addressing';
@@ -40,16 +25,8 @@ class DianSoapClient
     private const BASE64_ENCODING = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary';
     private const EC_NS = 'http://www.w3.org/2001/10/xml-exc-c14n#';
 
-    /**
-     * Cuerpo crudo (sobre SOAP completo) de la última respuesta recibida de
-     * la DIAN, capturado en call() antes de parsearlo -- es lo que se guarda
-     * como "response" del documento, sin desempacar ningún zip.
-     */
     private ?string $lastRawResponse = null;
 
-    // GetAcquirer solo existe en el ambiente de producción de la DIAN, sin
-    // importar el ambiente configurado para la empresa en el resto de
-    // servicios (habilitación no lo soporta).
     private const PRODUCTION_ENDPOINT = 'https://vpfe.dian.gov.co/WcfDianCustomerServices.svc';
 
     /**
@@ -70,14 +47,7 @@ class DianSoapClient
         $envelope = $this->buildSignedEnvelope($endpoint, $action, $bodyInnerXml, $certPem, $keyPem);
 
         try {
-            // La DIAN usa el código HTTP también para transmitir resultados
-            // de negocio (p. ej. 404 para "el adquiriente no existe"), no
-            // solo errores de transporte, así que el body se procesa
-            // siempre que llegue una respuesta, sin importar el status.
-            // retry(): la conexión a la DIAN es intermitente en este entorno
-            // (mismo síntoma que las fallas de DNS de MongoDB); 3 intentos
-            // con 1s de espera evitan que un corte transitorio tumbe la
-            // consulta entera.
+            
             $response = Http::withBody(
                 $envelope,
                 'application/soap+xml;charset=utf-8'
@@ -86,9 +56,6 @@ class DianSoapClient
             throw new RuntimeException(__('Could not connect to the DIAN service.'), 0, $e);
         }
 
-        // La respuesta cruda (el sobre SOAP completo, tal como lo mandó la
-        // DIAN) es en sí la constancia de lo que respondió -- se guarda tal
-        // cual junto al resultado parseado, sin desempacar ningún zip.
         $this->lastRawResponse = $response->body();
 
         return $this->parseResponse($this->lastRawResponse, $operation);
@@ -415,9 +382,7 @@ class DianSoapClient
             'xml_document_key' => (string) ($response->XmlDocumentKey ?? ''),
             'xml_file_name' => (string) ($response->XmlFileName ?? ''),
             'raw_response' => $this->lastRawResponse,
-            // Si vino XmlBase64Bytes, ese zip desempacado ES el documento de
-            // respuesta (ApplicationResponse); si no vino, response_xml queda
-            // null y el llamador cae de vuelta al sobre SOAP completo.
+            
             'response_xml' => $this->extractXmlFromZip($zipContent),
         ];
     }
@@ -517,13 +482,6 @@ class DianSoapClient
         $expires = gmdate('Y-m-d\TH:i:s.000\Z', time() + 300);
         $timestampId = 'Timestamp-' . $this->generateUuid();
 
-        // Mismo orden y anidación de namespaces que produce Chilkat
-        // (verificado contra una petición real, firmada con este mismo
-        // certificado, aceptada por la DIAN): Security primero, sin
-        // wsa:MessageID ni wsa:ReplyTo, sin mustUnderstand ni en wsse:Security
-        // ni en los headers de addressing, y cada namespace declarado en el
-        // nivel donde realmente se usa (wsa en soap:Header, wsse/wsu en
-        // wsse:Security) en vez de todos en la raíz.
         $envelopeXml = <<<XML
 <soap:Envelope xmlns:soap="{$this->x(self::SOAP_NS)}" xmlns:wcf="{$this->x(self::WCF_NS)}">
    <soap:Header xmlns:wsa="{$this->x(self::WSA_NS)}">
@@ -567,10 +525,7 @@ XML;
      */
     private function signToHeader(DOMDocument $doc, DOMElement $toNode, DOMElement $securityNode, DOMElement $timestampNode, string $certPem, string $keyPem): void
     {
-        // El nodo firmado necesita su propio wsu:Id para que la referencia
-        // de la firma (URI="#...") lo pueda apuntar. Se redeclara wsu
-        // localmente en el nodo (aunque ya esté en scope por el ancestro),
-        // tal como lo hacen WSS4J y Chilkat en sus implementaciones.
+        
         $toId = 'To-' . $this->generateUuid();
         $toNode->setAttributeNS(self::WSU_NS, 'wsu:Id', $toId);
         $toNode->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:wsu', self::WSU_NS);
@@ -592,40 +547,13 @@ XML;
         ]);
         $dsig->sign($key);
 
-        // El nodo de xmlseclibs vive en un DOMDocument interno aislado, sin
-        // los namespaces wsa/soap/wcf declarados en ningún ancestro. Hay que
-        // importarlo y adjuntarlo al sobre real ANTES de tocar cualquier
-        // canonicalización que dependa de "InclusiveNamespaces", porque esa
-        // lista solo puede "traer" namespaces que estén en scope en algún
-        // ancestro del nodo — si el nodo sigue aislado, la lista no tiene
-        // nada que traer y esos namespaces simplemente se omiten.
         $signatureNode = $doc->importNode($dsig->sigNode, true);
         $securityNode->appendChild($signatureNode);
 
-        // La plantilla interna de xmlseclibs deja nodos de texto de solo
-        // espacio en blanco entre los hijos de SignedInfo (para "verse
-        // bonita"). Esos nodos SÍ son parte del contenido canónico (exc-c14n
-        // no descarta espacios entre elementos sin DTD), así que hay que
-        // quitarlos ANTES de calcular cualquier digest o firma — si se
-        // quitaran después, el XML final ya no correspondería con lo
-        // firmado. Los clientes "normales" (WCF/WSS4J) nunca generan estos
-        // espacios de por sí.
         $this->stripWhitespaceTextNodes($signatureNode);
 
-        // .NET/WCF no implementa una canonicalización exclusiva "pura" para
-        // el nodo referenciado: al verificar, sigue incluyendo los
-        // namespaces ancestro visibles en el documento original (soap, wcf)
-        // aunque no se usen dentro del nodo firmado. Sin declarar esos
-        // prefijos como "inclusive" el digest que nosotros calculamos no
-        // coincide con el que ellos recalculan. (Esto NO aplica al
-        // SignedInfo en sí: ni WSS4J ni Chilkat le agregan una lista de
-        // namespaces inclusive, solo a la Reference).
         $this->addInclusiveNamespacesToTransform($signatureNode, $toNode, ['soap', 'wcf']);
 
-        // Por la misma razón (el nodo estaba aislado al calcularlo), el
-        // SignatureValue que calculó sign() tampoco sirve. Se recalcula
-        // ahora que el nodo ya está adjunto al sobre real y el DigestValue
-        // de arriba ya quedó correcto.
         $this->recomputeSignatureValue($signatureNode, $key);
 
         $signatureNode->setAttribute('Id', 'SIG-' . $this->generateUuid());
@@ -761,8 +689,7 @@ XML;
         $result = $doc->Body->{$operation . 'Response'}->{$operation . 'Result'} ?? null;
 
         if (! $result) {
-            // Algunas operaciones (p. ej. errores SOAP Fault) no siguen este
-            // patrón; devolvemos el body completo para que el llamador decida.
+            
             return $doc->Body;
         }
 

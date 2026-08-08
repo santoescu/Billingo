@@ -9,19 +9,12 @@ class CashMovement extends Model
     protected $connection = 'mongodb';
     protected $table = 'cash_movements';
 
-    // 'apertura'/'cierre' registran el saldo inicial/contado del turno;
-    // 'venta' se crea por cada documento emitido durante el turno (solo las
-    // ventas en efectivo suman al saldo esperado, ver CashShift); 'ingreso'
-    // y 'retiro' son movimientos manuales de efectivo (p. ej. un retiro
-    // parcial a mitad de turno).
     const TYPE_APERTURA = 'apertura';
     const TYPE_VENTA = 'venta';
     const TYPE_INGRESO = 'ingreso';
     const TYPE_RETIRO = 'retiro';
     const TYPE_CIERRE = 'cierre';
 
-    // Código DIAN de "Efectivo" en PaymentMeansCode -- el único medio de
-    // pago que efectivamente mueve el dinero físico de la caja.
     const CASH_PAYMENT_MEANS_CODE = '10';
 
     protected $fillable = [

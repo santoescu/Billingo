@@ -32,7 +32,7 @@
                 <select id="identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                     <option value="">{{ __('Select...') }}</option>
                     @foreach ($identificationTypes as $code => $label)
-                        <option value="{{ $code }}" @selected(old('identification_type') === $code)>{{ $code }} - {{ $label }}</option>
+                        <option value="{{ $code }}" @selected(old('identification_type') == $code)>{{ $code }} - {{ $label }}</option>
                     @endforeach
                 </select>
             </flux:field>

@@ -67,9 +67,6 @@ class CompanyController extends Controller
         $data = $this->validatedCompanyData($request);
         $data['status'] = $request->input('status', 'active');
 
-        // El archivo del certificado ya se subió aparte (arrastrar y soltar,
-        // ver uploadCertificate()), así que si se está fijando una clave
-        // nueva aquí, se valida contra el que ya está guardado.
         if (filled($data['dian_certificate_password'] ?? null) && $company->dian_certificate_content) {
             $this->assertCertificatePasswordMatches(
                 $company->dian_certificate_content,
@@ -280,10 +277,6 @@ class CompanyController extends Controller
             'dian_environment' => 'nullable|string|in:1,2',
         ]);
 
-        // El archivo se maneja aparte (storeCertificateIfUploaded/uploadCertificate);
-        // la clave sí se guarda como cualquier otro campo, pero solo si se
-        // escribió algo, para no borrar la que ya estuviera guardada al
-        // dejar el campo vacío.
         unset($data['dian_certificate']);
         if (blank($data['dian_certificate_password'] ?? null)) {
             unset($data['dian_certificate_password']);
@@ -291,8 +284,6 @@ class CompanyController extends Controller
 
         $data['fiscal_responsibilities'] = implode(';', $data['fiscal_responsibilities'] ?? []);
 
-        // The verification digit (dv) only applies to NIT (identification type 31),
-        // and is always calculated server-side, never trusted from the client.
         $data['dv'] = ($data['identification_type'] ?? null) === '31'
             ? Company::calculateVerificationDigit($data['identificacion'])
             : null;

@@ -27,25 +27,8 @@ class Resolution extends Model
         'is_manual',
     ];
 
-    // 'document_type' guarda el código real de la lista "Tipo de Documento"
-    // de la DIAN (ver UblDocumentBuilder::DOCUMENT_CODE_TO_FAMILY): '01' a
-    // '04' para facturas (nacional, exportación, contingencia...), '91' nota
-    // crédito, '92' nota débito -- el mismo código que se manda como
-    // "tipo_documento" al armar el XML, sin una etiqueta propia intermedia.
-    // La DIAN solo emite resoluciones (rangos autorizados) para facturas: las
-    // notas no tienen ese concepto ahí, así que la propia empresa define su
-    // numeración para ellas ('is_manual' = true), sin sincronizar nada por
-    // GetNumberingRange.
-
-    // Código por defecto para las resoluciones de factura que sincroniza
-    // GetNumberingRange: la respuesta de la DIAN no distingue el subtipo
-    // (01/02/03/04) del rango autorizado, así que se asume el caso estándar.
     const DOCUMENT_TYPE_FACTURA_DEFAULT = '01';
 
-    // Resolución de pruebas que la DIAN publica de forma fija para TODOS los
-    // facturadores en habilitación (no es específica de esta empresa ni hay
-    // que consultarla por GetNumberingRange): siempre debe existir mientras
-    // la empresa esté en ambiente de habilitación.
     const FIXED_TEST_RESOLUTION_NUMBER = '18760000001';
     const FIXED_TEST_PREFIX = 'SETP';
     const FIXED_TEST_TECHNICAL_KEY = 'fc8eac422eba16e22ffd8c6f94b3f40a6e38162c';

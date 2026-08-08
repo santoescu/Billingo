@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 use Illuminate\Notifications\Notifiable;
@@ -14,21 +13,14 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Auth\Passwords\CanResetPassword;
 
-
-
 class User extends Eloquent implements AuthenticatableContract, CanResetPasswordContract
 {
     use Authenticatable, Notifiable, CanResetPassword;
 
-    protected $table = 'users'; // colección en Mongo
+    protected $table = 'users'; 
     protected $fillable = ['name', 'email', 'password', 'locale', 'appearance', 'role'];
     protected $hidden = ['password', 'remember_token'];
 
-    /**
-     * Roles globales (a nivel de todo el sistema, no de una empresa) que dan
-     * acceso al panel de administración. Se comprueba con in_array() para
-     * poder agregar más roles grandes en el futuro sin cambiar el esquema.
-     */
     public const GLOBAL_ADMIN_ROLES = ['superadmin'];
 
     /**

@@ -7,11 +7,6 @@ use App\Models\PaymentMeansCode;
 use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 
-/**
- * Catálogo de medios de pago propios de la empresa (ver PaymentMethod), que
- * el POS usa en vez del catálogo crudo de la DIAN, con un mapeo opcional a
- * su código DIAN equivalente para cuando la venta se emite electrónica.
- */
 class PaymentMethodController extends Controller
 {
     public function index(Request $request)

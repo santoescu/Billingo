@@ -1,11 +1,6 @@
 @php
     $dianConfigured = $company->dian_pin && $company->dian_software_id;
-    // Etiquetas legibles para los códigos DIAN de 'document_type' (lista
-    // "Tipo de Documento"): el dato guardado es el código, esto es solo
-    // texto para mostrarlo.
-    // Un mismo rango autorizado puede usarse para varios subtipos de factura
-    // (nacional, exportación...), así que el 01 se muestra genérico como
-    // "Factura" en vez de atarlo a un subtipo específico.
+    
     $documentTypeLabels = [
         '01' => __('Electronic sales invoice'),
         '02' => __('Invoice (export)'),
@@ -18,9 +13,6 @@
 
     $basicSelectConfig = \App\Support\SelectConfig::basic();
 
-    // La sincronización con la DIAN solo aplica a facturación electrónica;
-    // una empresa que solo tenga POS únicamente usa prefijos manuales
-    // (Factura de venta), no rangos autorizados por la DIAN.
     $hasInvoicing = array_key_exists('invoicing', session('selected_company.modules', []));
 @endphp
 

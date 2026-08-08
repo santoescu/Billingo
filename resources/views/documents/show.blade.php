@@ -11,8 +11,6 @@
     $customer = $documento->payload['accounting_customer_party'] ?? [];
     $lineas = $documento->payload['lineas'] ?? [];
 
-    // Tabla oficial DIAN: "Forma de Pago" (cbc:ID dentro de cac:PaymentMeans)
-    // solo tiene estos 2 valores.
     $paymentFormLabels = [
         '1' => __('Cash'),
         '2' => __('Credit'),

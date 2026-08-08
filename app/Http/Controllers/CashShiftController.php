@@ -8,12 +8,6 @@ use App\Models\Resolution;
 use App\Models\User;
 use Illuminate\Http\Request;
 
-/**
- * Apertura, cierre y consulta de turnos de caja del módulo POS. El saldo
- * "esperado" al cerrar se calcula a partir de los CashMovement del turno
- * (ver CashMovement::signedAmount()), no de un contador aparte, para que
- * siempre cuadre con el detalle que se le muestra al cajero.
- */
 class CashShiftController extends Controller
 {
     /**

@@ -4,13 +4,6 @@ namespace App\Services\Dian;
 
 use InvalidArgumentException;
 
-/**
- * Cálculo puro de líneas, impuestos y totales de un documento (factura,
- * nota, remisión) a partir del JSON de entrada -- sin nada de XML/DOM, para
- * que lo pueda usar tanto UblDocumentBuilder (que sí arma el XML) como una
- * remisión (que solo necesita guardar subtotal/tax_total/total, sin emitir
- * nada ante la DIAN). Extraído de UblDocumentBuilder para poder reusarlo.
- */
 class DocumentTotalsCalculator
 {
     /**
@@ -28,11 +21,6 @@ class DocumentTotalsCalculator
         $impuestos = $this->agruparImpuestos($lineas);
         $lineExtensionAmount = round(array_sum(array_column($lineas, 'line_extension_amount')), 2);
 
-        // La DIAN exige que exista al menos un cac:TaxTotal a nivel de
-        // documento cuyo "Base Imponible" cuadre con la suma de las líneas
-        // (regla FAU04), incluso si ningún producto tiene impuestos --
-        // se declara un IVA al 0% cubriendo todo el subtotal. El tax_amount
-        // sigue siendo 0, así que no afecta ni los totales ni el CUFE.
         if (empty($impuestos) && $lineExtensionAmount > 0) {
             $impuestos = [[
                 'codigo' => '01',
@@ -79,9 +67,7 @@ class DocumentTotalsCalculator
             if (! empty($linea['descuento'])) {
                 $esPorcentaje = ($linea['descuento']['valor_tipo'] ?? 'porcentaje') === 'porcentaje';
                 $descuentoMotivo = $linea['descuento']['motivo'] ?? 'Descuento';
-                // Tope: un porcentaje nunca pasa de 100, y un valor fijo
-                // nunca supera el subtotal de la línea (si no, el total de
-                // la línea quedaría negativo).
+                
                 $descuentoPorcentaje = $esPorcentaje ? min((float) $linea['descuento']['valor'], 100) : null;
                 $descuentoAmount = $esPorcentaje
                     ? round($baseAmount * ($descuentoPorcentaje / 100), 2)
@@ -93,9 +79,7 @@ class DocumentTotalsCalculator
             $impuestosLinea = [];
             foreach ($linea['impuestos'] ?? [] as $impuesto) {
                 $porcentaje = (float) $impuesto['porcentaje'];
-                // La base gravable de cada impuesto por defecto es el subtotal
-                // de la línea, pero se puede indicar un valor menor (nunca
-                // mayor: no tendría sentido gravar más de lo que vale la línea).
+                
                 $baseGravable = min((float) ($impuesto['base_gravable'] ?? $lineExtensionAmount), $lineExtensionAmount);
                 $impuestosLinea[] = [
                     'codigo' => $impuesto['tipo'],
@@ -106,12 +90,6 @@ class DocumentTotalsCalculator
                 ];
             }
 
-            // La DIAN exige que CADA línea declare su propio cac:TaxTotal
-            // (regla FAU04: la base imponible del documento debe cuadrar con
-            // la suma de las bases de línea) -- si el producto no tiene
-            // impuesto asignado, se declara un IVA al 0% en la línea, igual
-            // que se hace a nivel de documento cuando ninguna línea tiene
-            // impuestos.
             if (empty($impuestosLinea) && $lineExtensionAmount > 0) {
                 $impuestosLinea[] = [
                     'codigo' => '01',

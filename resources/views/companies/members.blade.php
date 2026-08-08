@@ -1,5 +1,5 @@
 @php
-    // El owner y cualquier 'administrador' de un módulo pueden gestionar miembros.
+    
     $canManage = \App\Models\User::hasCompanyAdminAccess(
         session('selected_company.role'),
         collect(session('selected_company.modules', []))->map(fn ($role, $module) => ['module' => $module, 'role' => $role])->values()->all()

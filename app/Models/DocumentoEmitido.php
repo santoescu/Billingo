@@ -4,14 +4,6 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 
-/**
- * Un documento electrónico emitido por una empresa (factura, nota crédito,
- * nota débito, o a futuro documento soporte) y su resultado de validación
- * ante la DIAN. Todos los tipos de documento comparten esta misma colección;
- * se distinguen únicamente por "tipo_documento" (código DIAN: 01/02/03/04/05
- * factura, 91 nota crédito, 92 nota débito, 95 nota de ajuste) y por
- * "ambiente" (1=producción, 2=pruebas).
- */
 class DocumentoEmitido extends Model
 {
     protected $connection = 'mongodb';

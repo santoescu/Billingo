@@ -13,7 +13,7 @@ class Language extends Component
 
     public function mount()
     {
-        // Cargar el idioma actual del usuario o el idioma por defecto
+        
         $this->locale = Auth::user()->locale ?? config('app.locale');
     }
 

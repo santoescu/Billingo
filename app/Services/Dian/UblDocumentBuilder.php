@@ -11,14 +11,6 @@ use DOMDocument;
 use DOMElement;
 use InvalidArgumentException;
 
-/**
- * Traduce el JSON de un "documento emitido" (factura, nota crédito, nota
- * débito) al XML UBL 2.1 que espera la DIAN.
- *
- * El JSON de entrada usa los mismos nombres de los elementos UBL (en
- * snake_case). El emisor siempre sale de la Company autenticada, nunca del
- * JSON.
- */
 class UblDocumentBuilder
 {
     private const CAC_NS = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
@@ -83,7 +75,6 @@ class UblDocumentBuilder
 
     private string $tipoDocumentoCode;
 
-    /** @var array<string, Department|null> */
     private ?array $departmentsCache = null;
 
     private string $ambienteCode;
@@ -115,10 +106,6 @@ class UblDocumentBuilder
 
         $this->doc = new DOMDocument('1.0', 'UTF-8');
 
-        // Cálculo de líneas/impuestos/totales: vive en DocumentTotalsCalculator
-        // (ver app/Services/Dian/DocumentTotalsCalculator.php) para que las
-        // remisiones del POS puedan calcular subtotal/tax_total/total sin
-        // pasar por todo este builder (no llegan a construir XML).
         $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
         $lineas = $calculo['lineas'];
         $impuestos = $calculo['impuestos'];
@@ -405,9 +392,6 @@ class UblDocumentBuilder
 
         $node = $this->doc->createElementNS(self::CAC_NS, 'cac:DiscrepancyResponse');
 
-        // Solo hay ReferenceID cuando la nota referencia una factura puntual
-        // (operación 20/30); sin referencia (22/32) se identifica el período
-        // afectado con cac:InvoicePeriod en vez de un ID de factura.
         if (! empty($referencias['factura_id'])) {
             $this->appendCbc($node, 'ReferenceID', $referencias['factura_id']);
         }
@@ -542,10 +526,6 @@ class UblDocumentBuilder
 
         $party = $this->doc->createElementNS(self::CAC_NS, 'cac:Party');
 
-        // La DIAN exige (regla FAK61) que cuando el receptor es persona
-        // natural (AdditionalAccountID=2) se informe además el NIT del
-        // emisor en cac:PartyIdentification -- si no, rechaza el documento
-        // por "grupo no informado".
         if ($additionalAccountId === '2') {
             $partyIdentification = $this->doc->createElementNS(self::CAC_NS, 'cac:PartyIdentification');
             $id = $this->appendCbc($partyIdentification, 'ID', $company->identificacion);
@@ -893,9 +873,7 @@ class UblDocumentBuilder
             $item->appendChild($sellersId);
         }
         if (! empty($linea['codigo_barras'])) {
-            // Código de barras del producto (EAN/UPC/GTIN, etc.) -- sin
-            // schemeID porque no se conoce el estándar específico que use
-            // cada empresa; la DIAN acepta el elemento sin ese atributo.
+            
             $standardId = $this->doc->createElementNS(self::CAC_NS, 'cac:StandardItemIdentification');
             $this->appendCbc($standardId, 'ID', $linea['codigo_barras']);
             $item->appendChild($standardId);

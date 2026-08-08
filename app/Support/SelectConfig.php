@@ -2,13 +2,6 @@
 
 namespace App\Support;
 
-/**
- * Configuración JSON compartida para los selects de Preline (@preline/select)
- * usados en toda la aplicación -- antes cada vista tenía su propia copia de
- * este mismo bloque pegado a mano, lo que hacía que un ajuste de estilo (p.
- * ej. cómo se marca la opción seleccionada) hubiera que repetirlo en cada
- * archivo por separado.
- */
 class SelectConfig
 {
     /**

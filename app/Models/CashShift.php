@@ -23,11 +23,7 @@ class CashShift extends Model
         'closed_at',
         'status',
         'notes',
-        // Resoluciones elegidas al abrir el turno: toda venta se numera con
-        // 'fv_resolution_id' (talonario, obligatoria); si además el cajero
-        // marca "emitir factura electrónica" en una venta puntual, esa
-        // factura se numera con 'invoicing_resolution_id' (solo existe si la
-        // empresa tiene el módulo de facturación electrónica).
+        
         'fv_resolution_id',
         'invoicing_resolution_id',
     ];

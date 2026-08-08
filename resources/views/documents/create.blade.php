@@ -5,13 +5,6 @@
         '92' => __('Debit note'),
     ];
 
-    // Listas ordenadas de [code, label] en vez de arrays asociativos: si se
-    // manda a JS como objeto (@json de un array con claves '09','10','11'...)
-    // el motor de JS reordena las claves que parecen enteros antes que las
-    // demás (p. ej. "09" quedaría después de "10"-"16"), rompiendo el orden.
-    // Textos oficiales DIAN ("Concepto de Corrección"), iguales a los que usa
-    // UblDocumentBuilder::conceptoCorreccionDescripcion() para armar la
-    // Description del XML -- deben coincidir exactamente.
     $creditNoteConceptCodes = [
         ['code' => '1', 'label' => __('Partial refund of the goods and/or non-acceptance of part of the service')],
         ['code' => '2', 'label' => __('Cancellation of electronic invoice')],
@@ -28,10 +21,6 @@
         ['code' => '4', 'label' => __('Other')],
     ];
 
-    // Catálogo DIAN "Tipo de Operación" (CustomizationID): para notas, 20/30
-    // exigen referenciar la factura original y 22/32 no la exigen (ver
-    // UblDocumentBuilder::DEFAULT_CUSTOMIZATION_ID) -- la sección de
-    // referencia se muestra/oculta según cuál elija el usuario aquí.
     $operationTypesByDocumentType = [
         '01' => [
             ['code' => '10', 'label' => __('Standard')],
@@ -202,7 +191,7 @@
                         <flux:label>{{ __('Identification type') }}</flux:label>
                         <select id="doc-cliente_tipo_identificacion" name="cliente_tipo_identificacion" data-hs-select='{!! $basicSelectConfig !!}' data-dian-lookup-type class="hidden">
                             @foreach ($identificationTypes as $code => $label)
-                                <option value="{{ $code }}" @selected(old('cliente_tipo_identificacion', '13') === $code)>{{ $code }} - {{ $label }}</option>
+                                <option value="{{ $code }}" @selected(old('cliente_tipo_identificacion', '13') == $code)>{{ $code }} - {{ $label }}</option>
                             @endforeach
                         </select>
                     </flux:field>
@@ -1293,7 +1282,6 @@
                         lookupRoot.dianLookupTrigger();
                     }
                 }
-
 
                 function initClientSearch(departmentSelect) {
                     const searchInput = document.getElementById('doc-cliente-search');
