@@ -163,14 +163,16 @@
 <div class="lg:hidden p-3">
     <button
         type="button"
-        class="py-2 px-3 inline-flex justify-center items-center gap-x-2 text-start bg-gray-800 border border-gray-800 text-white text-sm font-medium rounded-lg shadow-2xs align-middle hover:bg-gray-950 focus:outline-hidden focus:bg-gray-900 dark:bg-white dark:text-neutral-800 dark:hover:bg-neutral-200 dark:focus:bg-neutral-200"
+        class="flex justify-center items-center flex-none size-9 text-sm text-gray-600 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700 dark:hover:text-neutral-200 dark:focus:text-neutral-200"
         aria-haspopup="dialog"
         aria-expanded="false"
         aria-controls="hs-sidebar-content-push-to-mini-sidebar"
-        aria-label="Toggle navigation"
+        aria-label="{{ __('Toggle navigation') }}"
         data-hs-overlay="#hs-sidebar-content-push-to-mini-sidebar"
     >
-        {{ __('Open') }}
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M15 3v18"></path><path d="m10 15-3-3 3-3"></path>
+        </svg>
     </button>
 </div>
 <!-- End Navigation Toggle -->
