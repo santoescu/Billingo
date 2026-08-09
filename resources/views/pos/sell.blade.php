@@ -748,7 +748,13 @@
                 };
 
                 window.posNewSale = function () {
-                    window.location.href = '{{ route('pos.create') }}';
+                    // Ya quedó una pre-cuenta nueva lista desde que se cobró
+                    // (ver el checkout de arriba) -- "Nueva venta" solo cierra
+                    // el modal, sin recargar la página ni perder las demás
+                    // pre-cuentas que sigan abiertas.
+                    if (window.HSOverlay) {
+                        HSOverlay.close('#pos-result-modal');
+                    }
                 };
 
                 function init() {
@@ -761,8 +767,14 @@
                     }
                     btn.dataset.bound = 'true';
 
+                    const ticket = makeTicket();
+                    activeTicketId = ticket.id;
+                    renderTickets();
+                    renderActiveTicket();
+
+                    document.getElementById('pos-ticket-add-btn').addEventListener('click', addTicket);
+
                     renderProducts(initialProducts);
-                    renderCart();
                     updatePosCashSectionVisibility();
 
                     document.addEventListener('click', (event) => {

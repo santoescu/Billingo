@@ -995,5 +995,8 @@
     "Back to products": "Volver a productos",
     "General": "General",
     "Kardex": "Kardex",
-    "More actions": "Más acciones"
+    "More actions": "Más acciones",
+    "New pre-bill": "Nueva pre-cuenta",
+    "Pre-bill": "Pre-cuenta",
+    "This pre-bill has products in the cart. Close it anyway?": "Esta pre-cuenta tiene productos en el carrito. ¿Cerrarla de todas formas?"
 }
