@@ -142,6 +142,16 @@
 </head>
 
 <body class="min-h-screen bg-white dark:bg-neutral-800">
+<script>
+    // Esta app no es una SPA (cada página es una recarga completa), y Preline
+    // no persiste solo si el sidebar quedó minimizado -- por defecto arranca
+    // expandido en cada carga, aunque el usuario lo haya dejado cerrado. Este
+    // bloque va lo más arriba posible del <body> (antes de pintar el
+    // sidebar) para aplicar el estado guardado sin parpadeo.
+    if (localStorage.getItem('sidebarMinified') === 'true') {
+        document.body.classList.add('hs-overlay-minified');
+    }
+</script>
 @include('components.toast')
 @include('components.confirm-dialog')
 
@@ -170,7 +180,7 @@
     id="hs-sidebar-content-push-to-mini-sidebar"
     class="hs-overlay [--auto-close:lg] hs-overlay-minified:w-13 lg:block lg:translate-x-0 lg:end-auto lg:bottom-0 w-64
                hs-overlay-open:translate-x-0 -translate-x-full transition-all duration-300 transform
-               h-full hidden overflow-x-hidden fixed top-0 start-0 bottom-0 z-60
+               h-full hidden fixed top-0 start-0 bottom-0 z-60
                bg-white border-e border-gray-200 dark:bg-neutral-800 dark:border-neutral-700"
     role="dialog"
     tabindex="-1"
@@ -278,7 +288,7 @@
             <div class="hs-dropdown [--strategy:absolute] [--auto-close:inside] relative w-full inline-flex" wire:ignore>
                 <button id="hs-sidebar-account"
                         type="button"
-                        class="w-full inline-flex shrink-0 items-center gap-x-2 p-2 text-start text-sm text-gray-800 rounded-md hover:bg-gray-100
+                        class="w-full inline-flex shrink-0 items-center hs-overlay-minified:justify-center gap-x-2 p-2 text-start text-sm text-gray-800 rounded-md hover:bg-gray-100
                        focus:outline-hidden focus:bg-gray-100
                        dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
                         aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
@@ -342,10 +352,40 @@
         if (window.HSAccordion && typeof window.HSAccordion.autoInit === 'function') window.HSAccordion.autoInit();
     }
 
-    document.addEventListener('DOMContentLoaded', initPreline);
+    // El bloque al inicio del <body> ya le puso la clase a <body> antes del
+    // primer pintado (evita el parpadeo). Acá se sincroniza el propio div
+    // del sidebar (Preline se fija en ESA clase, no en la de <body>, para
+    // saber si el próximo click debe minimizar o restaurar) y se deja un
+    // observer que guarda cualquier cambio futuro (clicks en el botón de
+    // minimizar) para la próxima carga de página.
+    function applyStoredSidebarState() {
+        const sidebar = document.getElementById('hs-sidebar-content-push-to-mini-sidebar');
+        if (! sidebar) return;
+
+        const shouldBeMinified = localStorage.getItem('sidebarMinified') === 'true';
+        sidebar.classList.toggle('minified', shouldBeMinified);
+        document.body.classList.toggle('hs-overlay-minified', shouldBeMinified);
+    }
+
+    let sidebarObserverStarted = false;
+    function watchSidebarState() {
+        if (sidebarObserverStarted) return;
+        sidebarObserverStarted = true;
+
+        new MutationObserver(() => {
+            localStorage.setItem('sidebarMinified', document.body.classList.contains('hs-overlay-minified') ? 'true' : 'false');
+        }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initPreline();
+        applyStoredSidebarState();
+        watchSidebarState();
+    });
 
     document.addEventListener('livewire:navigated', () => {
         initPreline();
+        applyStoredSidebarState();
 
         try {
             if (window.HSOverlay && typeof window.HSOverlay.close === 'function') {
