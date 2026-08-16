@@ -67,6 +67,15 @@
         badge.classList.toggle('hidden', count <= 0);
     }
 
+    /**
+     * Pinta la lista de notificaciones y engancha el click de cada ítem
+     * para marcarlo como leído. Si el click navega a otra página (tiene
+     * href), se espera a que el marcado como leído confirme antes de
+     * dejar seguir la navegación, para que no se cancele el fetch a
+     * mitad de camino.
+     * @param {Array} notifications
+     * @returns {void}
+     */
     function renderNotificationsList(notifications) {
         var list = document.getElementById('notifications-list');
 
@@ -101,9 +110,6 @@
                 var id = el.getAttribute('data-id');
                 var href = el.getAttribute('href');
 
-                // Si el clic navega a otra página, esperamos a que el marcado
-                // como leído confirme antes de dejar seguir la navegación,
-                // para que no se cancele el fetch a mitad de camino.
                 if (href) {
                     event.preventDefault();
                 }
@@ -166,6 +172,28 @@
         bell.setAttribute('aria-expanded', 'false');
     }
 
+    /**
+     * Engancha la campana de notificaciones: mueve el panel a <body>,
+     * dedupe nodos y engancha listeners una sola vez (Livewire vuelve a
+     * renderizar este partial en cada navegación wire:navigate).
+     *
+     * Cada navegación con wire:navigate vuelve a renderizar este partial en
+     * su sitio original dentro del sidebar, aunque el panel de una
+     * navegación anterior ya se haya movido a <body>. Eso puede dejar dos
+     * nodos con el mismo id: se conserva el que ya vive en <body> (el que
+     * está funcionando) y se descarta el nuevo.
+     *
+     * El sidebar tiene `transform`, así que el panel se saca a <body> para
+     * que su `position: fixed` sea realmente contra la ventana y pueda
+     * extenderse hacia el contenido, no solo dentro del sidebar.
+     *
+     * Los listeners del botón de la campana solo se enganchan una vez (no
+     * cambia entre navegaciones, Livewire lo conserva tal cual), pero los
+     * datos SIEMPRE se recargan, ya que el contenido de la lista/badge sí
+     * puede haber sido reseteado por el morph del servidor.
+     *
+     * @returns {void}
+     */
     function initNotificationsBell() {
         var bell = document.getElementById('hs-notifications-bell');
 
@@ -173,11 +201,6 @@
             return;
         }
 
-        // Cada navegación con wire:navigate vuelve a renderizar este partial
-        // en su sitio original dentro del sidebar, aunque el panel de una
-        // navegación anterior ya lo hayamos movido a <body> (ver más abajo).
-        // Eso puede dejar dos nodos con el mismo id: nos quedamos con el que
-        // ya vive en <body> (el que está funcionando) y descartamos el nuevo.
         var panelCandidates = document.querySelectorAll('[id="notifications-panel"]');
         var panel = null;
         panelCandidates.forEach(function (candidate) {
@@ -198,22 +221,12 @@
             return;
         }
 
-        // El sidebar tiene `transform`, así que sacamos el panel a <body>
-        // para que su `position: fixed` sea realmente contra la ventana y
-        // pueda extenderse hacia el contenido, no solo dentro del sidebar.
         if (panel.parentElement !== document.body) {
             document.body.appendChild(panel);
         }
 
         var markAllBtn = panel.querySelector('#notifications-mark-all-read');
 
-        // La barra lateral usa wire:navigate (navegación SPA de Livewire): el
-        // markup de este partial se vuelve a renderizar en cada cambio de
-        // página, pero cuando el botón de la campana no cambia, Livewire lo
-        // conserva tal cual, así que solo enganchamos sus listeners una vez
-        // (para no duplicarlos) pero SIEMPRE recargamos los datos abajo, ya
-        // que el contenido de la lista/badge sí puede haber sido reseteado
-        // por el morph del servidor.
         if (bell.dataset.notificationsBound !== 'true') {
             bell.dataset.notificationsBound = 'true';
 
