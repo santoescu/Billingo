@@ -823,6 +823,7 @@ class IssueDocumentService
      * @param  string|null  $userId  Quién vendió: el cajero del turno (venta POS) o quien
      * emitió la factura (venta directa por el panel web). Null en documentos emitidos por
      * la API con token de empresa (no hay un usuario asociado a esa petición).
+     * @return void El costo promedio (average_cost) del producto nunca se modifica aquí, solo se lee (como snapshot, antes de mutar el stock) para valorizar la salida.
      */
     private function discountInventory(Company $company, array $lineas, string $numeral, ?string $userId = null): void
     {
@@ -843,9 +844,6 @@ class IssueDocumentService
             $stocks = $product->warehouse_stocks ?? [];
             $warehouseId = $linea['bodega_id'] ?? null;
             $balanceAfter = null;
-
-            // Snapshot del costo promedio ANTES de mutar: una venta nunca
-            // modifica average_cost, solo lo lee para valorizar la salida.
             $unitCost = (float) ($product->average_cost ?? 0);
 
             if ($warehouseId) {
