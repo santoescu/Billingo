@@ -21,6 +21,20 @@ use Throwable;
 
 class PosController extends Controller
 {
+    /**
+     * Pantalla de venta del POS: redirige a abrir turno si no hay uno
+     * abierto. El listado inicial de productos usa el mismo filtro por
+     * defecto que la búsqueda AJAX con "Todas las bodegas" (ver
+     * DocumentoEmitidoController::productSearch()): más de 1 unidad en
+     * total, para no listar productos sin existencias reales; y el mismo
+     * shape que esa búsqueda (precios por tipo, stock por bodega), para que
+     * el tooltip de inventario/precio del grid no salga vacío hasta la
+     * primera búsqueda.
+     *
+     * @param  Request  $request  Petición actual (empresa activa en sesión).
+     * @param  DocumentoEmitidoController  $documentController  Provee mapProductsForJs() para reusar el mismo mapeo que el AJAX de búsqueda.
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse Vista pos.sell, o redirect a pos.shift si no hay turno abierto.
+     */
     public function create(Request $request, DocumentoEmitidoController $documentController)
     {
         $company = $this->currentCompany($request);
@@ -33,18 +47,12 @@ class PosController extends Controller
 
         $paymentMethods = $company->paymentMethods()->orderBy('name')->get();
 
-        // Mismo filtro por defecto que la búsqueda AJAX con "Todas las
-        // bodegas" (ver DocumentoEmitidoController::productSearch()): más
-        // de 1 unidad en total, no listar productos sin existencias reales.
         $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
 
         return view('pos.sell', [
             'shift' => $shift,
             'company' => $company,
             'paymentMethods' => $paymentMethods,
-            // Mismo shape que el AJAX de búsqueda (precios por tipo, stock
-            // por bodega) -- si no, el tooltip de inventario/precio del
-            // grid saldría vacío hasta la primera búsqueda.
             'products' => $documentController->mapProductsForJs($products),
             'warehouses' => $company->warehouses()->orderBy('name')->get(),
             'priceTypes' => $company->priceTypes()->orderBy('name')->get(),
