@@ -32,6 +32,14 @@
     // PosController::create() -> DocumentoEmitidoController::mapProductsForJs()),
     // con precios por tipo y stock por bodega -- no hace falta remapearlo acá.
     $initialProductsJs = $products;
+
+    $paymentSelectConfig = \App\Support\SelectConfig::basic();
+
+    $paymentMethodsJs = $paymentMethods->map(fn ($m) => [
+        'id' => (string) $m->_id,
+        'name' => $m->name,
+        'dianCode' => $m->dian_payment_means_code,
+    ])->values();
 @endphp
 
 <x-layouts.app :title="__('Sell')">
@@ -140,14 +148,19 @@
 
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 flex flex-col gap-3">
                 <div>
-                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-payment-method">{{ __('Payment method') }}</label>
-                    <select id="pos-payment-method" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
-                        @foreach ($paymentMethods as $paymentMethod)
-                            <option value="{{ $paymentMethod->_id }}" data-dian-code="{{ $paymentMethod->dian_payment_means_code }}">{{ $paymentMethod->name }}</option>
-                        @endforeach
-                    </select>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Payment method') }}</label>
+                        @if ($paymentMethods->isNotEmpty())
+                            <button type="button" id="pos-payment-add-btn" class="text-xs font-medium text-accent hover:underline focus:outline-hidden">
+                                + {{ __('Add payment method') }}
+                            </button>
+                        @endif
+                    </div>
+                    <div id="pos-payment-lines" class="flex flex-col gap-2"></div>
                     @if ($paymentMethods->isEmpty())
                         <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">{{ __('You have no payment methods configured yet.') }}</p>
+                    @else
+                        <p id="pos-payment-remaining" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
                     @endif
                 </div>
 
@@ -178,49 +191,12 @@
         </div>
     </div>
 
-    <!-- Modal: nuevo cliente rápido -->
-    <div id="pos-client-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="pos-client-modal-label">
-        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-md sm:w-full m-3 sm:mx-auto">
-            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
-                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
-                    <h3 id="pos-client-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('New client') }}</h3>
-                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#pos-client-modal">
-                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
-                    </button>
-                </div>
-                <div class="p-4 flex flex-col gap-4">
-                    <div id="pos-client-modal-error" class="hidden rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"></div>
-
-                    <div class="flex gap-3">
-                        <div class="w-40 shrink-0">
-                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Identification type') }}</label>
-                            <select id="pos-client-type" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
-                                @foreach ($identificationTypes as $code => $label)
-                                    <option value="{{ $code }}" @selected($code == '13')>{{ $code }} - {{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="flex-1">
-                            <flux:input id="pos-client-identification" :label="__('Identification')" required />
-                        </div>
-                    </div>
-
-                    <flux:input id="pos-client-name" :label="__('Name')" required />
-                    <flux:input id="pos-client-address" :label="__('Address')" />
-                    <div class="grid grid-cols-2 gap-3">
-                        <flux:input type="text" inputmode="numeric" data-numeric-only id="pos-client-phone" :label="__('Phone')" />
-                        <flux:input id="pos-client-email" type="email" :label="__('Email')" />
-                    </div>
-
-                    <p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('If this client will be issued an electronic invoice later, you can complete address, city and department from the Clients screen.') }}</p>
-                </div>
-                <div class="flex justify-end gap-2 p-4 pt-0">
-                    <flux:button type="button" variant="filled" data-hs-overlay="#pos-client-modal">{{ __('Cancel') }}</flux:button>
-                    <flux:button type="button" variant="primary" id="pos-client-save-btn">{{ __('Save') }}</flux:button>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Mismo panel de alta de cliente que usa la pantalla de Clientes (ver
+         third-parties/partials/form-panel.blade.php) -- el POS ya no tiene
+         su propio formulario simplificado; window.thirdPartyPanelOnSave más
+         abajo hace que, en vez de recargar la página, el cliente recién
+         creado quede seleccionado en la pre-cuenta activa. --}}
+    @include('third-parties.partials.form-panel', ['panelLabel' => __('Client'), 'storeRoute' => 'clients.store'])
 
     <!-- Modal: resultado de la venta -->
     <div id="pos-result-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="pos-result-modal-label">
@@ -252,13 +228,15 @@
             (function () {
                 const productSearchUrl = @json(route('documents.create-product-search'));
                 const clientSearchUrl = @json(route('documents.create-client-search'));
-                const clientStoreUrl = @json(route('clients.store'));
                 const checkoutUrl = @json(route('pos.checkout'));
                 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
                 const defaultClient = @json($defaultClientJs);
 
                 const initialProducts = @json($initialProductsJs);
+
+                const paymentMethods = @json($paymentMethodsJs);
+                const paymentSelectConfigAttr = @json($paymentSelectConfig);
 
                 // Pre-cuentas: cada una es un cliente + carrito + medio de
                 // pago independientes, para poder atender a un cliente sin
@@ -271,13 +249,22 @@
                 let activeTicketId = null;
                 let currentSale = null;
 
+                /**
+                 * Crea una pre-cuenta nueva y la agrega a `tickets`. El
+                 * carrito es un array de {code, barcode, description,
+                 * unit_code, unit_price, qty}. Una venta puede repartirse
+                 * entre varios medios de pago (p. ej. mitad en Addi, mitad
+                 * en efectivo); `payments` es un array de {paymentMethodId,
+                 * amount}.
+                 * @returns {object} La pre-cuenta creada.
+                 */
                 function makeTicket() {
                     const ticket = {
                         id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
                         number: nextTicketNumber++,
                         client: { ...defaultClient },
-                        cart: [], // [{code, barcode, description, unit_code, unit_price, qty}]
-                        paymentMethodId: null,
+                        cart: [],
+                        payments: paymentMethods.length > 0 ? [{ paymentMethodId: paymentMethods[0].id, amount: 0 }] : [],
                         efectivoRecibido: '',
                         warehouseId: 'all',
                     };
@@ -347,6 +334,15 @@
                     });
                 }
 
+                /**
+                 * Repinta toda la columna derecha/izquierda para la
+                 * pre-cuenta activa (cliente, pago, carrito, grid de
+                 * productos). La bodega elegida es propia de cada
+                 * pre-cuenta (no un filtro global): al cambiar de pestaña,
+                 * se restaura la que tenía esta y se vuelve a buscar con
+                 * ese filtro.
+                 * @returns {void}
+                 */
                 function renderActiveTicket() {
                     const ticket = activeTicket();
                     if (! ticket) {
@@ -357,17 +353,9 @@
                     document.getElementById('pos-client-identificacion').textContent = ticket.client.identificacion;
                     document.getElementById('pos-client-results').classList.add('hidden');
 
-                    const paymentSelect = document.getElementById('pos-payment-method');
-                    if (ticket.paymentMethodId) {
-                        paymentSelect.value = ticket.paymentMethodId;
-                    } else {
-                        paymentSelect.selectedIndex = 0;
-                    }
+                    renderPaymentLines();
                     document.getElementById('pos-efectivo-display').value = ticket.efectivoRecibido;
 
-                    // La bodega elegida es propia de cada pre-cuenta (no un
-                    // filtro global): al cambiar de pestaña, se restaura la
-                    // que tenía esta y se vuelve a buscar con ese filtro.
                     const warehouseSelect = document.getElementById('pos-warehouse-filter');
                     const warehouseInstance = window.HSSelect && HSSelect.getInstance(warehouseSelect);
                     if (warehouseInstance) {
@@ -402,6 +390,26 @@
 
                 // --- Grid de productos ---
 
+                /**
+                 * Pinta el grid de productos del POS. Con una bodega
+                 * elegida, el stock que se muestra en el badge es el de ESA
+                 * bodega puntual (product.warehouses viene del backend en la
+                 * búsqueda por AJAX) -- mostrar "product.stock" ahí sería el
+                 * total de todas las bodegas, no el de la que el cajero está
+                 * mirando; con "Todas las bodegas" se muestra el total (ya
+                 * es "product.stock", la suma de todas). Los badges de
+                 * inventario/precio usan un tooltip propio (mismo diseño que
+                 * los dropdowns de selects de la app) en vez del title
+                 * nativo del navegador: el badge muestra el número que
+                 * aplica a lo que se está mirando ahora mismo (bodega
+                 * filtrada o total), y al pasar el mouse se ve el desglose
+                 * completo. La tarjeta es horizontal (ícono a la izquierda,
+                 * info apilada a la derecha) para ser más compacta en alto y
+                 * dejar ver más productos de un vistazo sin perder ningún
+                 * dato.
+                 * @param {Array} products
+                 * @returns {void}
+                 */
                 function renderProducts(products) {
                     const grid = document.getElementById('pos-product-grid');
                     const empty = document.getElementById('pos-product-grid-empty');
@@ -412,24 +420,11 @@
                     const hasWarehouseFilter = warehouseId && warehouseId !== 'all';
 
                     products.forEach((product) => {
-                        // Con una bodega elegida, el stock que se muestra es
-                        // el de ESA bodega puntual (product.warehouses viene
-                        // del backend en la búsqueda por AJAX) -- mostrar
-                        // "product.stock" ahí sería el total de todas las
-                        // bodegas, no el de la que el cajero está mirando.
-                        // Con "Todas las bodegas" se muestra el total (ya es
-                        // "product.stock", la suma de todas).
                         const warehouseStock = hasWarehouseFilter
                             ? product.warehouses?.find((w) => w.warehouse_id === warehouseId)?.stock
                             : null;
                         const stockToShow = warehouseStock !== null && warehouseStock !== undefined ? warehouseStock : product.stock;
 
-                        // Badge con tooltip propio (mismo diseño que los
-                        // dropdowns de selects de la app: fondo blanco/zinc-700,
-                        // borde, sombra) en vez del title nativo del navegador
-                        // -- el badge muestra el número que aplica a lo que se
-                        // está mirando ahora mismo (bodega filtrada o total),
-                        // y al pasar el mouse se ve el desglose completo.
                         const inventoryLines = (product.warehouses || [])
                             .map((w) => [w.warehouse_name, (w.stock ?? 0).toLocaleString('es-CO')]);
                         if (inventoryLines.length === 0) {
@@ -440,10 +435,6 @@
                             ? product.prices.map((p) => [p.price_type_name, formatMoney(p.price)])
                             : [['{{ __('Base price') }}', formatMoney(product.unit_price)]];
 
-                        // Tarjeta horizontal (ícono a la izquierda, info
-                        // apilada a la derecha) en vez de la vertical de
-                        // antes -- más compacta en alto, deja ver más
-                        // productos de un vistazo sin perder ningún dato.
                         const card = document.createElement('button');
                         card.type = 'button';
                         card.className = 'flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-neutral-700 p-2.5 text-start hover:border-accent hover:shadow-sm focus:outline-hidden focus:ring-2 focus:ring-accent transition';
@@ -480,13 +471,17 @@
                     return div.innerHTML;
                 }
 
-                // Badge con tooltip propio (mismo diseño que los dropdowns de
-                // selects de la app: card blanca/zinc-700 con borde y sombra)
-                // en vez del title nativo del navegador. Un solo tooltip
-                // compartido, "position: fixed" y pegado a <body> -- si
-                // quedara "absolute" dentro de la tarjeta, el contenedor del
-                // grid (que tiene scroll) lo recorta o lo deja empujando las
-                // tarjetas vecinas en vez de flotar por encima de todo.
+                /**
+                 * Devuelve (creándolo si hace falta) el único tooltip
+                 * flotante compartido por todos los badges (mismo diseño
+                 * que los dropdowns de selects de la app) en vez del title
+                 * nativo del navegador. Es "position: fixed" y vive pegado a
+                 * <body> -- si quedara "absolute" dentro de la tarjeta, el
+                 * contenedor del grid (que tiene scroll) lo recortaría o lo
+                 * dejaría empujando las tarjetas vecinas en vez de flotar
+                 * por encima de todo.
+                 * @returns {HTMLElement}
+                 */
                 function ensureFloatingTooltip() {
                     let el = document.getElementById('pos-floating-tooltip');
                     if (! el) {
@@ -498,6 +493,15 @@
                     return el;
                 }
 
+                /**
+                 * Muestra el tooltip flotante junto a triggerEl. Arriba del
+                 * elemento por defecto; si no cabe (muy cerca del borde
+                 * superior de la ventana), abajo. Igual en horizontal, para
+                 * que nunca se salga de la pantalla.
+                 * @param {HTMLElement} triggerEl
+                 * @param {Array<[string, string]>} lines
+                 * @returns {void}
+                 */
                 function showFloatingTooltip(triggerEl, lines) {
                     const el = ensureFloatingTooltip();
                     el.innerHTML = lines.map(([left, right]) => `
@@ -511,9 +515,6 @@
                     const triggerRect = triggerEl.getBoundingClientRect();
                     const tooltipRect = el.getBoundingClientRect();
 
-                    // Arriba del badge por defecto; si no cabe (muy cerca del
-                    // borde superior de la ventana), abajo. Igual en
-                    // horizontal, para que nunca se salga de la pantalla.
                     let top = triggerRect.top - tooltipRect.height - 8;
                     if (top < 8) {
                         top = triggerRect.bottom + 8;
@@ -553,16 +554,20 @@
                     return document.getElementById('pos-product-search').value.trim();
                 }
 
+                /**
+                 * Engancha la búsqueda de producto y el filtro de bodega. El
+                 * select de bodega es de Preline (buscable): dispara
+                 * "change" nativo y "change.hs.select" propio -- hace falta
+                 * escuchar los dos para no perderse el cambio sin importar
+                 * cuál de las dos formas lo generó (clic en una opción vs.
+                 * setValue() por código).
+                 * @returns {void}
+                 */
                 function bindProductSearch() {
                     document.getElementById('pos-product-search').addEventListener('input', debounce((event) => {
                         searchProducts(event.target.value.trim());
                     }, 300));
 
-                    // El select de bodega es de Preline (buscable): dispara
-                    // "change" nativo y "change.hs.select" propio -- hace
-                    // falta escuchar los dos para no perderse el cambio sin
-                    // importar cuál de las dos formas lo generó (clic en una
-                    // opción vs. setValue() por código).
                     const warehouseSelect = document.getElementById('pos-warehouse-filter');
                     const onWarehouseChange = () => {
                         activeTicket().warehouseId = warehouseSelect.value;
@@ -574,13 +579,25 @@
 
                 // --- Carrito ---
 
+                /**
+                 * Arma una línea de carrito para un producto en una bodega
+                 * puntual. Sin "precio base" aparte: si el producto tiene
+                 * tipos de precio configurados, el primero de la lista (en
+                 * el orden en que se agregaron) es el que aplica por
+                 * defecto -- solo se cae al precio propio del producto si no
+                 * tiene ningún tipo de precio. `availableWarehouses` trae
+                 * todas las bodegas con stock de este producto, para que el
+                 * cajero pueda cambiar de cuál está sacando desde el
+                 * selector de la línea (igual que en facturación
+                 * electrónica).
+                 * @param {object} product Shape de mapProductsForJs().
+                 * @param {string|null} warehouseId
+                 * @param {string|null} warehouseName
+                 * @param {number|null} warehouseStock
+                 * @returns {object} Línea de carrito.
+                 */
                 function makeCartLine(product, warehouseId, warehouseName, warehouseStock) {
-                    const prices = product.prices || []; // [{price_type_id, price_type_name, price}]
-                    // Sin "precio base" aparte: si el producto tiene tipos de
-                    // precio configurados, el primero de la lista (en el
-                    // orden en que los agregaste) es el que aplica por
-                    // defecto -- solo se cae al precio propio del producto si
-                    // no tiene ningún tipo de precio.
+                    const prices = product.prices || [];
                     const defaultPrice = prices[0] ?? null;
 
                     return {
@@ -596,60 +613,72 @@
                         warehouseId: warehouseId,
                         warehouseName: warehouseName,
                         warehouseStock: warehouseStock,
-                        // Todas las bodegas con stock de este producto, para
-                        // que el cajero pueda cambiar de cuál está sacando
-                        // desde el selector de la línea (igual que en
-                        // facturación electrónica).
                         availableWarehouses: warehousesWithStock(product),
                     };
                 }
 
-                // Bodegas reales (no la entrada "sin asignar") con stock > 0
-                // para este producto -- si no tiene ninguna, se vende sin
-                // tope de cantidad (mismo criterio que un producto que no
-                // controla inventario).
+                /**
+                 * Bodegas reales (no la entrada "sin asignar") con stock > 0
+                 * para un producto -- si no tiene ninguna, se vende sin tope
+                 * de cantidad (mismo criterio que un producto que no
+                 * controla inventario).
+                 * @param {object} product
+                 * @returns {Array}
+                 */
                 function warehousesWithStock(product) {
                     return (product.warehouses || []).filter((w) => w.warehouse_id && (w.stock ?? 0) > 0);
                 }
 
-                // Cada línea del carrito queda ligada a UNA bodega puntual,
-                // con la cantidad topada al stock real de esa bodega (igual
-                // que en facturación electrónica). Si el cajero sigue
-                // agregando el mismo producto y esa bodega ya se agotó en el
-                // carrito, en vez de bloquear se abre una línea nueva
-                // sacando de otra bodega que sí tenga stock; si no hay más
-                // bodegas con stock, no se agrega nada más.
+                /**
+                 * Agrega un producto al carrito de la pre-cuenta activa,
+                 * atrapando cualquier error para que no deje el POS como
+                 * "congelado" sin decir nada -- se ve en consola para
+                 * depurar y se le avisa al cajero en vez de quedarse
+                 * callado. Ver addToCartUnsafe() para la lógica real: cada
+                 * línea del carrito queda ligada a UNA bodega puntual, con
+                 * la cantidad topada al stock real de esa bodega (igual que
+                 * en facturación electrónica); si el cajero sigue agregando
+                 * el mismo producto y esa bodega ya se agotó en el carrito,
+                 * en vez de bloquear se abre una línea nueva sacando de otra
+                 * bodega que sí tenga stock, y si no hay más bodegas con
+                 * stock, no se agrega nada más.
+                 * @param {object} product
+                 * @param {HTMLElement} cardEl Tarjeta clickeada, para anclar el error si falla.
+                 * @returns {void}
+                 */
                 function addToCart(product, cardEl) {
                     try {
                         addToCartUnsafe(product, cardEl);
                     } catch (error) {
-                        // Que un error acá no deje el POS como "congelado" sin
-                        // decir nada -- se ve en consola para depurar y se le
-                        // avisa al cajero en vez de quedarse callado.
                         console.error('addToCart failed', error);
                         showError('{{ __('Could not add the product to the cart.') }}');
                     }
                 }
 
-                // Parpadeo rojo + mensaje flotando sobre la MISMA tarjeta que
-                // se clickeó (reusa el tooltip flotante de los badges), en
-                // vez del banner genérico de arriba -- así queda claro a cuál
-                // producto le faltó stock cuando hay varios en pantalla.
+                /**
+                 * Hace parpadear en rojo la tarjeta de producto y flota un
+                 * mensaje sobre ELLA (reusa el tooltip flotante de los
+                 * badges), en vez del banner genérico de arriba -- así queda
+                 * claro a cuál producto le faltó stock cuando hay varios en
+                 * pantalla. Se quitan las clases de borde normal y se ponen
+                 * las rojas (dejarlas todas juntas no sirve: Tailwind no
+                 * garantiza que "border-red-400" gane solo por venir después
+                 * en el HTML, misma especificidad que "border-zinc-200";
+                 * gana la que quede después en la hoja de estilos compilada,
+                 * no en el classList). "hover:border-accent" también hay
+                 * que quitarlo mientras dure el rojo -- si no, con el mouse
+                 * encima (que es justo donde está, recién le dieron clic) el
+                 * hover se lo gana y el borde vuelve al color normal de la
+                 * app.
+                 * @param {HTMLElement} cardEl
+                 * @param {string} message
+                 * @returns {void}
+                 */
                 function flashCardError(cardEl, message) {
                     if (! cardEl) {
                         showError(message);
                         return;
                     }
-                    // Se quitan las clases de borde normal y se ponen las
-                    // rojas -- dejarlas todas juntas no sirve, Tailwind no
-                    // garantiza que "border-red-400" gane solo por venir
-                    // después en el HTML (misma especificidad que
-                    // "border-zinc-200"; gana la que quede después en la
-                    // hoja de estilos compilada, no en el classList).
-                    // "hover:border-accent" también hay que quitarlo mientras
-                    // dure el rojo -- si no, con el mouse encima (que es
-                    // justo donde está, recién le dieron clic) el hover se lo
-                    // gana y el borde vuelve al color normal de la app.
                     cardEl.classList.remove('border-zinc-200', 'dark:border-neutral-700', 'hover:border-accent');
                     cardEl.classList.add('border-red-400', 'dark:border-red-500');
                     showFloatingTooltip(cardEl, [[message, '']]);
@@ -660,6 +689,19 @@
                     }, 4000);
                 }
 
+                /**
+                 * Lógica real de agregar un producto al carrito (ver
+                 * addToCart() para el wrapper con try/catch). Si hay un
+                 * filtro de bodega activo en el buscador, se prefiere esa
+                 * (es de donde el cajero está mirando el producto), pero
+                 * solo si de verdad tiene stock. Si todas las bodegas con
+                 * stock de este producto ya están topadas en el carrito, no
+                 * hay de dónde sacar más y se avisa con flashCardError() en
+                 * vez de quedarse en silencio.
+                 * @param {object} product
+                 * @param {HTMLElement} cardEl
+                 * @returns {void}
+                 */
                 function addToCartUnsafe(product, cardEl) {
                     const cart = activeTicket().cart;
                     const availableWarehouses = warehousesWithStock(product);
@@ -676,9 +718,6 @@
                         return;
                     }
 
-                    // Si hay un filtro de bodega activo en el buscador, se
-                    // prefiere esa (es de donde el cajero está mirando el
-                    // producto), pero solo si de verdad tiene stock.
                     const filterWarehouseId = document.getElementById('pos-warehouse-filter').value;
                     const preferred = (filterWarehouseId && filterWarehouseId !== 'all')
                         ? availableWarehouses.find((w) => w.warehouse_id === filterWarehouseId)
@@ -705,21 +744,21 @@
                         return;
                     }
 
-                    // Todas las bodegas con stock de este producto ya están
-                    // topadas en el carrito -- no hay de dónde sacar más, se
-                    // avisa en vez de quedarse en silencio (eso es lo que se
-                    // sentía como "bloqueado").
                     flashCardError(cardEl, '{{ __('There is no more stock of this product in any warehouse.') }}');
                 }
 
-                // Blindaje contra recursión: reconstruir el carrito dispara
-                // eventos propios de Preline (el stepper de cantidad, los
-                // dropdowns) que pueden terminar llamando a renderCart() de
-                // nuevo antes de que la llamada anterior termine -- sin este
-                // seguro, eso arma un bucle infinito y revienta la pila
-                // (visto como cientos de "Maximum call stack size exceeded"
-                // en consola). Si ya se está reconstruyendo, cualquier
-                // llamada de más simplemente no hace nada.
+                /**
+                 * Repinta el carrito, con blindaje contra recursión:
+                 * reconstruirlo dispara eventos propios de Preline (el
+                 * stepper de cantidad, los dropdowns) que pueden terminar
+                 * llamando a renderCart() de nuevo antes de que la llamada
+                 * anterior termine -- sin este seguro, eso arma un bucle
+                 * infinito y revienta la pila (visto como cientos de
+                 * "Maximum call stack size exceeded" en consola). Si ya se
+                 * está reconstruyendo, cualquier llamada de más simplemente
+                 * no hace nada.
+                 * @returns {void}
+                 */
                 let isRenderingCart = false;
                 function renderCart() {
                     if (isRenderingCart) {
@@ -733,6 +772,37 @@
                     }
                 }
 
+                /**
+                 * Reconstruye el cuerpo del carrito. Todos los campos de una
+                 * línea quedan "pegados" en una sola tira (mismo recurso
+                 * visual que usa el proyecto WorkFlow para sus líneas de
+                 * presupuesto de contrato): un grid con columnas fijas, sin
+                 * separación entre campos, redondeando solo las puntas -- se
+                 * ve como un único campo continuo en vez de varias cajas
+                 * sueltas. Los botones +/- del stepper de Preline no
+                 * disparan un "input" nativo (el plugin solo pone el valor a
+                 * mano), así que hace falta escuchar también su propio
+                 * evento, además del "input" normal para cuando se escribe
+                 * la cantidad a mano; la cantidad se topa siempre al stock
+                 * real de la bodega de esa línea, porque el "max" del
+                 * stepper de Preline no siempre alcanza a frenar lo que se
+                 * escribe a mano. El selector de bodega de cada línea usa el
+                 * mismo patrón visual que "Lista de precios" (ícono chiquito
+                 * con un menú, no un <select> con el nombre a la vista): al
+                 * cambiarla, la cantidad se topa al stock de la nueva
+                 * bodega. Si el precio se escribe a mano, se toma tal cual
+                 * (ya no corresponde a ningún tipo de precio del catálogo,
+                 * así que el selector de tipo de precio vuelve a "Precio
+                 * base"). El listener "change.hs.inputNumber" del stepper de
+                 * cantidad se engancha DESPUÉS de construir el componente
+                 * HSInputNumber: Preline dispara su propio evento de
+                 * inicialización al construirse, y si el listener ya
+                 * estuviera puesto, ese evento llamaba a renderCart(), que
+                 * reconstruía TODO, que volvía a construir el componente,
+                 * que volvía a disparar el evento... un stack overflow por
+                 * recursión infinita.
+                 * @returns {void}
+                 */
                 function renderCartUnsafe() {
                     const cart = activeTicket().cart;
                     const body = document.getElementById('pos-cart-body');
@@ -752,13 +822,6 @@
                                 </button>
                             `).join('');
 
-                        // Todos los campos de la línea "pegados" en una sola
-                        // tira (mismo recurso visual que usa el proyecto
-                        // WorkFlow para sus líneas de presupuesto de
-                        // contrato): un grid con columnas fijas, sin
-                        // separación entre campos, redondeando solo las
-                        // puntas -- se ve como un único campo continuo en
-                        // vez de varias cajas sueltas.
                         const warehouseOptions = line.availableWarehouses.map((w) => `
                             <button type="button" data-warehouse-id="${w.warehouse_id}" data-stock="${w.stock}" class="pos-line-warehouse-option w-full text-start px-3 py-1.5 text-sm rounded-lg ${line.warehouseId === w.warehouse_id ? 'bg-accent/10 text-accent' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10'} focus:outline-hidden">
                                 ${escapeHtml(w.warehouse_name)} (${w.stock})
@@ -826,18 +889,10 @@
                                 </button>
                             </div>
                         `;
-                        // Los botones +/- del stepper de Preline no disparan
-                        // un "input" nativo (el plugin solo pone el valor a
-                        // mano) -- hace falta su propio evento, además del
-                        // "input" normal para cuando se escribe la cantidad.
                         const qtyWrapper = row.querySelector('.pos-line-qty-wrapper');
                         const qtyInput = row.querySelector('.pos-line-qty');
                         const applyQtyChange = () => {
                             let qty = parseFloat(qtyInput.value) || 0;
-                            // Tope duro a lo que de verdad hay en la bodega
-                            // de esta línea -- el "max" del stepper de
-                            // Preline no siempre alcanza a frenar lo que se
-                            // escribe a mano.
                             if (line.warehouseStock !== null && line.warehouseStock !== undefined && qty > line.warehouseStock) {
                                 qty = line.warehouseStock;
                             }
@@ -851,10 +906,6 @@
                         };
                         qtyInput.addEventListener('input', applyQtyChange);
 
-                        // Selector de bodega (mismo patrón visual que "Lista
-                        // de precios": ícono chiquito con un menú, no un
-                        // <select> con el nombre a la vista) -- al cambiarla,
-                        // la cantidad se topa al stock de la nueva bodega.
                         const lineWarehouseDropdown = row.querySelector('[data-warehouse-dropdown]');
                         row.querySelectorAll('.pos-line-warehouse-option').forEach((option) => {
                             option.addEventListener('click', () => {
@@ -874,9 +925,6 @@
 
                         row.querySelector('[data-action="remove"]').addEventListener('click', () => { cart.splice(index, 1); renderCart(); renderTickets(); });
 
-                        // Precio a mano: escribe libremente, se toma tal cual
-                        // (ya no corresponde a ningún tipo de precio del
-                        // catálogo, así que el select vuelve a "Precio base").
                         row.querySelector('[data-action="price"]').addEventListener('change', (event) => {
                             line.unit_price = parseFloat(event.target.value.replace(/[^0-9.-]/g, '')) || 0;
                             line.priceTypeId = null;
@@ -905,24 +953,22 @@
                         if (window.HSInputNumber) {
                             new HSInputNumber(qtyWrapper);
                         }
-                        // El listener se engancha DESPUÉS de construir el
-                        // componente: Preline dispara su propio evento de
-                        // inicialización al construirse, y si el listener ya
-                        // estuviera puesto, ese evento llamaba a
-                        // renderCart() -> reconstruía TODO -> volvía a
-                        // construir el componente -> volvía a disparar el
-                        // evento... un stack overflow por recursión infinita.
                         qtyWrapper.addEventListener('change.hs.inputNumber', applyQtyChange);
                     });
 
                     updateTotal();
                 }
 
-                // Los dropdowns de tipo de precio (el general del carrito y
-                // el de cada línea) no los detecta el autoInit global de
-                // Preline -- hay que instanciarlos a mano, igual que ya hace
-                // documents/create.blade.php con sus propios popovers
-                // dinámicos (impuestos por línea, etc.).
+                /**
+                 * Instancia a mano los dropdowns de Preline dentro de
+                 * container (tipo de precio general del carrito, tipo de
+                 * precio por línea, bodega por línea): el autoInit global de
+                 * Preline no los detecta porque se insertan dinámicamente,
+                 * igual que ya hace documents/create.blade.php con sus
+                 * propios popovers dinámicos (impuestos por línea, etc.).
+                 * @param {HTMLElement} container
+                 * @returns {void}
+                 */
                 function initDropdowns(container) {
                     if (! window.HSDropdown) {
                         return;
@@ -930,12 +976,19 @@
                     container.querySelectorAll('.hs-dropdown').forEach((el) => new HSDropdown(el));
                 }
 
-                // "--auto-close:false" hace que Preline deje de cerrar el
-                // popover solo (lo desactivamos para que no se cierre con
-                // cualquier clic adentro, como al escribir en el precio) --
-                // un solo listener delegado (no uno por fila, que se
-                // reconstruye entera en cada renderCart()) cierra cualquier
-                // dropdown abierto si el clic fue realmente afuera.
+                /**
+                 * Cierra cualquier dropdown abierto si el clic fue
+                 * realmente afuera. Los popovers usan "--auto-close:false"
+                 * para que Preline no los cierre solo con cualquier clic
+                 * adentro (como al escribir en el precio), así que hace
+                 * falta este cierre manual; es un solo listener delegado (no
+                 * uno por fila, que se reconstruye entera en cada
+                 * renderCart()) para no acumular listeners duplicados. Un
+                 * dropdown "huérfano" (su fila ya se reconstruyó en otro
+                 * renderCart()) no debe frenar el resto de este mismo clic
+                 * global, por eso el try/catch por elemento.
+                 * @returns {void}
+                 */
                 function bindDropdownOutsideClose() {
                     document.addEventListener('click', (event) => {
                         document.querySelectorAll('.hs-dropdown.open').forEach((el) => {
@@ -944,23 +997,23 @@
                                     HSDropdown.close(el);
                                 }
                             } catch (error) {
-                                // Un dropdown "huérfano" (su fila ya se
-                                // reconstruyó en otro renderCart()) no debe
-                                // frenar el resto de este mismo clic global.
                                 console.error('HSDropdown.close failed', error);
                             }
                         });
                     });
                 }
 
-                // --- Aplicar tipo de precio a todo el carrito ---
-
+                /**
+                 * Aplica un tipo de precio a todas las líneas del carrito
+                 * cuyo producto sí lo tenga -- las demás se quedan con lo
+                 * que tenían (mismo criterio que la facturación
+                 * electrónica).
+                 * @param {string} priceTypeId
+                 * @returns {void}
+                 */
                 function applyPriceTypeToCart(priceTypeId) {
                     const cart = activeTicket().cart;
                     cart.forEach((line) => {
-                        // Solo a las líneas cuyo producto sí tiene ese tipo
-                        // de precio -- las demás se quedan con lo que tenían
-                        // (mismo criterio que la facturación electrónica).
                         const match = line.prices.find((p) => p.price_type_id === priceTypeId);
                         if (! match) {
                             return;
@@ -976,9 +1029,25 @@
                     return activeTicket().cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
                 }
 
+                /**
+                 * Recalcula y pinta el total del carrito. Con un solo medio
+                 * de pago (el caso normal) el monto se mantiene igual al
+                 * total del carrito solo -- con varios ya es el usuario
+                 * quien reparte, no se le pisa lo que haya repartido.
+                 * @returns {void}
+                 */
                 function updateTotal() {
                     document.getElementById('pos-total-display').textContent = formatMoney(cartTotal());
-                    updateChange();
+
+                    const ticket = activeTicket();
+                    if (ticket && ticket.payments.length === 1) {
+                        ticket.payments[0].amount = cartTotal();
+                        renderPaymentLines();
+                    } else if (ticket) {
+                        updatePaymentRemaining();
+                    }
+
+                    updatePosCashSectionVisibility();
                 }
 
                 // --- Cliente ---
@@ -990,6 +1059,16 @@
                     document.getElementById('pos-client-results').classList.add('hidden');
                 }
 
+                /**
+                 * Engancha la búsqueda de cliente y el alta de uno nuevo.
+                 * Usa el mismo panel completo de alta de cliente que la
+                 * pantalla de Clientes
+                 * (third-parties/partials/form-panel.blade.php);
+                 * window.thirdPartyPanelOnSave hace que, al guardar, el
+                 * cliente quede seleccionado en la pre-cuenta activa en vez
+                 * de navegar a otra página.
+                 * @returns {void}
+                 */
                 function bindClientControls() {
                     document.getElementById('pos-client-search').addEventListener('input', debounce(async (event) => {
                         const query = event.target.value.trim();
@@ -1005,7 +1084,15 @@
 
                         results.innerHTML = '';
                         if (clients.length === 0) {
-                            results.innerHTML = `<div class="p-3 text-sm text-zinc-500 dark:text-neutral-400">{{ __('No results.') }}</div>`;
+                            const emptyItem = document.createElement('button');
+                            emptyItem.type = 'button';
+                            emptyItem.className = 'w-full text-start px-3 py-2 text-sm text-accent hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10';
+                            emptyItem.textContent = '{{ __('No results.') }} {{ __('Create client') }} "' + query + '"';
+                            emptyItem.addEventListener('click', () => {
+                                results.classList.add('hidden');
+                                window.openThirdPartyPanel({ identificacion: query });
+                            });
+                            results.appendChild(emptyItem);
                         } else {
                             clients.forEach((client) => {
                                 const item = document.createElement('button');
@@ -1020,87 +1107,138 @@
                     }, 300));
 
                     document.getElementById('pos-client-add-btn').addEventListener('click', () => {
-                        document.getElementById('pos-client-modal-error').classList.add('hidden');
-                        document.getElementById('pos-client-identification').value = document.getElementById('pos-client-search').value;
-                        document.getElementById('pos-client-name').value = '';
-                        document.getElementById('pos-client-address').value = '';
-                        document.getElementById('pos-client-phone').value = '';
-                        document.getElementById('pos-client-email').value = '';
-                        if (window.HSOverlay) {
-                            HSOverlay.autoInit();
-                            HSOverlay.open('#pos-client-modal');
-                        }
+                        window.openThirdPartyPanel({ identificacion: document.getElementById('pos-client-search').value });
                     });
 
-                    document.getElementById('pos-client-save-btn').addEventListener('click', async () => {
-                        const errorBox = document.getElementById('pos-client-modal-error');
-                        errorBox.classList.add('hidden');
-
-                        const payload = new URLSearchParams({
-                            identification_type: document.getElementById('pos-client-type').value,
-                            identificacion: document.getElementById('pos-client-identification').value,
-                            name: document.getElementById('pos-client-name').value,
-                            address: document.getElementById('pos-client-address').value,
-                            phone: document.getElementById('pos-client-phone').value,
-                            email: document.getElementById('pos-client-email').value,
-                            person_type: '2',
-                        });
-
-                        try {
-                            const response = await fetch(clientStoreUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Accept': 'application/json',
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                    'X-CSRF-TOKEN': csrfToken,
-                                },
-                                body: payload.toString(),
-                            });
-                            const data = await response.json();
-
-                            if (! response.ok) {
-                                const message = data.message || Object.values(data.errors || {}).flat().join(' ') || '{{ __('Could not save the client.') }}';
-                                throw new Error(message);
-                            }
-
-                            selectClient(data.client);
-                            if (window.HSOverlay) {
-                                HSOverlay.close('#pos-client-modal');
-                            }
-                        } catch (error) {
-                            errorBox.textContent = error.message;
-                            errorBox.classList.remove('hidden');
-                        }
-                    });
+                    window.thirdPartyPanelOnSave = selectClient;
                 }
 
                 // --- Pago ---
+                // Una venta puede repartirse entre varios medios de pago
+                // (ticket.payments = [{paymentMethodId, amount}, ...]); con
+                // una sola línea (el caso normal) el monto se sincroniza solo
+                // con el total del carrito, igual que antes.
 
-                function selectedPaymentOption() {
-                    const select = document.getElementById('pos-payment-method');
-                    return select.options[select.selectedIndex] || null;
+                function paymentMethodById(id) {
+                    return paymentMethods.find((m) => m.id === id) || null;
+                }
+
+                function parseAmount(value) {
+                    return parseFloat((value || '0').replace(/[^0-9.-]/g, '')) || 0;
+                }
+
+                function assignedPaymentsTotal(ticket) {
+                    return ticket.payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                }
+
+                function cashPaymentsTotal(ticket) {
+                    return ticket.payments
+                        .filter((p) => paymentMethodById(p.paymentMethodId)?.dianCode === '10')
+                        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                }
+
+                function renderPaymentLines() {
+                    const ticket = activeTicket();
+                    const container = document.getElementById('pos-payment-lines');
+                    container.innerHTML = '';
+
+                    ticket.payments.forEach((payment, index) => {
+                        const row = document.createElement('div');
+                        row.className = 'grid gap-2 items-center';
+                        row.style.gridTemplateColumns = '1fr 130px 32px';
+
+                        const selectId = `pos-payment-method-${index}`;
+                        const optionsHtml = paymentMethods.map((m) => `<option value="${m.id}" ${m.id === payment.paymentMethodId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+                        row.innerHTML = `
+                            <select id="${selectId}" data-hs-select='${paymentSelectConfigAttr}' class="hidden">${optionsHtml}</select>
+                            <div class="relative">
+                                <input type="text" inputmode="decimal" data-payment-amount
+                                    class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0" value="${payment.amount ? payment.amount : ''}">
+                                <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                                </div>
+                            </div>
+                            <button type="button" data-remove class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 ${ticket.payments.length <= 1 ? 'invisible' : ''}" aria-label="{{ __('Remove') }}">
+                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                            </button>
+                        `;
+                        container.appendChild(row);
+
+                        const select = row.querySelector('select');
+                        if (window.HSSelect) {
+                            new HSSelect(select);
+                        }
+                        select.addEventListener('change', () => {
+                            payment.paymentMethodId = select.value;
+                            updatePosCashSectionVisibility();
+                            updatePaymentRemaining();
+                        });
+
+                        const amountInput = row.querySelector('[data-payment-amount]');
+                        amountInput.addEventListener('input', () => {
+                            payment.amount = parseAmount(amountInput.value);
+                            updatePosCashSectionVisibility();
+                            updatePaymentRemaining();
+                        });
+
+                        const removeBtn = row.querySelector('[data-remove]');
+                        if (ticket.payments.length > 1) {
+                            removeBtn.addEventListener('click', () => {
+                                ticket.payments.splice(index, 1);
+                                renderPaymentLines();
+                                updatePosCashSectionVisibility();
+                                updatePaymentRemaining();
+                            });
+                        }
+                    });
+
+                    updatePaymentRemaining();
+                }
+
+                function updatePaymentRemaining() {
+                    const ticket = activeTicket();
+                    const remaining = Math.round((cartTotal() - assignedPaymentsTotal(ticket)) * 100) / 100;
+                    const label = document.getElementById('pos-payment-remaining');
+                    if (! label) {
+                        return;
+                    }
+                    if (remaining === 0) {
+                        label.classList.add('hidden');
+                        return;
+                    }
+                    label.textContent = remaining > 0
+                        ? '{{ __('Missing to assign') }}: ' + formatMoney(remaining)
+                        : '{{ __('Assigned amount exceeds the total by') }} ' + formatMoney(Math.abs(remaining));
+                    label.classList.remove('hidden');
                 }
 
                 function updatePosCashSectionVisibility() {
-                    const option = selectedPaymentOption();
-                    const isCash = option && option.dataset.dianCode === '10';
+                    const ticket = activeTicket();
+                    const isCash = cashPaymentsTotal(ticket) > 0;
                     document.getElementById('pos-cash-section').classList.toggle('hidden', ! isCash);
                     if (! isCash) {
                         document.getElementById('pos-efectivo-display').value = '';
+                        ticket.efectivoRecibido = '';
                     }
                     updateChange();
                 }
 
                 function updateChange() {
-                    const recibido = parseFloat((document.getElementById('pos-efectivo-display').value || '0').replace(/[^0-9.-]/g, '')) || 0;
-                    document.getElementById('pos-change-display').textContent = formatMoney(Math.max(recibido - cartTotal(), 0));
+                    const ticket = activeTicket();
+                    const recibido = parseAmount(document.getElementById('pos-efectivo-display').value);
+                    document.getElementById('pos-change-display').textContent = formatMoney(Math.max(recibido - cashPaymentsTotal(ticket), 0));
                 }
 
                 function bindPaymentControls() {
-                    document.getElementById('pos-payment-method').addEventListener('change', () => {
-                        activeTicket().paymentMethodId = selectedPaymentOption()?.value || null;
+                    document.getElementById('pos-payment-add-btn')?.addEventListener('click', () => {
+                        const ticket = activeTicket();
+                        const remaining = Math.max(cartTotal() - assignedPaymentsTotal(ticket), 0);
+                        const unusedMethod = paymentMethods.find((m) => ! ticket.payments.some((p) => p.paymentMethodId === m.id)) || paymentMethods[0];
+                        ticket.payments.push({ paymentMethodId: unusedMethod?.id || null, amount: remaining });
+                        renderPaymentLines();
                         updatePosCashSectionVisibility();
                     });
+
                     document.getElementById('pos-efectivo-display').addEventListener('input', (event) => {
                         activeTicket().efectivoRecibido = event.target.value;
                         updateChange();
@@ -1109,6 +1247,13 @@
 
                 // --- Checkout ---
 
+                /**
+                 * Engancha el botón de cobrar: manda la venta por fetch y,
+                 * si sale bien, cierra esta pre-cuenta sola (sin pedir
+                 * confirmación, el carrito ya no representa nada pendiente)
+                 * y deja lista otra para la siguiente venta.
+                 * @returns {void}
+                 */
                 function bindCheckout() {
                 document.getElementById('pos-checkout-btn').addEventListener('click', async () => {
                     const btn = document.getElementById('pos-checkout-btn');
@@ -1122,11 +1267,18 @@
                         return;
                     }
 
+                    const remaining = Math.round((cartTotal() - assignedPaymentsTotal(ticket)) * 100) / 100;
+                    if (remaining !== 0) {
+                        showError(remaining > 0
+                            ? '{{ __('Missing to assign') }}: ' + formatMoney(remaining)
+                            : '{{ __('Assigned amount exceeds the total by') }} ' + formatMoney(Math.abs(remaining)));
+                        return;
+                    }
+
                     btn.disabled = true;
                     btn.textContent = '{{ __('Processing...') }}';
 
                     const client = ticket.client;
-                    const paymentOption = selectedPaymentOption();
                     const efectivoDisplay = document.getElementById('pos-efectivo-display').value;
                     const efectivoRecibido = efectivoDisplay ? parseFloat(efectivoDisplay.replace(/[^0-9.-]/g, '')) : '';
 
@@ -1140,9 +1292,13 @@
                     body.append('cliente_ciudad_codigo', client.city_code || '');
                     body.append('cliente_telefono', client.phone || '');
                     body.append('cliente_email', client.email || '');
-                    if (paymentOption) {
-                        body.append('payment_method_id[0]', paymentOption.value);
-                    }
+                    ticket.payments.forEach((payment, index) => {
+                        if (! payment.paymentMethodId) {
+                            return;
+                        }
+                        body.append(`payment_method_id[${index}]`, payment.paymentMethodId);
+                        body.append(`payment_method_amount[${index}]`, payment.amount || 0);
+                    });
                     if (efectivoRecibido !== '') {
                         body.append('efectivo_recibido', efectivoRecibido);
                     }
@@ -1183,10 +1339,6 @@
                         issueBtn.disabled = false;
                         issueBtn.textContent = '{{ __('Issue electronic invoice') }}';
 
-                        // La venta ya quedó registrada: esta pre-cuenta terminó
-                        // su ciclo, se cierra sola (sin pedir confirmación,
-                        // el carrito ya no representa nada pendiente) y se
-                        // deja lista otra para la siguiente venta.
                         tickets = tickets.filter((t) => t.id !== ticket.id);
                         if (tickets.length === 0) {
                             makeTicket();
@@ -1262,11 +1414,15 @@
                     }
                 };
 
+                /**
+                 * Navega a la lista de ventas. "Ir a ventas" navega de
+                 * verdad (sale de esta pantalla), así que las pre-cuentas
+                 * que sigan abiertas con productos se perderían sin avisar
+                 * -- se pierde solo si el cajero confirma que quiere salir
+                 * de todas formas.
+                 * @returns {void}
+                 */
                 window.posGoToSales = function () {
-                    // "Ir a ventas" navega de verdad (sale de esta pantalla),
-                    // así que las pre-cuentas que sigan abiertas con
-                    // productos se perderían sin avisar -- se pierde solo si
-                    // el cajero confirma que quiere salir de todas formas.
                     const hasPendingTickets = tickets.some((t) => t.cart.length > 0);
                     if (hasPendingTickets && ! confirm('{{ __('You have other pre-bills open with products. If you leave, you will lose them. Continue?') }}')) {
                         return;
@@ -1274,11 +1430,15 @@
                     window.location.href = '{{ route('pos.sales.index') }}';
                 };
 
+                /**
+                 * Cierra el modal de resultado. Ya quedó una pre-cuenta
+                 * nueva lista desde que se cobró (ver el checkout de
+                 * arriba), así que "Nueva venta" solo cierra el modal, sin
+                 * recargar la página ni perder las demás pre-cuentas que
+                 * sigan abiertas.
+                 * @returns {void}
+                 */
                 window.posNewSale = function () {
-                    // Ya quedó una pre-cuenta nueva lista desde que se cobró
-                    // (ver el checkout de arriba) -- "Nueva venta" solo cierra
-                    // el modal, sin recargar la página ni perder las demás
-                    // pre-cuentas que sigan abiertas.
                     if (window.HSOverlay) {
                         HSOverlay.close('#pos-result-modal');
                     }
@@ -1332,5 +1492,9 @@
                 document.addEventListener('livewire:navigated', init);
             })();
         </script>
+
+        @include('third-parties.partials.form-panel-script', ['storeRoute' => 'clients.store'])
+
+        <x-dian-acquirer-lookup-script />
     @endpush
 </x-layouts.app>
