@@ -212,6 +212,7 @@ class DocumentoEmitidoController extends Controller
         $company = $this->currentCompany($request);
 
         $query = trim((string) $request->query('q', ''));
+        $warehouseId = trim((string) $request->query('warehouse_id', ''));
 
         $products = $company->products()->active()
             ->when($query !== '', function ($builder) use ($query) {
@@ -221,54 +222,85 @@ class DocumentoEmitidoController extends Controller
                         ->orWhere('description', 'like', '%' . $query . '%');
                 });
             })
+            // Filtro de bodega/stock -- solo lo pide la pantalla de venta
+            // del POS (ver pos/sell.blade.php); el selector de líneas de
+            // facturación no manda "warehouse_id" y sigue sin filtrar por
+            // stock (ahí sí puede hacer falta referenciar un producto sin
+            // existencias). "all" = todas las bodegas, pero igual exige más
+            // de 1 unidad en total; un id puntual exige más de 1 unidad en
+            // ESA bodega (elemMatch: ambas condiciones sobre el mismo
+            // elemento del arreglo embebido, no en cualquiera).
+            ->when($warehouseId === 'all', function ($builder) {
+                $builder->where('stock', '>', 1);
+            })
+            ->when($warehouseId !== '' && $warehouseId !== 'all', function ($builder) use ($warehouseId) {
+                $builder->where('warehouse_stocks', 'elemMatch', [
+                    'warehouse_id' => $warehouseId,
+                    'stock' => ['$gt' => 1],
+                ]);
+            })
             ->orderBy('description')
             ->limit(50)
             ->get();
 
+        return response()->json([
+            'products' => $this->mapProductsForJs($products),
+        ]);
+    }
+
+    /**
+     * Traduce productos al shape que consume el JS del selector de productos
+     * (precios por tipo, stock por bodega) -- público para que PosController
+     * arme el mismo shape en la carga inicial de la pantalla de venta (ver
+     * pos/sell.blade.php), sin duplicar esta lógica.
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $products
+     */
+    public function mapProductsForJs($products)
+    {
         $priceTypeIds = $products->flatMap(fn ($product) => collect($product->extra_prices ?? [])->pluck('price_type_id'))->unique()->values()->all();
         $warehouseIds = $products->flatMap(fn ($product) => collect($product->warehouse_stocks ?? [])->pluck('warehouse_id'))->unique()->values()->all();
 
         $priceTypesById = PriceType::whereIn('_id', $priceTypeIds)->get()->keyBy(fn ($priceType) => (string) $priceType->_id);
         $warehousesById = Warehouse::whereIn('_id', $warehouseIds)->get()->keyBy(fn ($warehouse) => (string) $warehouse->_id);
 
-        return response()->json([
-            'products' => $products->map(function (Product $product) use ($priceTypesById, $warehousesById) {
-                $prices = collect($product->extra_prices ?? [])
-                    ->map(fn ($entry) => [
-                        'price_type_id' => $entry['price_type_id'] ?? null,
-                        'price_type_name' => $priceTypesById->get($entry['price_type_id'] ?? null)?->name ?? __('Price'),
-                        'price' => (float) ($entry['price'] ?? 0),
-                    ])
-                    ->values();
+        return $products->map(function (Product $product) use ($priceTypesById, $warehousesById) {
+            $prices = collect($product->extra_prices ?? [])
+                ->map(fn ($entry) => [
+                    'price_type_id' => $entry['price_type_id'] ?? null,
+                    'price_type_name' => $priceTypesById->get($entry['price_type_id'] ?? null)?->name ?? __('Price'),
+                    'price' => (float) ($entry['price'] ?? 0),
+                ])
+                ->values();
 
-                $warehouses = collect($product->warehouse_stocks ?? [])
-                    ->map(fn ($entry) => [
-                        'warehouse_id' => $entry['warehouse_id'] ?? null,
-                        'warehouse_name' => $warehousesById->get($entry['warehouse_id'] ?? null)?->name ?? __('Warehouse'),
-                        'stock' => (float) ($entry['stock'] ?? 0),
-                    ])
-                    ->values();
+            $warehouses = collect($product->warehouse_stocks ?? [])
+                ->map(fn ($entry) => [
+                    'warehouse_id' => $entry['warehouse_id'] ?? null,
+                    'warehouse_name' => $warehousesById->get($entry['warehouse_id'] ?? null)?->name ?? __('Warehouse'),
+                    'stock' => (float) ($entry['stock'] ?? 0),
+                ])
+                ->values();
 
-                $warehouses->push([
-                    'warehouse_id' => null,
-                    'warehouse_name' => __('Unassigned'),
-                    'stock' => $product->unassigned_stock,
-                ]);
+            $warehouses->push([
+                'warehouse_id' => null,
+                'warehouse_name' => __('Unassigned'),
+                'stock' => $product->unassigned_stock,
+            ]);
 
-                return [
-                    'id' => (string) $product->_id,
-                    'code' => $product->code,
-                    'barcode' => $product->barcode,
-                    'description' => $product->description,
-                    'unit_code' => $product->unit_code,
-                    'unit_price' => (float) $product->unit_price,
-                    'tracks_inventory' => (bool) $product->tracks_inventory,
-                    'stock' => (float) $product->stock,
-                    'prices' => $prices,
-                    'warehouses' => $warehouses,
-                ];
-            })->values(),
-        ]);
+            return [
+                'id' => (string) $product->_id,
+                'code' => $product->code,
+                'barcode' => $product->barcode,
+                'description' => $product->description,
+                'unit_code' => $product->unit_code,
+                'unit_price' => (float) $product->unit_price,
+                'tracks_inventory' => (bool) $product->tracks_inventory,
+                'stock' => (float) $product->stock,
+                'prices' => $prices,
+                'warehouses' => $warehouses,
+                'image_url' => $product->image_url,
+            ];
+        })->values();
     }
 
     /**

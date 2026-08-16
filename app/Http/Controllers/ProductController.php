@@ -66,6 +66,7 @@ class ProductController extends Controller
         $company = $this->currentCompany($request);
         $data = $this->validatedData($request);
         $data['company_id'] = (string) $company->_id;
+        $data = array_merge($data, $this->handleImageUpload($request));
 
         $product = Product::create($data);
 
@@ -100,6 +101,14 @@ class ProductController extends Controller
         $previousTotal = (float) ($product->stock ?? 0);
 
         $data = $this->validatedData($request);
+
+        if ($request->boolean('remove_image')) {
+            $data['image_data'] = null;
+            $data['image_mime'] = null;
+        } else {
+            $data = array_merge($data, $this->handleImageUpload($request));
+        }
+
         $product->update($data);
 
         if ($product->tracks_inventory) {
@@ -112,6 +121,27 @@ class ProductController extends Controller
         ]);
 
         return redirect()->route('products.index');
+    }
+
+    /**
+     * Cambia solo la imagen de un producto (clic directo sobre la foto en
+     * la vista de detalle) sin pasar por la validación completa del
+     * formulario de edición.
+     */
+    public function updateImage(Request $request, string $product)
+    {
+        $company = $this->currentCompany($request);
+        $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
+
+        $imageData = $this->handleImageUpload($request);
+
+        if (empty($imageData)) {
+            throw ValidationException::withMessages(['image' => __('Please choose an image.')]);
+        }
+
+        $product->update($imageData);
+
+        return response()->json(['image_url' => $product->image_url]);
     }
 
     /**
@@ -395,6 +425,33 @@ class ProductController extends Controller
         $product->average_cost = $newQty > 0.00001
             ? round((($oldQty * $oldAvg) + ($entryQty * $entryUnitCost)) / $newQty, 4)
             : $entryUnitCost;
+    }
+
+    /**
+     * Lee la foto del producto (si vino en la petición) y la deja lista en
+     * base64 para guardarla directo en el documento -- nada se escribe en
+     * disco (ver comentario en Product::getImageUrlAttribute()). Un límite
+     * de 1MB porque, codificada en base64, ya le suma cerca de un 33% más de
+     * peso al documento de Mongo.
+     *
+     * @return array{image_data?: string, image_mime?: string} Vacío si no vino ninguna imagen nueva.
+     */
+    private function handleImageUpload(Request $request): array
+    {
+        if (! $request->hasFile('image')) {
+            return [];
+        }
+
+        $request->validate([
+            'image' => 'image|max:1024',
+        ]);
+
+        $file = $request->file('image');
+
+        return [
+            'image_data' => base64_encode(file_get_contents($file->getRealPath())),
+            'image_mime' => $file->getMimeType(),
+        ];
     }
 
     private function validatedData(Request $request): array

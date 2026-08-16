@@ -22,7 +22,11 @@ class Product extends Model
         'warehouse_stocks',
         'average_cost',
         'status',
+        'image_data',
+        'image_mime',
     ];
+
+    protected $appends = ['image_url'];
 
     public function company()
     {
@@ -51,6 +55,23 @@ class Product extends Model
     public function getAverageCostFormattedAttribute()
     {
         return '$' . number_format((float) ($this->average_cost ?? 0), 2, ',', '.');
+    }
+
+    /**
+     * "URL" (en realidad un data URI) de la foto del producto, null si no
+     * tiene -- guardada en base64 directo en el documento de Mongo, no en
+     * disco (los despliegues de este proyecto no persisten storage/ entre
+     * versiones, igual que el certificado de firma digital de la empresa).
+     * Tanto la tabla de Productos como el grid del POS la usan; si viene
+     * null, cada pantalla se encarga de mostrar su propio ícono de respaldo.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image_data || ! $this->image_mime) {
+            return null;
+        }
+
+        return 'data:' . $this->image_mime . ';base64,' . $this->image_data;
     }
 
     /**

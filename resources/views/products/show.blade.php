@@ -88,6 +88,16 @@
         </div>
 
         <div class="flex flex-col gap-6">
+            <div class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 flex justify-center">
+                <button type="button" onclick="document.getElementById('pd-image-input').click()" class="relative block w-full aspect-square max-w-72 rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Image') }}">
+                    <img id="pd-image-preview" src="{{ $product->image_url }}" alt="" class="size-full object-cover {{ $product->image_url ? '' : 'hidden' }}">
+                    <span id="pd-image-placeholder" class="flex items-center justify-center size-full bg-accent/10 text-accent {{ $product->image_url ? 'hidden' : '' }}">
+                        <svg class="shrink-0 size-16" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    </span>
+                </button>
+                <input type="file" id="pd-image-input" accept="image/*" class="hidden">
+            </div>
+
             @if ($product->tracks_inventory)
                 <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
@@ -238,6 +248,32 @@
                 } else {
                     loadKardex();
                 }
+
+                document.getElementById('pd-image-input').addEventListener('change', async (event) => {
+                    const file = event.target.files?.[0];
+                    if (! file) {
+                        return;
+                    }
+
+                    const body = new FormData();
+                    body.append('image', file);
+                    body.append('_token', @json(csrf_token()));
+
+                    const response = await fetch(@json(route('products.image.update', ['product' => $product->_id])), {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        body,
+                    });
+
+                    if (! response.ok) {
+                        return;
+                    }
+
+                    const data = await response.json();
+                    document.getElementById('pd-image-preview').src = data.image_url;
+                    document.getElementById('pd-image-preview').classList.remove('hidden');
+                    document.getElementById('pd-image-placeholder').classList.add('hidden');
+                });
             })();
         </script>
     @endpush

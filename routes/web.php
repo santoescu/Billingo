@@ -90,6 +90,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [ProductController::class, 'store'])->name('store');
             Route::get('{product}', [ProductController::class, 'show'])->name('show');
             Route::put('{product}', [ProductController::class, 'update'])->name('update');
+            Route::post('{product}/image', [ProductController::class, 'updateImage'])->name('image.update');
             Route::delete('{product}', [ProductController::class, 'destroy'])->name('destroy');
             Route::post('{product}/stock-entries', [ProductController::class, 'storeStockEntry'])->name('stock-entries.store');
             Route::post('{product}/average-cost', [ProductController::class, 'correctAverageCost'])->name('average-cost.update');

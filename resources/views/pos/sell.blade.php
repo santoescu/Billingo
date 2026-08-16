@@ -28,15 +28,10 @@
         'email' => $defaultClient->email,
     ];
 
-    $initialProductsJs = $products->map(fn ($product) => [
-        'id' => (string) $product->_id,
-        'code' => $product->code,
-        'barcode' => $product->barcode,
-        'description' => $product->description,
-        'unit_code' => $product->unit_code,
-        'unit_price' => (float) $product->unit_price,
-        'stock' => (float) $product->stock,
-    ])->values();
+    // $products ya viene en el mismo shape que el AJAX de búsqueda (ver
+    // PosController::create() -> DocumentoEmitidoController::mapProductsForJs()),
+    // con precios por tipo y stock por bodega -- no hace falta remapearlo acá.
+    $initialProductsJs = $products;
 @endphp
 
 <x-layouts.app :title="__('Sell')">
@@ -60,17 +55,29 @@
         </button>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
         <!-- Columna izquierda: buscador + grid de productos -->
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
-            <div class="p-4 border-b border-gray-200 dark:border-neutral-700">
-                <div class="relative">
+            <div class="p-4 border-b border-gray-200 dark:border-neutral-700 flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
                     <input type="text" id="pos-product-search" autocomplete="off"
-                        placeholder="{{ __('Search by product, reference or code') }}"
-                        class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base shadow-xs h-11 py-2 px-3 ps-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                        placeholder="{{ __('Code, barcode or description') }}"
+                        class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base shadow-xs h-10 py-2 px-3 ps-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
                     <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     </div>
+                </div>
+                <div class="sm:w-56 shrink-0">
+                    {{-- "all" es un valor real seleccionable (no la cadena vacía):
+                         con "" como valor, Preline lo trata como el
+                         placeholder y ya no se puede volver a elegir desde
+                         el dropdown una vez elegida otra bodega. --}}
+                    <select id="pos-warehouse-filter" data-hs-select='{!! \App\Support\SelectConfig::searchable() !!}' class="hidden">
+                        <option value="all" selected>{{ __('All warehouses') }}</option>
+                        @foreach ($warehouses as $warehouse)
+                            <option value="{{ $warehouse->_id }}">{{ $warehouse->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             <div id="pos-product-grid" class="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
@@ -96,8 +103,33 @@
             </div>
 
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
-                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
-                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Cart') }}</h3>
+                <div class="px-2.5 py-2.5 border-b border-gray-200 dark:border-neutral-700">
+                    <div class="grid" style="grid-template-columns: 1fr 76px 40px 112px 108px 40px;">
+                        <span class="px-2.5 text-xs font-medium text-zinc-500 dark:text-neutral-400 self-center">{{ __('Description') }}</span>
+                        <span class="text-xs font-medium text-zinc-500 dark:text-neutral-400 text-center self-center">{{ __('Quantity') }}</span>
+                        <span></span>
+                        <div class="self-center">
+                            @if ($priceTypes->isNotEmpty())
+                                <div class="hs-dropdown [--auto-close:false] relative">
+                                    <button type="button" id="pos-bulk-price-type-btn" class="hs-dropdown-toggle inline-flex items-center gap-1 px-2 text-xs font-medium text-zinc-500 hover:text-accent dark:text-neutral-400 focus:outline-hidden" title="{{ __('Apply price type to all lines') }}">
+                                        {{ __('Price list') }}
+                                        <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 w-56 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 space-y-0.5 dark:bg-neutral-800 dark:border-neutral-700">
+                                        @foreach ($priceTypes as $priceType)
+                                            <button type="button" class="pos-bulk-price-type-option w-full text-start px-3 py-1.5 text-sm rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10" data-price-type-id="{{ $priceType->_id }}">
+                                                {{ $priceType->name }}
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @else
+                                <span class="px-2 text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Unit price') }}</span>
+                            @endif
+                        </div>
+                        <span class="text-xs font-medium text-zinc-500 dark:text-neutral-400 text-end px-2.5 self-center">{{ __('Subtotal') }}</span>
+                        <span></span>
+                    </div>
                 </div>
                 <div id="pos-cart-body" class="divide-y divide-gray-200 dark:divide-neutral-700 max-h-[40vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
                 <p id="pos-cart-empty" class="p-4 text-sm text-zinc-500 dark:text-neutral-400">
@@ -141,7 +173,7 @@
                     <span id="pos-total-display" class="text-xl font-bold text-gray-800 dark:text-neutral-200">$0.00</span>
                 </div>
 
-                <flux:button type="button" variant="primary" id="pos-checkout-btn" class="w-full">{{ __('Charge') }}</flux:button>
+                <flux:button type="button" variant="primary" id="pos-checkout-btn" class="w-full">{{ __('Charge sale') }}</flux:button>
             </div>
         </div>
     </div>
@@ -208,9 +240,7 @@
                     </flux:button>
                     <flux:button type="button" variant="filled" icon="printer" onclick="window.posPrintReceipt()">{{ __('Print') }}</flux:button>
                     <flux:button type="button" variant="filled" icon="arrow-down-tray" onclick="window.posDownloadReceipt()">{{ __('Download') }}</flux:button>
-                    <a href="{{ route('pos.sales.index') }}" class="col-span-2">
-                        <flux:button type="button" variant="filled" icon="receipt-percent" class="w-full">{{ __('Go to sales') }}</flux:button>
-                    </a>
+                    <flux:button type="button" variant="filled" icon="receipt-percent" class="col-span-2" onclick="window.posGoToSales()">{{ __('Go to sales') }}</flux:button>
                     <flux:button type="button" variant="primary" class="col-span-2" onclick="window.posNewSale()">{{ __('New sale') }}</flux:button>
                 </div>
             </div>
@@ -249,6 +279,7 @@
                         cart: [], // [{code, barcode, description, unit_code, unit_price, qty}]
                         paymentMethodId: null,
                         efectivoRecibido: '',
+                        warehouseId: 'all',
                     };
                     tickets.push(ticket);
                     return ticket;
@@ -334,6 +365,18 @@
                     }
                     document.getElementById('pos-efectivo-display').value = ticket.efectivoRecibido;
 
+                    // La bodega elegida es propia de cada pre-cuenta (no un
+                    // filtro global): al cambiar de pestaña, se restaura la
+                    // que tenía esta y se vuelve a buscar con ese filtro.
+                    const warehouseSelect = document.getElementById('pos-warehouse-filter');
+                    const warehouseInstance = window.HSSelect && HSSelect.getInstance(warehouseSelect);
+                    if (warehouseInstance) {
+                        warehouseInstance.setValue(ticket.warehouseId || 'all');
+                    } else {
+                        warehouseSelect.value = ticket.warehouseId || 'all';
+                    }
+                    searchProducts(currentProductQuery());
+
                     updatePosCashSectionVisibility();
                     renderCart();
                 }
@@ -365,27 +408,68 @@
                     grid.innerHTML = '';
                     empty.classList.toggle('hidden', products.length > 0);
 
+                    const warehouseId = document.getElementById('pos-warehouse-filter').value;
+                    const hasWarehouseFilter = warehouseId && warehouseId !== 'all';
+
                     products.forEach((product) => {
+                        // Con una bodega elegida, el stock que se muestra es
+                        // el de ESA bodega puntual (product.warehouses viene
+                        // del backend en la búsqueda por AJAX) -- mostrar
+                        // "product.stock" ahí sería el total de todas las
+                        // bodegas, no el de la que el cajero está mirando.
+                        // Con "Todas las bodegas" se muestra el total (ya es
+                        // "product.stock", la suma de todas).
+                        const warehouseStock = hasWarehouseFilter
+                            ? product.warehouses?.find((w) => w.warehouse_id === warehouseId)?.stock
+                            : null;
+                        const stockToShow = warehouseStock !== null && warehouseStock !== undefined ? warehouseStock : product.stock;
+
+                        // Badge con tooltip propio (mismo diseño que los
+                        // dropdowns de selects de la app: fondo blanco/zinc-700,
+                        // borde, sombra) en vez del title nativo del navegador
+                        // -- el badge muestra el número que aplica a lo que se
+                        // está mirando ahora mismo (bodega filtrada o total),
+                        // y al pasar el mouse se ve el desglose completo.
+                        const inventoryLines = (product.warehouses || [])
+                            .map((w) => [w.warehouse_name, (w.stock ?? 0).toLocaleString('es-CO')]);
+                        if (inventoryLines.length === 0) {
+                            inventoryLines.push(['{{ __('No warehouse breakdown available.') }}', '']);
+                        }
+
+                        const priceLines = (product.prices && product.prices.length > 0)
+                            ? product.prices.map((p) => [p.price_type_name, formatMoney(p.price)])
+                            : [['{{ __('Base price') }}', formatMoney(product.unit_price)]];
+
+                        // Tarjeta horizontal (ícono a la izquierda, info
+                        // apilada a la derecha) en vez de la vertical de
+                        // antes -- más compacta en alto, deja ver más
+                        // productos de un vistazo sin perder ningún dato.
                         const card = document.createElement('button');
                         card.type = 'button';
-                        card.className = 'flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-neutral-700 p-3 text-start hover:border-accent hover:shadow-sm focus:outline-hidden focus:ring-2 focus:ring-accent transition';
+                        card.className = 'flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-neutral-700 p-2.5 text-start hover:border-accent hover:shadow-sm focus:outline-hidden focus:ring-2 focus:ring-accent transition';
+                        const iconHtml = product.image_url
+                            ? `<img src="${product.image_url}" alt="" class="shrink-0 size-12 rounded-lg object-cover">`
+                            : `<span class="flex items-center justify-center shrink-0 size-12 rounded-lg bg-accent/10 text-accent">
+                                <svg class="shrink-0 size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                            </span>`;
                         card.innerHTML = `
-                            <div class="flex items-start gap-3">
-                                <span class="flex items-center justify-center shrink-0 size-16 rounded-lg bg-accent/10 text-accent">
-                                    <svg class="shrink-0 size-7" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-                                </span>
-                                <span class="text-sm font-medium text-gray-800 dark:text-white line-clamp-3">${escapeHtml(product.description || '')}</span>
-                            </div>
-                            <div class="flex justify-between items-center text-xs text-zinc-500 dark:text-neutral-400">
-                                <span>${escapeHtml(product.code || '—')}</span>
-                                <span>${escapeHtml(product.barcode || '—')}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Stock') }}: ${(product.stock ?? 0).toLocaleString('es-CO')}</span>
-                                <span class="text-sm font-semibold text-gray-800 dark:text-neutral-200">${formatMoney(product.unit_price)}</span>
+                            ${iconHtml}
+                            <div class="flex-1 min-w-0 flex flex-col gap-1">
+                                <span class="text-sm font-medium text-gray-800 dark:text-white line-clamp-1" title="${escapeHtml(product.description || '')}">${escapeHtml(product.description || '')}</span>
+                                <div class="flex justify-between items-center text-xs text-zinc-500 dark:text-neutral-400">
+                                    <span class="truncate">${escapeHtml(product.code || '—')}</span>
+                                    <span class="shrink-0">${escapeHtml(product.barcode || '—')}</span>
+                                </div>
+                                <div class="flex justify-between items-center gap-2" data-badges></div>
                             </div>
                         `;
-                        card.addEventListener('click', () => addToCart(product));
+                        card.addEventListener('click', () => addToCart(product, card));
+
+                        const badgesRow = card.querySelector('[data-badges]');
+                        badgesRow.appendChild(tooltipBadge(`{{ __('Inventory') }}: ${(stockToShow ?? 0).toLocaleString('es-CO')}`, inventoryLines, 'text-xs text-zinc-600 dark:text-zinc-300'));
+                        const displayPrice = (product.prices && product.prices.length > 0) ? product.prices[0].price : product.unit_price;
+                        badgesRow.appendChild(tooltipBadge(formatMoney(displayPrice), priceLines, 'text-sm font-semibold text-gray-800 dark:text-neutral-200'));
+
                         grid.appendChild(card);
                     });
                 }
@@ -396,38 +480,260 @@
                     return div.innerHTML;
                 }
 
+                // Badge con tooltip propio (mismo diseño que los dropdowns de
+                // selects de la app: card blanca/zinc-700 con borde y sombra)
+                // en vez del title nativo del navegador. Un solo tooltip
+                // compartido, "position: fixed" y pegado a <body> -- si
+                // quedara "absolute" dentro de la tarjeta, el contenedor del
+                // grid (que tiene scroll) lo recorta o lo deja empujando las
+                // tarjetas vecinas en vez de flotar por encima de todo.
+                function ensureFloatingTooltip() {
+                    let el = document.getElementById('pos-floating-tooltip');
+                    if (! el) {
+                        el = document.createElement('div');
+                        el.id = 'pos-floating-tooltip';
+                        el.className = 'hidden fixed z-50 w-56 bg-white border border-zinc-200 rounded-lg shadow-xl p-2 text-xs dark:bg-zinc-700 dark:border-white/10';
+                        document.body.appendChild(el);
+                    }
+                    return el;
+                }
+
+                function showFloatingTooltip(triggerEl, lines) {
+                    const el = ensureFloatingTooltip();
+                    el.innerHTML = lines.map(([left, right]) => `
+                        <div class="flex justify-between gap-3 py-0.5">
+                            <span class="text-zinc-500 dark:text-neutral-400">${escapeHtml(left)}</span>
+                            ${right ? `<span class="font-medium text-zinc-700 dark:text-zinc-200">${escapeHtml(right)}</span>` : ''}
+                        </div>
+                    `).join('');
+                    el.classList.remove('hidden');
+
+                    const triggerRect = triggerEl.getBoundingClientRect();
+                    const tooltipRect = el.getBoundingClientRect();
+
+                    // Arriba del badge por defecto; si no cabe (muy cerca del
+                    // borde superior de la ventana), abajo. Igual en
+                    // horizontal, para que nunca se salga de la pantalla.
+                    let top = triggerRect.top - tooltipRect.height - 8;
+                    if (top < 8) {
+                        top = triggerRect.bottom + 8;
+                    }
+                    let left = triggerRect.left;
+                    if (left + tooltipRect.width > window.innerWidth - 8) {
+                        left = window.innerWidth - tooltipRect.width - 8;
+                    }
+
+                    el.style.top = `${top}px`;
+                    el.style.left = `${left}px`;
+                }
+
+                function hideFloatingTooltip() {
+                    document.getElementById('pos-floating-tooltip')?.classList.add('hidden');
+                }
+
+                function tooltipBadge(label, lines, badgeClasses) {
+                    const badge = document.createElement('span');
+                    badge.className = `inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-white/10 px-2 py-0.5 cursor-default ${badgeClasses}`;
+                    badge.textContent = label;
+                    badge.addEventListener('mouseenter', () => showFloatingTooltip(badge, lines));
+                    badge.addEventListener('mouseleave', hideFloatingTooltip);
+                    return badge;
+                }
+
                 async function searchProducts(query) {
-                    const response = await fetch(productSearchUrl + '?q=' + encodeURIComponent(query));
+                    const warehouseId = document.getElementById('pos-warehouse-filter').value || 'all';
+                    const params = new URLSearchParams({ q: query, warehouse_id: warehouseId });
+
+                    const response = await fetch(productSearchUrl + '?' + params.toString());
                     const data = await response.json();
                     renderProducts(data.products || []);
                 }
 
-                document.getElementById('pos-product-search').addEventListener('input', debounce((event) => {
-                    searchProducts(event.target.value.trim());
-                }, 300));
+                function currentProductQuery() {
+                    return document.getElementById('pos-product-search').value.trim();
+                }
+
+                function bindProductSearch() {
+                    document.getElementById('pos-product-search').addEventListener('input', debounce((event) => {
+                        searchProducts(event.target.value.trim());
+                    }, 300));
+
+                    // El select de bodega es de Preline (buscable): dispara
+                    // "change" nativo y "change.hs.select" propio -- hace
+                    // falta escuchar los dos para no perderse el cambio sin
+                    // importar cuál de las dos formas lo generó (clic en una
+                    // opción vs. setValue() por código).
+                    const warehouseSelect = document.getElementById('pos-warehouse-filter');
+                    const onWarehouseChange = () => {
+                        activeTicket().warehouseId = warehouseSelect.value;
+                        searchProducts(currentProductQuery());
+                    };
+                    warehouseSelect.addEventListener('change', onWarehouseChange);
+                    warehouseSelect.addEventListener('change.hs.select', onWarehouseChange);
+                }
 
                 // --- Carrito ---
 
-                function addToCart(product) {
-                    const cart = activeTicket().cart;
-                    const existing = cart.find((line) => line.code === product.code);
-                    if (existing) {
-                        existing.qty += 1;
-                    } else {
-                        cart.push({
-                            code: product.code,
-                            barcode: product.barcode,
-                            description: product.description,
-                            unit_code: product.unit_code || 'EA',
-                            unit_price: product.unit_price,
-                            qty: 1,
-                        });
-                    }
-                    renderCart();
-                    renderTickets();
+                function makeCartLine(product, warehouseId, warehouseName, warehouseStock) {
+                    const prices = product.prices || []; // [{price_type_id, price_type_name, price}]
+                    // Sin "precio base" aparte: si el producto tiene tipos de
+                    // precio configurados, el primero de la lista (en el
+                    // orden en que los agregaste) es el que aplica por
+                    // defecto -- solo se cae al precio propio del producto si
+                    // no tiene ningún tipo de precio.
+                    const defaultPrice = prices[0] ?? null;
+
+                    return {
+                        code: product.code,
+                        barcode: product.barcode,
+                        description: product.description,
+                        unit_code: product.unit_code || 'EA',
+                        basePrice: product.unit_price,
+                        prices,
+                        priceTypeId: defaultPrice?.price_type_id ?? null,
+                        unit_price: defaultPrice?.price ?? product.unit_price,
+                        qty: 1,
+                        warehouseId: warehouseId,
+                        warehouseName: warehouseName,
+                        warehouseStock: warehouseStock,
+                        // Todas las bodegas con stock de este producto, para
+                        // que el cajero pueda cambiar de cuál está sacando
+                        // desde el selector de la línea (igual que en
+                        // facturación electrónica).
+                        availableWarehouses: warehousesWithStock(product),
+                    };
                 }
 
+                // Bodegas reales (no la entrada "sin asignar") con stock > 0
+                // para este producto -- si no tiene ninguna, se vende sin
+                // tope de cantidad (mismo criterio que un producto que no
+                // controla inventario).
+                function warehousesWithStock(product) {
+                    return (product.warehouses || []).filter((w) => w.warehouse_id && (w.stock ?? 0) > 0);
+                }
+
+                // Cada línea del carrito queda ligada a UNA bodega puntual,
+                // con la cantidad topada al stock real de esa bodega (igual
+                // que en facturación electrónica). Si el cajero sigue
+                // agregando el mismo producto y esa bodega ya se agotó en el
+                // carrito, en vez de bloquear se abre una línea nueva
+                // sacando de otra bodega que sí tenga stock; si no hay más
+                // bodegas con stock, no se agrega nada más.
+                function addToCart(product, cardEl) {
+                    try {
+                        addToCartUnsafe(product, cardEl);
+                    } catch (error) {
+                        // Que un error acá no deje el POS como "congelado" sin
+                        // decir nada -- se ve en consola para depurar y se le
+                        // avisa al cajero en vez de quedarse callado.
+                        console.error('addToCart failed', error);
+                        showError('{{ __('Could not add the product to the cart.') }}');
+                    }
+                }
+
+                // Parpadeo rojo + mensaje flotando sobre la MISMA tarjeta que
+                // se clickeó (reusa el tooltip flotante de los badges), en
+                // vez del banner genérico de arriba -- así queda claro a cuál
+                // producto le faltó stock cuando hay varios en pantalla.
+                function flashCardError(cardEl, message) {
+                    if (! cardEl) {
+                        showError(message);
+                        return;
+                    }
+                    // Se quitan las clases de borde normal y se ponen las
+                    // rojas -- dejarlas todas juntas no sirve, Tailwind no
+                    // garantiza que "border-red-400" gane solo por venir
+                    // después en el HTML (misma especificidad que
+                    // "border-zinc-200"; gana la que quede después en la
+                    // hoja de estilos compilada, no en el classList).
+                    // "hover:border-accent" también hay que quitarlo mientras
+                    // dure el rojo -- si no, con el mouse encima (que es
+                    // justo donde está, recién le dieron clic) el hover se lo
+                    // gana y el borde vuelve al color normal de la app.
+                    cardEl.classList.remove('border-zinc-200', 'dark:border-neutral-700', 'hover:border-accent');
+                    cardEl.classList.add('border-red-400', 'dark:border-red-500');
+                    showFloatingTooltip(cardEl, [[message, '']]);
+                    setTimeout(() => {
+                        cardEl.classList.remove('border-red-400', 'dark:border-red-500');
+                        cardEl.classList.add('border-zinc-200', 'dark:border-neutral-700', 'hover:border-accent');
+                        hideFloatingTooltip();
+                    }, 4000);
+                }
+
+                function addToCartUnsafe(product, cardEl) {
+                    const cart = activeTicket().cart;
+                    const availableWarehouses = warehousesWithStock(product);
+
+                    if (availableWarehouses.length === 0) {
+                        const existing = cart.find((line) => line.code === product.code && ! line.warehouseId);
+                        if (existing) {
+                            existing.qty += 1;
+                        } else {
+                            cart.push(makeCartLine(product, null, null, null));
+                        }
+                        renderCart();
+                        renderTickets();
+                        return;
+                    }
+
+                    // Si hay un filtro de bodega activo en el buscador, se
+                    // prefiere esa (es de donde el cajero está mirando el
+                    // producto), pero solo si de verdad tiene stock.
+                    const filterWarehouseId = document.getElementById('pos-warehouse-filter').value;
+                    const preferred = (filterWarehouseId && filterWarehouseId !== 'all')
+                        ? availableWarehouses.find((w) => w.warehouse_id === filterWarehouseId)
+                        : null;
+                    const ordered = preferred
+                        ? [preferred, ...availableWarehouses.filter((w) => w !== preferred)]
+                        : availableWarehouses;
+
+                    for (const w of ordered) {
+                        const existing = cart.find((line) => line.code === product.code && line.warehouseId === w.warehouse_id);
+                        if (existing) {
+                            if (existing.qty < w.stock) {
+                                existing.qty += 1;
+                                renderCart();
+                                renderTickets();
+                                return;
+                            }
+                            continue; // esta bodega ya está topada en el carrito, probar la siguiente
+                        }
+
+                        cart.push(makeCartLine(product, w.warehouse_id, w.warehouse_name, w.stock));
+                        renderCart();
+                        renderTickets();
+                        return;
+                    }
+
+                    // Todas las bodegas con stock de este producto ya están
+                    // topadas en el carrito -- no hay de dónde sacar más, se
+                    // avisa en vez de quedarse en silencio (eso es lo que se
+                    // sentía como "bloqueado").
+                    flashCardError(cardEl, '{{ __('There is no more stock of this product in any warehouse.') }}');
+                }
+
+                // Blindaje contra recursión: reconstruir el carrito dispara
+                // eventos propios de Preline (el stepper de cantidad, los
+                // dropdowns) que pueden terminar llamando a renderCart() de
+                // nuevo antes de que la llamada anterior termine -- sin este
+                // seguro, eso arma un bucle infinito y revienta la pila
+                // (visto como cientos de "Maximum call stack size exceeded"
+                // en consola). Si ya se está reconstruyendo, cualquier
+                // llamada de más simplemente no hace nada.
+                let isRenderingCart = false;
                 function renderCart() {
+                    if (isRenderingCart) {
+                        return;
+                    }
+                    isRenderingCart = true;
+                    try {
+                        renderCartUnsafe();
+                    } finally {
+                        isRenderingCart = false;
+                    }
+                }
+
+                function renderCartUnsafe() {
                     const cart = activeTicket().cart;
                     const body = document.getElementById('pos-cart-body');
                     const empty = document.getElementById('pos-cart-empty');
@@ -436,34 +742,234 @@
 
                     cart.forEach((line, index) => {
                         const row = document.createElement('div');
-                        row.className = 'p-3 flex items-center gap-2';
-                        row.innerHTML = `
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-800 dark:text-white truncate">${escapeHtml(line.description)}</p>
-                                <p class="text-xs text-zinc-500 dark:text-neutral-400">${formatMoney(line.unit_price)}</p>
-                            </div>
-                            <div class="flex items-center gap-1 shrink-0">
-                                <button type="button" data-action="dec" class="size-7 inline-flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700">−</button>
-                                <span class="w-8 text-center text-sm">${line.qty}</span>
-                                <button type="button" data-action="inc" class="size-7 inline-flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700">+</button>
-                            </div>
-                            <p class="w-20 shrink-0 text-end text-sm font-semibold text-gray-800 dark:text-neutral-200">${formatMoney(line.unit_price * line.qty)}</p>
-                            <button type="button" data-action="remove" class="shrink-0 size-7 inline-flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
-                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                        row.className = 'p-2.5';
+
+                        const priceOptions = line.prices
+                            .map((p) => ({ id: p.price_type_id, name: p.price_type_name }))
+                            .map((option) => `
+                                <button type="button" data-price-type-id="${option.id}" class="pos-line-price-type-option w-full text-start px-3 py-1.5 text-sm rounded-lg ${(line.priceTypeId || '') === option.id ? 'bg-accent/10 text-accent' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10'} focus:outline-hidden">
+                                    ${escapeHtml(option.name)}
+                                </button>
+                            `).join('');
+
+                        // Todos los campos de la línea "pegados" en una sola
+                        // tira (mismo recurso visual que usa el proyecto
+                        // WorkFlow para sus líneas de presupuesto de
+                        // contrato): un grid con columnas fijas, sin
+                        // separación entre campos, redondeando solo las
+                        // puntas -- se ve como un único campo continuo en
+                        // vez de varias cajas sueltas.
+                        const warehouseOptions = line.availableWarehouses.map((w) => `
+                            <button type="button" data-warehouse-id="${w.warehouse_id}" data-stock="${w.stock}" class="pos-line-warehouse-option w-full text-start px-3 py-1.5 text-sm rounded-lg ${line.warehouseId === w.warehouse_id ? 'bg-accent/10 text-accent' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10'} focus:outline-hidden">
+                                ${escapeHtml(w.warehouse_name)} (${w.stock})
                             </button>
+                        `).join('');
+
+                        row.innerHTML = `
+                            <div class="grid flex-1 min-w-0" style="grid-template-columns: 1fr 76px ${line.availableWarehouses.length > 0 ? '40px' : ''} 112px 108px 40px;">
+                                <div class="h-9 flex items-center px-2.5 border border-e-0 border-zinc-200 dark:border-white/10 rounded-s-lg bg-white dark:bg-white/10 text-sm text-gray-800 dark:text-white truncate" title="${escapeHtml(line.description)}">
+                                    ${escapeHtml(line.description)}
+                                </div>
+
+                                <div class="pos-line-qty-wrapper bg-white dark:bg-white/10 border border-e-0 border-zinc-200 dark:border-white/10 h-9" data-hs-input-number='${JSON.stringify(line.warehouseStock !== null && line.warehouseStock !== undefined ? { step: 1, min: 1, max: line.warehouseStock } : { step: 1, min: 1 })}'>
+                                    <div class="w-full h-full flex justify-between items-center">
+                                        <div class="grow px-1 text-center">
+                                            <input class="pos-line-qty w-full h-full p-0 bg-transparent border-0 text-sm text-center text-zinc-700 dark:text-zinc-300 focus:ring-0 focus:outline-hidden [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" style="-moz-appearance: textfield;" type="number" aria-roledescription="{{ __('Quantity') }}" value="${line.qty}" ${line.warehouseStock !== null && line.warehouseStock !== undefined ? `max="${line.warehouseStock}"` : ''} data-hs-input-number-input>
+                                        </div>
+                                        <div class="flex flex-col h-full divide-y divide-zinc-200 dark:divide-white/10 border-s border-zinc-200 dark:border-white/10">
+                                            <button type="button" class="flex-1 w-6 inline-flex justify-center items-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Increase') }}" data-hs-input-number-increment>
+                                                <svg class="shrink-0 size-2.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                            </button>
+                                            <button type="button" class="flex-1 w-6 inline-flex justify-center items-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Decrease') }}" data-hs-input-number-decrement>
+                                                <svg class="shrink-0 size-2.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                ${line.availableWarehouses.length > 0 ? `
+                                    <div class="hs-dropdown [--auto-close:false] relative h-9 flex items-center justify-center border border-e-0 border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10" data-warehouse-dropdown>
+                                        <button type="button" class="hs-dropdown-toggle size-6 inline-flex items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:bg-white/10" title="{{ __('Warehouse') }}: ${escapeHtml(line.warehouseName || '')}">
+                                            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+                                        </button>
+                                        <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 w-48 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 space-y-0.5 dark:bg-neutral-800 dark:border-neutral-700">
+                                            ${warehouseOptions}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                <div class="relative h-9">
+                                    <input type="text" inputmode="decimal" data-action="price" value="${line.unit_price.toLocaleString('es-CO')}"
+                                        class="h-9 w-full border border-e-0 border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 text-sm ps-5 ${line.prices.length > 0 ? 'pe-7' : 'pe-2'} focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                    <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
+                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                                    </div>
+                                    ${line.prices.length > 0 ? `
+                                        <div class="hs-dropdown [--auto-close:false] absolute inset-y-0 end-0 flex items-center pe-1" data-price-type-dropdown>
+                                            <button type="button" class="hs-dropdown-toggle size-6 inline-flex items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:bg-white/10" title="{{ __('Price list') }}">
+                                                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 w-40 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 space-y-0.5 dark:bg-neutral-800 dark:border-neutral-700">
+                                                ${priceOptions}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+
+                                <div class="relative h-9">
+                                    <input type="text" readonly disabled value="${formatMoney(line.unit_price * line.qty)}"
+                                        class="h-9 w-full border border-e-0 border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 text-zinc-800 dark:text-neutral-100 text-sm font-semibold text-end px-2.5 disabled:opacity-100">
+                                </div>
+
+                                <button type="button" data-action="remove" class="h-9 w-full inline-flex items-center justify-center rounded-e-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-900/40 focus:outline-hidden focus:z-10 focus:ring-2 focus:ring-accent" title="{{ __('Delete') }}">
+                                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
                         `;
-                        row.querySelector('[data-action="inc"]').addEventListener('click', () => { line.qty += 1; renderCart(); renderTickets(); });
-                        row.querySelector('[data-action="dec"]').addEventListener('click', () => {
-                            line.qty -= 1;
-                            if (line.qty <= 0) { cart.splice(index, 1); }
+                        // Los botones +/- del stepper de Preline no disparan
+                        // un "input" nativo (el plugin solo pone el valor a
+                        // mano) -- hace falta su propio evento, además del
+                        // "input" normal para cuando se escribe la cantidad.
+                        const qtyWrapper = row.querySelector('.pos-line-qty-wrapper');
+                        const qtyInput = row.querySelector('.pos-line-qty');
+                        const applyQtyChange = () => {
+                            let qty = parseFloat(qtyInput.value) || 0;
+                            // Tope duro a lo que de verdad hay en la bodega
+                            // de esta línea -- el "max" del stepper de
+                            // Preline no siempre alcanza a frenar lo que se
+                            // escribe a mano.
+                            if (line.warehouseStock !== null && line.warehouseStock !== undefined && qty > line.warehouseStock) {
+                                qty = line.warehouseStock;
+                            }
+                            if (qty <= 0) {
+                                cart.splice(index, 1);
+                            } else {
+                                line.qty = qty;
+                            }
+                            renderCart();
+                            renderTickets();
+                        };
+                        qtyInput.addEventListener('input', applyQtyChange);
+
+                        // Selector de bodega (mismo patrón visual que "Lista
+                        // de precios": ícono chiquito con un menú, no un
+                        // <select> con el nombre a la vista) -- al cambiarla,
+                        // la cantidad se topa al stock de la nueva bodega.
+                        const lineWarehouseDropdown = row.querySelector('[data-warehouse-dropdown]');
+                        row.querySelectorAll('.pos-line-warehouse-option').forEach((option) => {
+                            option.addEventListener('click', () => {
+                                line.warehouseId = option.dataset.warehouseId;
+                                line.warehouseName = line.availableWarehouses.find((w) => w.warehouse_id === line.warehouseId)?.warehouse_name ?? null;
+                                line.warehouseStock = parseFloat(option.dataset.stock) || 0;
+                                if (line.qty > line.warehouseStock) {
+                                    line.qty = line.warehouseStock;
+                                }
+                                if (window.HSDropdown && lineWarehouseDropdown) {
+                                    HSDropdown.close(lineWarehouseDropdown);
+                                }
+                                renderCart();
+                                renderTickets();
+                            });
+                        });
+
+                        row.querySelector('[data-action="remove"]').addEventListener('click', () => { cart.splice(index, 1); renderCart(); renderTickets(); });
+
+                        // Precio a mano: escribe libremente, se toma tal cual
+                        // (ya no corresponde a ningún tipo de precio del
+                        // catálogo, así que el select vuelve a "Precio base").
+                        row.querySelector('[data-action="price"]').addEventListener('change', (event) => {
+                            line.unit_price = parseFloat(event.target.value.replace(/[^0-9.-]/g, '')) || 0;
+                            line.priceTypeId = null;
                             renderCart();
                             renderTickets();
                         });
-                        row.querySelector('[data-action="remove"]').addEventListener('click', () => { cart.splice(index, 1); renderCart(); renderTickets(); });
+
+                        const linePriceTypeDropdown = row.querySelector('[data-price-type-dropdown]');
+                        row.querySelectorAll('.pos-line-price-type-option').forEach((option) => {
+                            option.addEventListener('click', () => {
+                                const priceTypeId = option.dataset.priceTypeId;
+                                line.priceTypeId = priceTypeId || null;
+                                line.unit_price = priceTypeId
+                                    ? (line.prices.find((p) => p.price_type_id === priceTypeId)?.price ?? line.basePrice)
+                                    : line.basePrice;
+                                if (window.HSDropdown && linePriceTypeDropdown) {
+                                    HSDropdown.close(linePriceTypeDropdown);
+                                }
+                                renderCart();
+                                renderTickets();
+                            });
+                        });
+
                         body.appendChild(row);
+                        initDropdowns(row);
+                        if (window.HSInputNumber) {
+                            new HSInputNumber(qtyWrapper);
+                        }
+                        // El listener se engancha DESPUÉS de construir el
+                        // componente: Preline dispara su propio evento de
+                        // inicialización al construirse, y si el listener ya
+                        // estuviera puesto, ese evento llamaba a
+                        // renderCart() -> reconstruía TODO -> volvía a
+                        // construir el componente -> volvía a disparar el
+                        // evento... un stack overflow por recursión infinita.
+                        qtyWrapper.addEventListener('change.hs.inputNumber', applyQtyChange);
                     });
 
                     updateTotal();
+                }
+
+                // Los dropdowns de tipo de precio (el general del carrito y
+                // el de cada línea) no los detecta el autoInit global de
+                // Preline -- hay que instanciarlos a mano, igual que ya hace
+                // documents/create.blade.php con sus propios popovers
+                // dinámicos (impuestos por línea, etc.).
+                function initDropdowns(container) {
+                    if (! window.HSDropdown) {
+                        return;
+                    }
+                    container.querySelectorAll('.hs-dropdown').forEach((el) => new HSDropdown(el));
+                }
+
+                // "--auto-close:false" hace que Preline deje de cerrar el
+                // popover solo (lo desactivamos para que no se cierre con
+                // cualquier clic adentro, como al escribir en el precio) --
+                // un solo listener delegado (no uno por fila, que se
+                // reconstruye entera en cada renderCart()) cierra cualquier
+                // dropdown abierto si el clic fue realmente afuera.
+                function bindDropdownOutsideClose() {
+                    document.addEventListener('click', (event) => {
+                        document.querySelectorAll('.hs-dropdown.open').forEach((el) => {
+                            try {
+                                if (! el.contains(event.target) && window.HSDropdown) {
+                                    HSDropdown.close(el);
+                                }
+                            } catch (error) {
+                                // Un dropdown "huérfano" (su fila ya se
+                                // reconstruyó en otro renderCart()) no debe
+                                // frenar el resto de este mismo clic global.
+                                console.error('HSDropdown.close failed', error);
+                            }
+                        });
+                    });
+                }
+
+                // --- Aplicar tipo de precio a todo el carrito ---
+
+                function applyPriceTypeToCart(priceTypeId) {
+                    const cart = activeTicket().cart;
+                    cart.forEach((line) => {
+                        // Solo a las líneas cuyo producto sí tiene ese tipo
+                        // de precio -- las demás se quedan con lo que tenían
+                        // (mismo criterio que la facturación electrónica).
+                        const match = line.prices.find((p) => p.price_type_id === priceTypeId);
+                        if (! match) {
+                            return;
+                        }
+                        line.priceTypeId = priceTypeId;
+                        line.unit_price = match.price;
+                    });
+                    renderCart();
+                    renderTickets();
                 }
 
                 function cartTotal() {
@@ -484,87 +990,89 @@
                     document.getElementById('pos-client-results').classList.add('hidden');
                 }
 
-                document.getElementById('pos-client-search').addEventListener('input', debounce(async (event) => {
-                    const query = event.target.value.trim();
-                    const results = document.getElementById('pos-client-results');
-                    if (query === '') {
-                        results.classList.add('hidden');
-                        return;
-                    }
+                function bindClientControls() {
+                    document.getElementById('pos-client-search').addEventListener('input', debounce(async (event) => {
+                        const query = event.target.value.trim();
+                        const results = document.getElementById('pos-client-results');
+                        if (query === '') {
+                            results.classList.add('hidden');
+                            return;
+                        }
 
-                    const response = await fetch(clientSearchUrl + '?q=' + encodeURIComponent(query));
-                    const data = await response.json();
-                    const clients = data.clients || [];
+                        const response = await fetch(clientSearchUrl + '?q=' + encodeURIComponent(query));
+                        const data = await response.json();
+                        const clients = data.clients || [];
 
-                    results.innerHTML = '';
-                    if (clients.length === 0) {
-                        results.innerHTML = `<div class="p-3 text-sm text-zinc-500 dark:text-neutral-400">{{ __('No results.') }}</div>`;
-                    } else {
-                        clients.forEach((client) => {
-                            const item = document.createElement('button');
-                            item.type = 'button';
-                            item.className = 'w-full text-start px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10';
-                            item.innerHTML = `<span class="block font-medium text-gray-800 dark:text-white">${escapeHtml(client.name)}</span><span class="block text-xs text-zinc-500 dark:text-neutral-400">${escapeHtml(client.identificacion)}</span>`;
-                            item.addEventListener('click', () => selectClient(client));
-                            results.appendChild(item);
-                        });
-                    }
-                    results.classList.remove('hidden');
-                }, 300));
+                        results.innerHTML = '';
+                        if (clients.length === 0) {
+                            results.innerHTML = `<div class="p-3 text-sm text-zinc-500 dark:text-neutral-400">{{ __('No results.') }}</div>`;
+                        } else {
+                            clients.forEach((client) => {
+                                const item = document.createElement('button');
+                                item.type = 'button';
+                                item.className = 'w-full text-start px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10';
+                                item.innerHTML = `<span class="block font-medium text-gray-800 dark:text-white">${escapeHtml(client.name)}</span><span class="block text-xs text-zinc-500 dark:text-neutral-400">${escapeHtml(client.identificacion)}</span>`;
+                                item.addEventListener('click', () => selectClient(client));
+                                results.appendChild(item);
+                            });
+                        }
+                        results.classList.remove('hidden');
+                    }, 300));
 
-                document.getElementById('pos-client-add-btn').addEventListener('click', () => {
-                    document.getElementById('pos-client-modal-error').classList.add('hidden');
-                    document.getElementById('pos-client-identification').value = document.getElementById('pos-client-search').value;
-                    document.getElementById('pos-client-name').value = '';
-                    document.getElementById('pos-client-address').value = '';
-                    document.getElementById('pos-client-phone').value = '';
-                    document.getElementById('pos-client-email').value = '';
-                    if (window.HSOverlay) {
-                        HSOverlay.autoInit();
-                        HSOverlay.open('#pos-client-modal');
-                    }
-                });
-
-                document.getElementById('pos-client-save-btn').addEventListener('click', async () => {
-                    const errorBox = document.getElementById('pos-client-modal-error');
-                    errorBox.classList.add('hidden');
-
-                    const payload = new URLSearchParams({
-                        identification_type: document.getElementById('pos-client-type').value,
-                        identificacion: document.getElementById('pos-client-identification').value,
-                        name: document.getElementById('pos-client-name').value,
-                        address: document.getElementById('pos-client-address').value,
-                        phone: document.getElementById('pos-client-phone').value,
-                        email: document.getElementById('pos-client-email').value,
-                        person_type: '2',
+                    document.getElementById('pos-client-add-btn').addEventListener('click', () => {
+                        document.getElementById('pos-client-modal-error').classList.add('hidden');
+                        document.getElementById('pos-client-identification').value = document.getElementById('pos-client-search').value;
+                        document.getElementById('pos-client-name').value = '';
+                        document.getElementById('pos-client-address').value = '';
+                        document.getElementById('pos-client-phone').value = '';
+                        document.getElementById('pos-client-email').value = '';
+                        if (window.HSOverlay) {
+                            HSOverlay.autoInit();
+                            HSOverlay.open('#pos-client-modal');
+                        }
                     });
 
-                    try {
-                        const response = await fetch(clientStoreUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'X-CSRF-TOKEN': csrfToken,
-                            },
-                            body: payload.toString(),
+                    document.getElementById('pos-client-save-btn').addEventListener('click', async () => {
+                        const errorBox = document.getElementById('pos-client-modal-error');
+                        errorBox.classList.add('hidden');
+
+                        const payload = new URLSearchParams({
+                            identification_type: document.getElementById('pos-client-type').value,
+                            identificacion: document.getElementById('pos-client-identification').value,
+                            name: document.getElementById('pos-client-name').value,
+                            address: document.getElementById('pos-client-address').value,
+                            phone: document.getElementById('pos-client-phone').value,
+                            email: document.getElementById('pos-client-email').value,
+                            person_type: '2',
                         });
-                        const data = await response.json();
 
-                        if (! response.ok) {
-                            const message = data.message || Object.values(data.errors || {}).flat().join(' ') || '{{ __('Could not save the client.') }}';
-                            throw new Error(message);
-                        }
+                        try {
+                            const response = await fetch(clientStoreUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                },
+                                body: payload.toString(),
+                            });
+                            const data = await response.json();
 
-                        selectClient(data.client);
-                        if (window.HSOverlay) {
-                            HSOverlay.close('#pos-client-modal');
+                            if (! response.ok) {
+                                const message = data.message || Object.values(data.errors || {}).flat().join(' ') || '{{ __('Could not save the client.') }}';
+                                throw new Error(message);
+                            }
+
+                            selectClient(data.client);
+                            if (window.HSOverlay) {
+                                HSOverlay.close('#pos-client-modal');
+                            }
+                        } catch (error) {
+                            errorBox.textContent = error.message;
+                            errorBox.classList.remove('hidden');
                         }
-                    } catch (error) {
-                        errorBox.textContent = error.message;
-                        errorBox.classList.remove('hidden');
-                    }
-                });
+                    });
+                }
 
                 // --- Pago ---
 
@@ -588,17 +1096,20 @@
                     document.getElementById('pos-change-display').textContent = formatMoney(Math.max(recibido - cartTotal(), 0));
                 }
 
-                document.getElementById('pos-payment-method').addEventListener('change', () => {
-                    activeTicket().paymentMethodId = selectedPaymentOption()?.value || null;
-                    updatePosCashSectionVisibility();
-                });
-                document.getElementById('pos-efectivo-display').addEventListener('input', (event) => {
-                    activeTicket().efectivoRecibido = event.target.value;
-                    updateChange();
-                });
+                function bindPaymentControls() {
+                    document.getElementById('pos-payment-method').addEventListener('change', () => {
+                        activeTicket().paymentMethodId = selectedPaymentOption()?.value || null;
+                        updatePosCashSectionVisibility();
+                    });
+                    document.getElementById('pos-efectivo-display').addEventListener('input', (event) => {
+                        activeTicket().efectivoRecibido = event.target.value;
+                        updateChange();
+                    });
+                }
 
                 // --- Checkout ---
 
+                function bindCheckout() {
                 document.getElementById('pos-checkout-btn').addEventListener('click', async () => {
                     const btn = document.getElementById('pos-checkout-btn');
                     document.getElementById('pos-checkout-error').classList.add('hidden');
@@ -642,6 +1153,9 @@
                         body.append(`items[${index}][unidad_medida]`, line.unit_code || 'EA');
                         body.append(`items[${index}][cantidad]`, line.qty);
                         body.append(`items[${index}][precio_unitario]`, line.unit_price);
+                        if (line.warehouseId) {
+                            body.append(`items[${index}][bodega_id]`, line.warehouseId);
+                        }
                     });
 
                     try {
@@ -689,9 +1203,10 @@
                         showError(error.message || '{{ __('Could not issue the document.') }}');
                     } finally {
                         btn.disabled = false;
-                        btn.textContent = '{{ __('Charge') }}';
+                        btn.textContent = '{{ __('Charge sale') }}';
                     }
                 });
+                }
 
                 window.posIssueElectronic = async function () {
                     if (! currentSale) {
@@ -747,6 +1262,18 @@
                     }
                 };
 
+                window.posGoToSales = function () {
+                    // "Ir a ventas" navega de verdad (sale de esta pantalla),
+                    // así que las pre-cuentas que sigan abiertas con
+                    // productos se perderían sin avisar -- se pierde solo si
+                    // el cajero confirma que quiere salir de todas formas.
+                    const hasPendingTickets = tickets.some((t) => t.cart.length > 0);
+                    if (hasPendingTickets && ! confirm('{{ __('You have other pre-bills open with products. If you leave, you will lose them. Continue?') }}')) {
+                        return;
+                    }
+                    window.location.href = '{{ route('pos.sales.index') }}';
+                };
+
                 window.posNewSale = function () {
                     // Ya quedó una pre-cuenta nueva lista desde que se cobró
                     // (ver el checkout de arriba) -- "Nueva venta" solo cierra
@@ -773,6 +1300,23 @@
                     renderActiveTicket();
 
                     document.getElementById('pos-ticket-add-btn').addEventListener('click', addTicket);
+
+                    const bulkPriceTypeDropdown = document.getElementById('pos-bulk-price-type-btn')?.closest('.hs-dropdown');
+                    initDropdowns(document);
+                    bindDropdownOutsideClose();
+                    document.querySelectorAll('.pos-bulk-price-type-option').forEach((option) => {
+                        option.addEventListener('click', () => {
+                            applyPriceTypeToCart(option.dataset.priceTypeId);
+                            if (window.HSDropdown && bulkPriceTypeDropdown) {
+                                HSDropdown.close(bulkPriceTypeDropdown);
+                            }
+                        });
+                    });
+
+                    bindProductSearch();
+                    bindClientControls();
+                    bindPaymentControls();
+                    bindCheckout();
 
                     renderProducts(initialProducts);
                     updatePosCashSectionVisibility();

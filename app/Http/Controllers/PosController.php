@@ -21,7 +21,7 @@ use Throwable;
 
 class PosController extends Controller
 {
-    public function create(Request $request)
+    public function create(Request $request, DocumentoEmitidoController $documentController)
     {
         $company = $this->currentCompany($request);
 
@@ -33,13 +33,21 @@ class PosController extends Controller
 
         $paymentMethods = $company->paymentMethods()->orderBy('name')->get();
 
-        $products = $company->products()->active()->orderBy('description')->limit(60)->get();
+        // Mismo filtro por defecto que la búsqueda AJAX con "Todas las
+        // bodegas" (ver DocumentoEmitidoController::productSearch()): más
+        // de 1 unidad en total, no listar productos sin existencias reales.
+        $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
 
         return view('pos.sell', [
             'shift' => $shift,
             'company' => $company,
             'paymentMethods' => $paymentMethods,
-            'products' => $products,
+            // Mismo shape que el AJAX de búsqueda (precios por tipo, stock
+            // por bodega) -- si no, el tooltip de inventario/precio del
+            // grid saldría vacío hasta la primera búsqueda.
+            'products' => $documentController->mapProductsForJs($products),
+            'warehouses' => $company->warehouses()->orderBy('name')->get(),
+            'priceTypes' => $company->priceTypes()->orderBy('name')->get(),
             'defaultClient' => $this->defaultClient($company),
             'departments' => Department::orderBy('descripcion')->get(),
             'fiscalResponsibilities' => FiscalResponsibility::orderBy('codigo')->get(),

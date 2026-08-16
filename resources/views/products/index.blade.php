@@ -104,8 +104,7 @@
                         <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="productsTable">
                             <thead class="bg-gray-50 dark:bg-neutral-700">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Barcode') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Code') }}</th>
+                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Product') }}</th>
                                     <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
                                     <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Price') }}</th>
                                     <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Stock') }}</th>
@@ -116,8 +115,21 @@
                             <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
                                 @foreach ($products as $product)
                                     <tr>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $product->barcode ?? '—' }}</td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $product->code ?? '—' }}</td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex items-center gap-3">
+                                                @if ($product->image_url)
+                                                    <img src="{{ $product->image_url }}" alt="" class="shrink-0 size-9 rounded-lg object-cover">
+                                                @else
+                                                    <span class="flex items-center justify-center shrink-0 size-9 rounded-lg bg-accent/10 text-accent">
+                                                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                                                    </span>
+                                                @endif
+                                                <div class="min-w-0">
+                                                    <span class="block text-sm text-gray-600 dark:text-neutral-400 truncate">{{ $product->barcode ?? '—' }}</span>
+                                                    <span class="block text-xs text-neutral-400 dark:text-neutral-500 truncate">{{ $product->code ?? '—' }}</span>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td class="px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $product->description }}</td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400" data-order="{{ $product->unit_price }}">
                                             {{ $product->unit_price_formatted }}
@@ -146,7 +158,7 @@
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                                                 </a>
 
-                                                <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product) !!})">
+                                                <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product->makeHidden('image_data')) !!})">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
                                                         <path d="m15 5 4 4"></path>
@@ -606,9 +618,10 @@
             </button>
         </div>
         <div class="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-            <form id="productForm" method="POST" action="{{ route('products.store') }}" class="space-y-6">
+            <form id="productForm" method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="space-y-6">
                 @csrf
                 <input type="hidden" id="pr-method" name="_method" value="POST">
+                <input type="hidden" id="pr-remove_image" name="remove_image" value="0">
 
                 @if ($errors->any())
                     <div class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
@@ -620,11 +633,22 @@
                     </div>
                 @endif
 
-                <div class="flex gap-3">
-                    <div class="w-32 shrink-0">
-                        <flux:input id="pr-code" name="code" :label="__('Code')" value="{{ old('code') }}" required />
+                <div class="flex items-stretch gap-3">
+                    <div class="shrink-0 relative w-32 aspect-square">
+                        <button type="button" onclick="document.getElementById('pr-image').click()" class="relative block size-full rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Image') }}">
+                            <img id="pr-image-preview" src="" alt="" class="hidden size-full object-cover object-center">
+                            <span id="pr-image-placeholder" class="flex items-center justify-center size-full bg-accent/10 text-accent">
+                                <svg class="shrink-0 size-11" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                            </span>
+                        </button>
+                        <input type="file" id="pr-image" name="image" accept="image/*" class="hidden">
+                        <button type="button" id="pr-image-remove-btn" class="hidden absolute -top-1.5 -end-1.5 size-5 items-center justify-center rounded-full bg-white text-gray-500 border border-gray-200 shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 focus:outline-hidden dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400" onclick="removeProductImage()" aria-label="{{ __('Remove image') }}" title="{{ __('Remove image') }}">
+                            <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                        </button>
                     </div>
-                    <div class="flex-1">
+
+                    <div class="flex-1 flex flex-col gap-3">
+                        <flux:input id="pr-code" name="code" :label="__('Code')" value="{{ old('code') }}" required />
                         <flux:input id="pr-barcode" name="barcode" :label="__('Barcode')" value="{{ old('barcode') }}" />
                     </div>
                 </div>
@@ -1537,6 +1561,32 @@
                     }
                 }
 
+                function setProductImagePreview(url) {
+                    const img = document.getElementById('pr-image-preview');
+                    const placeholder = document.getElementById('pr-image-placeholder');
+                    const removeBtn = document.getElementById('pr-image-remove-btn');
+
+                    if (url) {
+                        img.src = url;
+                        img.classList.remove('hidden');
+                        placeholder.classList.add('hidden');
+                        removeBtn.classList.remove('hidden');
+                        removeBtn.classList.add('flex');
+                    } else {
+                        img.src = '';
+                        img.classList.add('hidden');
+                        placeholder.classList.remove('hidden');
+                        removeBtn.classList.add('hidden');
+                        removeBtn.classList.remove('flex');
+                    }
+                }
+
+                window.removeProductImage = function () {
+                    document.getElementById('pr-image').value = '';
+                    document.getElementById('pr-remove_image').value = '1';
+                    setProductImagePreview(null);
+                };
+
                 window.openProductPanel = function (product) {
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
@@ -1555,6 +1605,9 @@
                     document.getElementById('pr-code').value = product?.code ?? '';
                     document.getElementById('pr-barcode').value = product?.barcode ?? '';
                     document.getElementById('pr-description').value = product?.description ?? '';
+                    document.getElementById('pr-image').value = '';
+                    document.getElementById('pr-remove_image').value = '0';
+                    setProductImagePreview(product?.image_url ?? null);
                     setSelectValue('pr-unit_code', product?.unit_code);
                     resetExtraPriceLines(product?.extra_prices);
                     if (! product?.extra_prices || product.extra_prices.length === 0) {
@@ -1616,6 +1669,17 @@
                     checkbox.dataset.bound = 'true';
 
                     checkbox.addEventListener('change', toggleStockField);
+
+                    document.getElementById('pr-image').addEventListener('change', (event) => {
+                        const file = event.target.files?.[0];
+                        document.getElementById('pr-remove_image').value = '0';
+                        if (!file) {
+                            return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => setProductImagePreview(reader.result);
+                        reader.readAsDataURL(file);
+                    });
 
                     document.getElementById('se-quantity-display').addEventListener('input', (event) => {
                         handleDecimalDisplayInput(event.target.value, 'se-quantity', 'se-quantity-display');
