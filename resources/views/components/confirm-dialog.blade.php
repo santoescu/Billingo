@@ -36,7 +36,7 @@
      * está "bloqueado" -- así, sin importar qué lo dispare (fondo, X,
      * Escape), no se cierra hasta llamar a stop().
      *
-     * @returns {{start: function(string): void, stop: function(string): void}}
+     * @returns {object} start(selector), stop(selector)
      */
     window.appModalProcessing = (function () {
         function overlayInstance(selector) {
@@ -74,7 +74,7 @@
      *   - window.appConfirmDialog.ask('...').then(ok => ...) -- para flujos
      *     con fetch() que ya manejan su propio estado de carga.
      *
-     * @returns {{open: function, ask: function, cancel: function, accept: function}}
+     * @returns {object} open(event, form, message), ask(message), cancel(), accept()
      */
     window.appConfirmDialog = (function () {
         let pendingForm = null;
