@@ -52,6 +52,12 @@ class ProductImportController extends Controller
     /**
      * Procesa el archivo guardado en preview() según el mapeo de columnas
      * que el usuario definió (columna del Excel -> campo del producto).
+     *
+     * El import es una sincronización absoluta desde la planilla (igual que
+     * "stock", que reemplaza el total, no lo suma) -- por eso el costo
+     * importado fija average_cost directo, como "Fix cost", en vez de
+     * recalcularlo con la fórmula de promedio ponderado (que es para
+     * entradas puntuales, ver ProductController::storeStockEntry()).
      */
     public function import(Request $request)
     {
@@ -203,12 +209,6 @@ class ProductImportController extends Controller
                 $productData['extra_prices'] = $extraPrices;
             }
             if ($cost !== null) {
-                // El import es una sincronización absoluta desde la planilla
-                // (igual que "stock", que reemplaza el total, no lo suma) --
-                // por eso el costo importado fija average_cost directo, como
-                // "Fix cost", en vez de recalcularlo con la fórmula de
-                // promedio ponderado (que es para entradas puntuales, ver
-                // ProductController::storeStockEntry()).
                 $productData['average_cost'] = $cost;
             }
 
