@@ -1,5 +1,22 @@
 <script>
     (function () {
+        /**
+         * Inicializa, en cada bloque marcado con [data-dian-lookup] (tipo +
+         * número de identificación) que no lo tenga ya, la consulta a la
+         * DIAN que autocompleta nombre/correo y el cálculo del DV.
+         *
+         * El nombre/correo a rellenar viven en otra parte del formulario (no
+         * dentro de este cluster de tipo+número), así que se buscan en el
+         * contenedor más cercano marcado como [data-dian-lookup-form].
+         *
+         * root.dianLookupTrigger queda expuesto como API pública: cuando algo
+         * externo (p. ej. elegir un cliente ya existente de una búsqueda)
+         * llena la identificación por JS en vez de que el usuario la
+         * escriba, el navegador no dispara 'input' solo, así que hay que
+         * forzar la consulta a mano llamando a esta función.
+         *
+         * @returns {void}
+         */
         function initDianAcquirerLookups() {
             document.querySelectorAll('[data-dian-lookup]').forEach((root) => {
                 if (root.dataset.dianLookupInitialized) {
@@ -37,10 +54,6 @@
                     dvInput.value = isNit && numberInput.value ? calculateDv(numberInput.value) : '';
                 }
 
-                // El nombre/correo a rellenar viven en otra parte del
-                // formulario (no dentro de este cluster de tipo+número), así
-                // que se buscan en el contenedor más cercano marcado como
-                // alcance del formulario completo.
                 const formScope = root.closest('[data-dian-lookup-form]') || document;
                 const nameInput = formScope.querySelector('[data-dian-lookup-name]');
                 const emailInput = formScope.querySelector('[data-dian-lookup-email]');
@@ -48,6 +61,13 @@
                 let lookupTimeout = null;
                 let lookupToken = 0;
 
+                /**
+                 * Consulta la DIAN por la identificación actual y autocompleta
+                 * nombre/correo. Descarta la respuesta si, mientras esperaba,
+                 * el usuario ya cambió el valor (comparando un token por
+                 * consulta), para no pisar lo que esté escribiendo ahora.
+                 * @returns {Promise<void>}
+                 */
                 async function lookupInDian() {
                     const identificationType = typeSelect.value;
                     const identificationNumber = numberInput.value.trim();
@@ -79,8 +99,6 @@
 
                         const data = await response.json();
 
-                        // Si mientras esperábamos el usuario ya cambió el valor, esta
-                        // respuesta quedó obsoleta: no pisar lo que esté escribiendo ahora.
                         if (token !== lookupToken) {
                             return;
                         }
@@ -123,10 +141,6 @@
                 typeSelect.addEventListener('change', () => { refreshDv(); scheduleLookup(); });
                 refreshDv();
 
-                // API pública: cuando algo externo (p. ej. elegir un cliente
-                // ya existente de una búsqueda) llena la identificación por
-                // JS en vez de que el usuario la escriba, el navegador no
-                // dispara 'input' solo -- hay que forzar la consulta a mano.
                 root.dianLookupTrigger = function () {
                     refreshDv();
                     clearTimeout(lookupTimeout);
