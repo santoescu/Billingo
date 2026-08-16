@@ -88,13 +88,18 @@
             </tr>
         @endif
         @if ($cashReceived !== null)
+            @php
+                $cashPortion = count($documento->payments ?? []) > 0
+                    ? collect($documento->payments)->where('dian_code', '10')->sum('amount')
+                    : (float) $documento->total;
+            @endphp
             <tr>
                 <td>{{ __('Cash received') }}</td>
                 <td class="end">{{ number_format((float) $cashReceived, 2) }}</td>
             </tr>
             <tr>
                 <td class="bold">{{ __('Change') }}</td>
-                <td class="end bold">{{ number_format(max((float) $cashReceived - (float) $documento->total, 0), 2) }}</td>
+                <td class="end bold">{{ number_format(max((float) $cashReceived - $cashPortion, 0), 2) }}</td>
             </tr>
         @endif
     </table>
