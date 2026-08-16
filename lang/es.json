@@ -1,4 +1,9 @@
 {
+    "The amounts assigned to the payment methods (:assigned) do not match the sale total (:total).": "Los montos asignados a los medios de pago (:assigned) no coinciden con el total de la venta (:total).",
+    "Add payment method": "Agregar medio de pago",
+    "Assigned": "Asignado",
+    "Missing to assign": "Falta por asignar",
+    "Assigned amount exceeds the total by": "El monto asignado supera el total por",
     "Point of sale": "Punto de venta",
     "Cash register": "Caja",
     "Open, view or close your cash shift.": "Abre, revisa o cierra tu turno de caja.",

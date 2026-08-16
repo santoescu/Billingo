@@ -28,6 +28,13 @@ class DocumentoPos extends Model
         
         'payment_method_id',
         'payment_method_name',
+        // Desglose completo cuando la venta se pagó con más de un medio
+        // (p. ej. mitad efectivo, mitad tarjeta): [{payment_method_id,
+        // payment_method_name, dian_code, amount}, ...]. payment_method_id/
+        // payment_method_name arriba siguen guardando el PRIMER medio, para
+        // no romper nada que ya dependa de un solo valor (factura
+        // electrónica, CashMovement, vistas viejas).
+        'payments',
         'notes',
         'documento_emitido_id',
     ];

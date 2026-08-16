@@ -74,7 +74,14 @@
             <td class="bold">{{ __('Total') }}</td>
             <td class="end bold">{{ $documento->total_formatted }}</td>
         </tr>
-        @if ($documento->payment_method_name || $paymentMeansCode)
+        @if (count($documento->payments ?? []) > 1)
+            @foreach ($documento->payments as $payment)
+                <tr>
+                    <td>{{ $payment['payment_method_name'] ?? __('Payment method') }}</td>
+                    <td class="end">{{ number_format((float) ($payment['amount'] ?? 0), 2) }}</td>
+                </tr>
+            @endforeach
+        @elseif ($documento->payment_method_name || $paymentMeansCode)
             <tr>
                 <td>{{ __('Payment method') }}</td>
                 <td class="end">{{ $documento->payment_method_name ?? $paymentMeansCode->medio }}</td>

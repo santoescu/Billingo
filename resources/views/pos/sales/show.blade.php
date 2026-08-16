@@ -98,10 +98,22 @@
                         <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment form') }}</span>
                         <span class="text-gray-800 dark:text-neutral-200">{{ $paymentFormLabels[$documento->payment_means_id ?? ''] ?? $documento->payment_means_id ?? '—' }}</span>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment method') }}</span>
-                        <span class="text-gray-800 dark:text-neutral-200">{{ $documento->payment_method_name ?? $paymentMeansCode->medio ?? '—' }}</span>
-                    </div>
+                    @if (count($documento->payments ?? []) > 1)
+                        <div class="flex flex-col gap-1">
+                            <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment method') }}</span>
+                            @foreach ($documento->payments as $payment)
+                                <div class="flex justify-between">
+                                    <span class="text-gray-800 dark:text-neutral-200">{{ $payment['payment_method_name'] ?? '—' }}</span>
+                                    <span class="text-gray-800 dark:text-neutral-200">${{ number_format((float) ($payment['amount'] ?? 0), 2) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment method') }}</span>
+                            <span class="text-gray-800 dark:text-neutral-200">{{ $documento->payment_method_name ?? $paymentMeansCode->medio ?? '—' }}</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
