@@ -150,6 +150,16 @@ class ProductController extends Controller
      * inicial de /products porque, a diferencia de precios/bodegas (siempre
      * pocos por producto), el historial de movimientos crece sin límite con
      * el tiempo.
+     *
+     * Una salida por venta guarda 'document:<numeral>' en "reason" -- para
+     * poder linkear al .show de esa venta hay que resolver ese numeral
+     * contra documentos_pos (venta de POS) O documentos_emitidos (factura
+     * electrónica directa, sin pasar por POS), sin saber de antemano cuál de
+     * los dos es. Se resuelve en batch (no una consulta por movimiento).
+     *
+     * @param  Request  $request  Petición actual (empresa activa en sesión).
+     * @param  string  $product  ID del producto.
+     * @return \Illuminate\Http\JsonResponse Lista de movimientos con nombre de bodega/usuario y link a la venta cuando aplica.
      */
     public function kardex(Request $request, string $product)
     {
@@ -162,11 +172,6 @@ class ProductController extends Controller
         $userIds = $movements->pluck('user_id')->filter()->unique()->values()->all();
         $usersById = User::whereIn('_id', $userIds)->get()->keyBy(fn ($user) => (string) $user->_id);
 
-        // Una salida por venta guarda 'document:<numeral>' en "reason" -- para
-        // poder linkear al .show de esa venta hay que resolver ese numeral
-        // contra documentos_pos (venta de POS) O documentos_emitidos (factura
-        // electrónica directa, sin pasar por POS), sin saber de antemano cuál
-        // de los dos es. Se resuelve en batch (no una consulta por movimiento).
         $saleNumerals = $movements
             ->map(fn (StockMovement $m) => str_starts_with($m->reason ?? '', 'document:') ? substr($m->reason, strlen('document:')) : null)
             ->filter()
@@ -255,6 +260,15 @@ class ProductController extends Controller
      * libre de stock del formulario de edición, esta es la única acción que
      * captura explícitamente cuánto costó lo que entra, y por lo tanto la
      * única que recalcula average_cost con la fórmula de promedio ponderado).
+     *
+     * El select de bodega manda "" para "Sin asignar" (no ausencia del
+     * campo); se normaliza a null para que quede igual que el resto de la
+     * app (logStockChanges/discountInventory usan null para esa bodega
+     * virtual, no string vacío).
+     *
+     * @param  Request  $request  Debe traer quantity, unit_cost y opcionalmente warehouse_id/note.
+     * @param  string  $product  ID del producto.
+     * @return \Illuminate\Http\RedirectResponse Redirect a products.index tras registrar la entrada.
      */
     public function storeStockEntry(Request $request, string $product)
     {
@@ -272,10 +286,6 @@ class ProductController extends Controller
 
         $quantity = (float) $data['quantity'];
         $unitCost = (float) $data['unit_cost'];
-        // El select manda "" para "Sin asignar" (no ausencia del campo);
-        // se normaliza a null para que quede igual que el resto de la app
-        // (logStockChanges/discountInventory usan null para esa bodega
-        // virtual, no string vacío).
         $warehouseId = $data['warehouse_id'] ?: null;
 
         $oldQty = (float) ($product->stock ?? 0);
@@ -352,8 +362,17 @@ class ProductController extends Controller
      * bodega por bodega, más lo "sin asignar" (stock total - lo asignado a
      * bodegas) tratado como una bodega virtual (warehouse_id null).
      *
+     * Este camino (ajustes manuales desde el formulario general, sin un
+     * costo capturado explícitamente) no mueve el promedio ponderado: un
+     * aumento se trata como si entrara al costo promedio vigente (no altera
+     * la fórmula) y una disminución simplemente se valoriza a ese mismo
+     * promedio -- así average_cost queda estable ante correcciones.
+     *
+     * @param  Product  $product  Producto ya actualizado (se compara contra el estado previo recibido por parámetro).
      * @param  array  $previousWarehouseStocks  "warehouse_stocks" del producto antes del cambio.
      * @param  float  $previousTotal  "stock" total del producto antes del cambio.
+     * @param  Request  $request  Petición actual (usuario autenticado para el movimiento).
+     * @param  string  $reason  Motivo a guardar en cada StockMovement.
      */
     private function logStockChanges(Product $product, array $previousWarehouseStocks, float $previousTotal, Request $request, string $reason): void
     {
@@ -367,11 +386,6 @@ class ProductController extends Controller
             ->map(fn (array $entry) => (float) ($entry['stock'] ?? 0));
         $current[$unassignedKey] = round((float) $product->stock - round($current->sum(), 2), 2);
 
-        // Este camino (ajustes manuales desde el formulario general, sin un
-        // costo capturado explícitamente) no mueve el promedio ponderado: un
-        // aumento se trata como si entrara al costo promedio vigente (no
-        // altera la fórmula) y una disminución simplemente se valoriza a ese
-        // mismo promedio -- así average_cost queda estable ante correcciones.
         $unitCost = (float) ($product->average_cost ?? 0);
 
         foreach ($previous->keys()->merge($current->keys())->unique() as $key) {
