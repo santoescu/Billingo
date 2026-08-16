@@ -786,13 +786,18 @@
                     }
                 }
 
+                /**
+                 * Pinta el prefijo/número del documento a partir de la
+                 * resolución elegida. En modo POS el prefijo/número siempre
+                 * son los de la resolución "FV" del turno (ya vienen
+                 * pintados desde el servidor, ver "$shift->fvResolution" en
+                 * el blade) -- esta función no hace nada; si se dejara
+                 * correr, pisaría esos valores con los de la resolución de
+                 * facturación electrónica (la que sí carga este select,
+                 * oculto en POS).
+                 * @returns {void}
+                 */
                 function fillPrefixSecuencial() {
-                    // En modo POS el prefijo/número siempre son los de la
-                    // resolución "FV" del turno (ya vienen pintados desde el
-                    // servidor, ver "$shift->fvResolution" en el blade) -- acá
-                    // no hay nada que actualizar; si se dejara correr, pisaría
-                    // esos valores con los de la resolución de facturación
-                    // electrónica (la que sí carga este select, oculto en POS).
                     if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
                         return;
                     }
@@ -809,6 +814,14 @@
                     setFacturaFieldsReadonly(false, '', '');
                 }
 
+                /**
+                 * Reconstruye el select de concepto de nota crédito/débito
+                 * según el tipo de documento y operación. Sin referencia a
+                 * una factura puntual (operación 22) no tiene sentido
+                 * "Anulación de factura electrónica" -- ese concepto exige
+                 * saber cuál factura se está anulando.
+                 * @returns {void}
+                 */
                 function rebuildConceptCodes() {
                     const tipoDocumento = document.getElementById('doc-tipo_documento').value;
                     const tipoOperacion = document.getElementById('doc-tipo_operacion').value;
@@ -818,9 +831,6 @@
 
                     let conceptCodes = tipoDocumento === '91' ? creditNoteConceptCodes : debitNoteConceptCodes;
 
-                    // Sin referencia a una factura puntual (operación 22) no
-                    // tiene sentido "Anulación de factura electrónica" -- ese
-                    // concepto exige saber cuál factura se está anulando.
                     if (tipoOperacion === '22') {
                         conceptCodes = conceptCodes.filter(({ code }) => code !== '2');
                     }
@@ -828,14 +838,18 @@
                     rebuildSelect(document.getElementById('doc-referencia_concepto_codigo'), conceptCodes.map(({ code, label }) => ({ value: code, label: code + ' - ' + label })));
                 }
 
+                /**
+                 * Muestra/oculta la sección de referencia (factura anulada o
+                 * periodo) según el tipo de operación. En modo POS esta
+                 * sección entera no existe en el DOM (ver "$posMode" en el
+                 * blade), así que los `?.` de abajo simplemente no hacen nada.
+                 * @returns {void}
+                 */
                 function updateReferenceVisibility() {
                     const tipoOperacion = document.getElementById('doc-tipo_operacion').value;
                     const requiresFullReference = referenceRequiredOperationTypes.includes(tipoOperacion);
                     const requiresPeriod = periodOperationTypes.includes(tipoOperacion);
 
-                    // En modo POS esta sección entera no existe en el DOM
-                    // (ver "$posMode" en el blade) -- no hay nada que
-                    // mostrar u ocultar.
                     document.getElementById('doc-reference-section')?.classList.toggle('hidden', ! requiresFullReference && ! requiresPeriod);
                     document.getElementById('doc-referencia_factura_id-wrapper')?.classList.toggle('hidden', ! requiresFullReference);
                     document.getElementById('doc-factura-manual-fields')?.classList.toggle('hidden', ! requiresFullReference);
@@ -857,15 +871,21 @@
                     }
                 }
 
+                /**
+                 * Reconstruye el tipo de operación y las referencias para un
+                 * tipo de documento, y recarga las resoluciones. En modo POS
+                 * la resolución no se elige por documento (ya quedó fija al
+                 * abrir el turno), así que no recarga nada -- evita además
+                 * pisar el prefijo/número que el servidor ya pintó (ver
+                 * fillPrefixSecuencial()).
+                 * @param {string} tipoDocumento
+                 * @returns {Promise<void>}
+                 */
                 async function applyDocumentType(tipoDocumento) {
                     const operationTypes = operationTypesByDocumentType[tipoDocumento] || [];
                     rebuildSelect(document.getElementById('doc-tipo_operacion'), operationTypes.map(({ code, label }) => ({ value: code, label: code + ' - ' + label })));
                     updateReferenceVisibility();
 
-                    // En modo POS la resolución no se elige por documento (ya
-                    // quedó fija al abrir el turno), así que no hay nada que
-                    // recargar acá -- evita además pisar el prefijo/número
-                    // que el servidor ya pintó (ver fillPrefixSecuencial()).
                     if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
                         return;
                     }
@@ -873,10 +893,15 @@
                     await reloadResolutionOptions(tipoDocumento);
                 }
 
-                // Separado de applyDocumentType() para poder recargar solo
-                // las resoluciones (sin tocar tipo_operacion) -- no aplica en
-                // modo POS (ver "$posMode" en el blade): ahí la resolución ya
-                // quedó fija al abrir el turno, este selector ni se muestra.
+                /**
+                 * Recarga solo las resoluciones disponibles para un tipo de
+                 * documento (sin tocar tipo_operacion) -- separado de
+                 * applyDocumentType() para poder llamarse solo. No aplica en
+                 * modo POS (ver "$posMode" en el blade): ahí la resolución ya
+                 * quedó fija al abrir el turno, este selector ni se muestra.
+                 * @param {string} tipoDocumento
+                 * @returns {Promise<void>}
+                 */
                 async function reloadResolutionOptions(tipoDocumento) {
                     const resolutionSelect = document.getElementById('doc-resolution');
                     rebuildSelect(resolutionSelect, [{ value: '', label: '{{ __('Loading...') }}' }]);
@@ -899,11 +924,19 @@
 
                 let facturaLookupTimeout = null;
 
+                /**
+                 * Fija UUID/fecha de la factura referenciada como readOnly
+                 * (no disabled): así el valor sí viaja en el submit del
+                 * formulario -- cuando la factura se encontró, el UUID/fecha
+                 * que trajo la búsqueda por AJAX quedan en el payload desde
+                 * el frontend, sin que el backend tenga que volver a
+                 * consultarlos.
+                 * @param {boolean} readonly
+                 * @param {string} uuidValue
+                 * @param {string} fechaValue
+                 * @returns {void}
+                 */
                 function setFacturaFieldsReadonly(readonly, uuidValue, fechaValue) {
-                    // readOnly (no disabled): así el valor sí viaja en el submit del
-                    // formulario -- cuando la factura se encontró, el UUID/fecha que
-                    // trajo la búsqueda por AJAX quedan en el payload desde el
-                    // frontend, sin que el backend tenga que volver a consultarlos.
                     const uuidInput = document.getElementById('doc-referencia_factura_uuid');
                     uuidInput.value = uuidValue ?? '';
                     uuidInput.readOnly = readonly;
@@ -976,10 +1009,14 @@
                     return div.innerHTML;
                 }
 
-                // xmlToArray() en el backend solo agrupa en array cuando hay
-                // más de una ocurrencia del mismo elemento -- si solo hay uno
-                // (p. ej. un único evento), llega como objeto suelto. Esto
-                // normaliza ambos casos a array para poder iterar siempre igual.
+                /**
+                 * Normaliza un valor del XML de la DIAN a array siempre.
+                 * xmlToArray() en el backend solo agrupa en array cuando hay
+                 * más de una ocurrencia del mismo elemento -- si solo hay uno
+                 * (p. ej. un único evento), llega como objeto suelto.
+                 * @param {*} value
+                 * @returns {Array}
+                 */
                 function dianAsArray(value) {
                     if (value === undefined || value === null || value === '') {
                         return [];
@@ -987,10 +1024,15 @@
                     return Array.isArray(value) ? value : [value];
                 }
 
-                // El "Folio" de la DIAN a veces ya trae el prefijo pegado (p. ej.
-                // Serie "SETP" + Folio "SETP990000000") y a veces no (Serie "FEL"
-                // + Folio "227106") -- se arma el numeral completo evitando
-                // duplicar el prefijo cuando el Folio ya lo trae.
+                /**
+                 * Arma el numeral completo de un documento DIAN. El "Folio"
+                 * a veces ya trae el prefijo pegado (p. ej. Serie "SETP" +
+                 * Folio "SETP990000000") y a veces no (Serie "FEL" + Folio
+                 * "227106") -- evita duplicar el prefijo cuando el Folio ya
+                 * lo trae.
+                 * @param {object} numeroDocumento
+                 * @returns {string}
+                 */
                 function dianFullNumeral(numeroDocumento) {
                     const serie = (numeroDocumento.Serie || '').trim();
                     const folio = (numeroDocumento.Folio || '').trim();
@@ -1032,10 +1074,15 @@
                         + '</p>';
                 }
 
+                /**
+                 * Pinta la lista de validaciones de un documento DIAN,
+                 * ocultando "Documento validado por la DIAN": no aporta nada
+                 * nuevo, si el evento/documento aparece aquí es porque ya
+                 * está validado, esa línea solo repite algo implícito.
+                 * @param {object} validacionesDoc
+                 * @returns {string}
+                 */
                 function dianValidaciones(validacionesDoc) {
-                    // "Documento validado por la DIAN" no aporta nada nuevo --
-                    // si el evento/documento aparece aquí es porque ya está
-                    // validado; esa línea solo repite algo implícito.
                     const items = dianAsArray(validacionesDoc && validacionesDoc.ValidacionDoc)
                         .filter((item) => item.Nombre !== 'Documento validado por la DIAN');
                     if (items.length === 0) {
@@ -1195,6 +1242,14 @@
                     return documents.map(renderDianDocument).join('<hr class="my-4 border-zinc-200 dark:border-white/10">');
                 }
 
+                /**
+                 * Consulta un UUID/CUFE contra la DIAN y muestra el
+                 * resultado en el modal. El usuario puede llegar aquí solo
+                 * con el CUFE (sin saber el numeral) -- si la DIAN lo
+                 * encuentra, se autocompletan el numeral y la fecha de
+                 * emisión con lo que trajo la consulta.
+                 * @returns {void}
+                 */
                 function validateUuid() {
                     const uuid = document.getElementById('doc-referencia_factura_uuid').value.trim();
                     const modalBody = document.getElementById('validate-uuid-modal-body');
@@ -1221,10 +1276,6 @@
 
                             modalBody.innerHTML = renderDianInfo(data.info);
 
-                            // El usuario puede llegar aquí solo con el CUFE
-                            // (sin saber el numeral) -- si la DIAN lo
-                            // encuentra, se autocompletan el numeral y la
-                            // fecha de emisión con lo que trajo la consulta.
                             const foundDoc = dianAsArray(data.info && data.info.documents)[0];
                             if (foundDoc) {
                                 const numeroDocumento = foundDoc.NumeroDocumento || {};
@@ -1283,6 +1334,14 @@
                     }
                 }
 
+                /**
+                 * Engancha la búsqueda incremental de cliente y el modal
+                 * "buscar en todos los clientes" (botón de lupa dentro del
+                 * campo, tabla con su propio buscador, sin tocar la
+                 * búsqueda incremental de arriba).
+                 * @param {HTMLSelectElement} departmentSelect
+                 * @returns {void}
+                 */
                 function initClientSearch(departmentSelect) {
                     const searchInput = document.getElementById('doc-cliente-search');
                     const resultsEl = document.getElementById('doc-cliente-search-results');
@@ -1358,9 +1417,6 @@
                         }
                     });
 
-                    // Botón de lupa dentro del campo: abre un modal con la
-                    // tabla de TODOS los clientes (con su propio buscador),
-                    // sin tocar la búsqueda incremental de arriba.
                     const openAllClientsBtn = document.getElementById('doc-cliente-search-open-modal');
                     if (openAllClientsBtn) {
                         openAllClientsBtn.addEventListener('click', () => {
@@ -1392,6 +1448,16 @@
                     };
                 }
 
+                /**
+                 * Inicializa los componentes Preline (select, input number,
+                 * dropdown) de una fila de línea recién insertada. El
+                 * auto-cierre de Preline se desactiva en cada dropdown
+                 * ([--auto-close:false]) porque cerraba el panel con
+                 * CUALQUIER clic adentro (hasta escribiendo en los campos);
+                 * se cierra a mano solo con clics realmente afuera.
+                 * @param {HTMLElement} row
+                 * @returns {void}
+                 */
                 function initLineSelects(row) {
                     if (window.HSSelect) {
                         row.querySelectorAll('[data-hs-select]').forEach((el) => new HSSelect(el));
@@ -1403,10 +1469,6 @@
                         row.querySelectorAll('.hs-dropdown').forEach((el) => {
                             new HSDropdown(el);
 
-                            // Se desactivó el auto-cierre de Preline porque
-                            // cerraba el panel con CUALQUIER clic adentro
-                            // (hasta escribiendo en los campos) -- se cierra
-                            // a mano solo con clics realmente afuera.
                             document.addEventListener('click', (event) => {
                                 if (! el.classList.contains('open')) {
                                     return;
@@ -1421,9 +1483,17 @@
 
                 const taxNames = { '01': 'IVA', '03': 'ICA', '04': 'INC' };
 
-                // Con el primer impuesto agregado, el botón grande "Agregar
-                // impuesto" pasa a ser un "+" chiquito al final de la lista
-                // de badges (misma columna, para no ocupar tanto espacio).
+                /**
+                 * Reposiciona el botón "Agregar impuesto" de una línea según
+                 * si ya tiene impuestos. Con el primer impuesto agregado, el
+                 * botón grande pasa a ser un "+" chiquito al final de la
+                 * lista de badges (misma columna, para no ocupar tanto
+                 * espacio) -- siempre enseguida del último impuesto, en su
+                 * misma fila. Sin impuestos, vuelve a su lugar original,
+                 * debajo de la lista vacía de badges.
+                 * @param {HTMLElement} row
+                 * @returns {void}
+                 */
                 function updateAddTaxButtonState(row) {
                     const badgesBody = row.querySelector('.line-taxes-body');
                     const rows = badgesBody.querySelectorAll(':scope > .line-tax-row');
@@ -1435,15 +1505,11 @@
                         label.classList.add('hidden');
                         btn.classList.remove('ps-3', 'pe-4');
                         btn.classList.add('w-10', 'px-0');
-                        // El "+" siempre va enseguida del último impuesto (en
-                        // su misma fila), no debajo de todos.
                         rows[rows.length - 1].appendChild(dropdown);
                     } else {
                         label.classList.remove('hidden');
                         btn.classList.remove('w-10', 'px-0');
                         btn.classList.add('ps-3', 'pe-4');
-                        // Sin impuestos, el botón vuelve a su lugar original,
-                        // debajo de la lista vacía de badges.
                         badgesBody.after(dropdown);
                     }
                 }
@@ -1452,9 +1518,13 @@
                     return '$' + value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
 
-                // Solo existe en modo POS (ver "$posMode" en el blade) --
-                // recalcula el cambio cada vez que cambia el total de la
-                // venta o lo que escribió el cajero en "efectivo recibido".
+                /**
+                 * Recalcula el cambio del POS cada vez que cambia el total
+                 * de la venta o lo que escribió el cajero en "efectivo
+                 * recibido". Los campos solo existen en modo POS (ver
+                 * "$posMode" en el blade); si no están, no hace nada.
+                 * @returns {void}
+                 */
                 function updatePosChange() {
                     const hidden = document.getElementById('pos-efectivo-hidden');
                     const changeDisplay = document.getElementById('pos-change-display');
@@ -1467,14 +1537,18 @@
                     changeDisplay.textContent = formatMoney(Math.max(recibido - total, 0));
                 }
 
-                // La venta del POS se manda por fetch (no un submit normal de
-                // formulario): así la página se queda quieta y, en vez de
-                // navegar a otra pantalla, se abre el modal de resultado con
-                // la vista previa del recibo y las acciones (emitir
-                // electrónica, imprimir, descargar, nueva venta). Se crea
-                // SIEMPRE como factura de venta primero -- "Emitir factura
-                // electrónica" en el modal es una acción aparte, después de
-                // que la venta ya existe (ver PosController::issueElectronic()).
+                /**
+                 * Engancha el checkout del POS: la venta se manda por fetch
+                 * (no un submit normal de formulario), así la página se
+                 * queda quieta y, en vez de navegar a otra pantalla, se abre
+                 * el modal de resultado con la vista previa del recibo y las
+                 * acciones (emitir electrónica, imprimir, descargar, nueva
+                 * venta). Se crea SIEMPRE como factura de venta primero --
+                 * "Emitir factura electrónica" en el modal es una acción
+                 * aparte, después de que la venta ya existe (ver
+                 * PosController::issueElectronic()).
+                 * @returns {void}
+                 */
                 function initPosAjaxCheckout() {
                     const form = document.getElementById('documentForm');
                     const modal = document.getElementById('pos-result-modal');
@@ -1590,14 +1664,18 @@
                     };
                 }
 
-                // Sin esto, si alguien le da clic varias veces a "Emitir
-                // documento" (por ejemplo porque no ve ningún cambio
-                // mientras la petición está en camino) se mandan varias
-                // ventas duplicadas. Cualquier submit del formulario termina
-                // en un envío real tarde o temprano (el modal de "¿Emitir
-                // factura electrónica?" del POS no tiene forma de cancelar,
-                // solo Sí/No, ambos mandan el formulario), así que es seguro
-                // deshabilitar el botón desde el primer submit.
+                /**
+                 * Deshabilita el botón de envío desde el primer submit, para
+                 * evitar ventas duplicadas si alguien le da clic varias
+                 * veces a "Emitir documento" (por ejemplo porque no ve
+                 * ningún cambio mientras la petición está en camino).
+                 * Cualquier submit del formulario termina en un envío real
+                 * tarde o temprano (el modal de "¿Emitir factura
+                 * electrónica?" del POS no tiene forma de cancelar, solo
+                 * Sí/No, ambos mandan el formulario), así que es seguro
+                 * deshabilitarlo ya desde el primer submit.
+                 * @returns {void}
+                 */
                 function initSubmitProcessingState() {
                     const form = document.getElementById('documentForm');
                     const button = document.getElementById('documentSubmitBtn');
@@ -1615,14 +1693,18 @@
                     });
                 }
 
-                // La última línea de productos siempre queda vacía (esperando
-                // el siguiente producto que se busque -- se agrega sola al
-                // elegir un producto, ver applyProduct()). Si el usuario emite
-                // el documento sin llenarla, no debe mandarse al servidor como
-                // si fuera un ítem real (descripción vacía, cantidad 0): se
-                // quita del formulario justo antes de enviarlo, nunca antes
-                // (mientras se sigue editando, sigue siendo el lugar donde
-                // buscar el próximo producto).
+                /**
+                 * Quita del formulario, justo antes de enviarlo, la línea de
+                 * producto vacía que siempre queda al final (esperando el
+                 * siguiente producto que se busque -- se agrega sola al
+                 * elegir un producto, ver applyProduct()). Si el usuario
+                 * emite el documento sin llenarla, no debe mandarse al
+                 * servidor como si fuera un ítem real (descripción vacía,
+                 * cantidad 0); se quita solo al enviar, nunca antes, porque
+                 * mientras se sigue editando sigue siendo el lugar donde
+                 * buscar el próximo producto.
+                 * @returns {void}
+                 */
                 function initEmptyLineSubmitCleanup() {
                     const form = document.getElementById('documentForm');
                     if (! form) {
@@ -1638,10 +1720,17 @@
                     });
                 }
 
-                // El campo visible del precio unitario usa formato colombiano
-                // (punto de miles, coma de centavos), igual que en el módulo
-                // de productos; el campo oculto guarda el valor con punto
-                // decimal estándar, que es lo que espera el backend.
+                /**
+                 * Formatea un valor decimal al formato visible colombiano
+                 * (punto de miles, coma de centavos), igual que en el módulo
+                 * de productos; el campo oculto (rawLinePriceValue) guarda
+                 * el valor con punto decimal estándar, que es lo que espera
+                 * el backend.
+                 * @param {string} intPart
+                 * @param {string} decPart
+                 * @param {boolean} hasComma
+                 * @returns {string}
+                 */
                 function formatLinePrice(intPart, decPart, hasComma) {
                     if (! intPart && ! hasComma) {
                         return '';
@@ -1657,10 +1746,19 @@
                     return decPart ? `${intPart || '0'}.${decPart}` : (intPart || '0');
                 }
 
-                // "row" es el contenedor donde buscar los campos por defecto
-                // (.line-precio/.line-precio-display); se pueden pasar los
-                // elementos directamente (hiddenEl/displayEl) para reusar
-                // este mismo formato en otros campos (descuento, impuestos).
+                /**
+                 * Precarga el precio visible/oculto de una línea a partir de
+                 * un valor crudo con punto decimal. "row" es el contenedor
+                 * donde buscar los campos por defecto
+                 * (.line-precio/.line-precio-display); se pueden pasar los
+                 * elementos directamente (hiddenEl/displayEl) para reusar
+                 * este mismo formato en otros campos (descuento, impuestos).
+                 * @param {HTMLElement} row
+                 * @param {string|number} rawValue
+                 * @param {HTMLElement} [hiddenEl]
+                 * @param {HTMLElement} [displayEl]
+                 * @returns {void}
+                 */
                 function setLinePriceValue(row, rawValue, hiddenEl = null, displayEl = null) {
                     const hidden = hiddenEl || row.querySelector('.line-precio');
                     const display = displayEl || row.querySelector('.line-precio-display');
@@ -1696,13 +1794,17 @@
                     display.value = formatLinePrice(intPart, decPart, hasComma);
                 }
 
-                // El campo de descuento reusa el mismo formato/estructura que
-                // el precio unitario (mismo separador de miles/decimales), y
-                // según el tipo elegido (porcentaje o valor fijo) cambia el
-                // símbolo que antecede al número ("%" o "$"). El tope máximo
-                // (100 para porcentaje, el subtotal de la línea para valor
-                // fijo) se aplica al calcular el subtotal, no mientras se
-                // escribe, para no pelearle al cursor del usuario.
+                /**
+                 * Actualiza el símbolo ("%" o "$") que antecede al campo de
+                 * descuento de una línea, según el tipo elegido (porcentaje
+                 * o valor fijo) -- reusa el mismo formato/estructura que el
+                 * precio unitario. El tope máximo (100 para porcentaje, el
+                 * subtotal de la línea para valor fijo, ver discountCap())
+                 * se aplica al calcular el subtotal, no mientras se escribe,
+                 * para no pelearle al cursor del usuario.
+                 * @param {HTMLElement} row
+                 * @returns {void}
+                 */
                 function updateDiscountPrefix(row) {
                     const tipo = row.querySelector('.line-descuento-tipo').value || 'porcentaje';
                     row.querySelector('.line-descuento-prefix').textContent = tipo === 'porcentaje' ? '%' : '$';
@@ -1718,11 +1820,18 @@
                     return cantidad * precio;
                 }
 
-                // Formatea lo que se escribió (mismo formato colombiano que
-                // el precio) y lo recorta a "cap" si se pasa -- así el campo
-                // nunca queda mostrando un valor que después se iba a
-                // ignorar en el cálculo. hiddenEl guarda el valor real (punto
-                // decimal), displayEl es lo que ve el usuario.
+                /**
+                 * Reformatea un campo mientras se escribe (mismo formato
+                 * colombiano que el precio) y lo recorta a "cap" si se pasa
+                 * -- así el campo nunca queda mostrando un valor que después
+                 * se iba a ignorar en el cálculo. hiddenEl guarda el valor
+                 * real (punto decimal), displayEl es lo que ve el usuario.
+                 * @param {string} typedValue
+                 * @param {HTMLElement} hiddenEl
+                 * @param {HTMLElement} displayEl
+                 * @param {number} [cap]
+                 * @returns {void}
+                 */
                 function handleCappedPriceInput(typedValue, hiddenEl, displayEl, cap) {
                     let str = String(typedValue ?? '').replace(/\./g, '');
                     const commaIndex = str.indexOf(',');
@@ -1759,14 +1868,30 @@
                     );
                 }
 
-                // La cantidad máxima de una línea es el stock disponible en
-                // la bodega elegida; la mínima siempre es 0. Se aplica en
-                // cuanto hay una bodega seleccionada (sin importar si el
-                // producto tiene marcado "controla inventario" -- lo que
-                // importa es el stock real de esa bodega puntual, que
-                // siempre viene informado). Sin producto/bodega elegida
-                // todavía, no hay tope. Se reconstruye el componente +/- con
-                // ese nuevo tope cada vez que cambia el producto o la bodega.
+                /**
+                 * Fija el tope de cantidad de una línea al stock disponible
+                 * en la bodega elegida (la mínima siempre es 0), sin
+                 * importar si el producto tiene marcado "controla
+                 * inventario" -- lo que importa es el stock real de esa
+                 * bodega puntual, que siempre viene informado. Sin
+                 * producto/bodega elegida todavía, no hay tope. Se
+                 * reconstruye el componente +/- con ese nuevo tope cada vez
+                 * que cambia el producto o la bodega; el valor se recorta
+                 * ANTES de reconstruirlo (si se hiciera después, el contador
+                 * +/- quedaría pensando que el valor sigue siendo el viejo,
+                 * de ahí que "+"/"-" no respondieran bien con varias
+                 * líneas). Todo el campo de cantidad (escribir a mano, "+" y
+                 * "-") queda bloqueado hasta que haya un producto elegido --
+                 * sin producto no hay bodega ni stock de referencia. La
+                 * librería reactiva los botones ella sola cada vez que
+                 * cambia el valor (al escribir, al hacer clic, o incluso al
+                 * construir la instancia), sin importar el atributo
+                 * "disabled" que se les puso a mano -- por eso hace falta
+                 * reforzarlo también después de cada cambio, no solo una vez
+                 * al armar el componente.
+                 * @param {HTMLElement} row
+                 * @returns {void}
+                 */
                 function updateCantidadLimits(row) {
                     const wrapper = row.querySelector('.line-cantidad-wrapper');
                     const cantidadInput = row.querySelector('.line-cantidad');
@@ -1785,10 +1910,6 @@
                     }
                     wrapper.setAttribute('data-hs-input-number', JSON.stringify(config));
 
-                    // El valor se recorta ANTES de reconstruir el componente:
-                    // si se hiciera después, el contador +/- quedaría
-                    // pensando que el valor sigue siendo el viejo (de ahí que
-                    // "+"/"-" no respondieran bien con varias líneas).
                     if (max !== null && (parseFloat(cantidadInput.value) || 0) > max) {
                         cantidadInput.value = max;
                     }
@@ -1798,9 +1919,6 @@
                         new HSInputNumber(wrapper);
                     }
 
-                    // Todo el campo de cantidad (escribir a mano, "+" y "-")
-                    // queda bloqueado hasta que haya un producto elegido --
-                    // sin producto no hay bodega ni stock de referencia.
                     const hasProduct = bodegaSelect.options.length > 0;
                     const incrementBtn = wrapper.querySelector('[data-hs-input-number-increment]');
                     const decrementBtn = wrapper.querySelector('[data-hs-input-number-decrement]');
@@ -1816,22 +1934,22 @@
                     };
                     applyDisabledState();
 
-                    // La librería reactiva los botones ella sola cada vez que
-                    // cambia el valor (al escribir, al hacer clic, o incluso
-                    // al construir la instancia), sin importar el atributo
-                    // "disabled" que les pusimos a mano -- por eso hace falta
-                    // reforzarlo también después de cada cambio, no solo una
-                    // vez al armar el componente.
                     if (! wrapper.dataset.stepperGuardBound) {
                         wrapper.dataset.stepperGuardBound = 'true';
                         wrapper.addEventListener('change.hs.inputNumber', applyDisabledState);
                     }
                 }
 
-                // Subtotal de una línea: cantidad x precio, menos el descuento
-                // de línea (si hay), más la suma de sus impuestos (cada uno
-                // sobre su propia base gravable, que nunca puede superar ese
-                // subtotal ya con el descuento aplicado).
+                /**
+                 * Calcula el subtotal de una línea: cantidad x precio, menos
+                 * el descuento de línea (si hay, topado a 100 si es
+                 * porcentaje o al subtotal si es valor fijo), más la suma de
+                 * sus impuestos (cada uno sobre su propia base gravable, que
+                 * nunca puede superar ese subtotal ya con el descuento
+                 * aplicado).
+                 * @param {HTMLElement} row
+                 * @returns {number}
+                 */
                 function computeLineSubtotal(row) {
                     const cantidad = parseFloat(row.querySelector('.line-cantidad').value) || 0;
                     const precio = parseFloat(row.querySelector('.line-precio').value) || 0;
@@ -1839,8 +1957,6 @@
 
                     const descuentoTipo = row.querySelector('.line-descuento-tipo')?.value || 'porcentaje';
                     const descuentoValor = parseFloat(row.querySelector('.line-descuento-valor')?.value) || 0;
-                    // Tope: un porcentaje nunca pasa de 100, y un valor fijo
-                    // nunca supera el subtotal de la línea.
                     const descuentoAmount = descuentoTipo === 'porcentaje'
                         ? baseAmount * (Math.min(descuentoValor, 100) / 100)
                         : Math.min(descuentoValor, baseAmount);
@@ -1866,6 +1982,14 @@
                     recalcTotal();
                 }
 
+                /**
+                 * Recalcula el total del documento sumando el subtotal de
+                 * cada línea. totalEl.dataset.raw guarda el valor crudo
+                 * para el cálculo de cambio del POS (ver updatePosChange())
+                 * -- no incluye cargos/descuentos de documento, solo la
+                 * suma de líneas, que es el caso normal de una venta rápida.
+                 * @returns {void}
+                 */
                 function recalcTotal() {
                     let total = 0;
                     document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
@@ -1873,19 +1997,19 @@
                     });
                     const totalEl = document.getElementById('documentLinesTotal');
                     totalEl.textContent = formatMoney(total);
-                    // Valor crudo para el cálculo de cambio del POS (ver
-                    // bloque "Cash received" más abajo) -- no incluye
-                    // cargos/descuentos de documento, solo la suma de
-                    // líneas, que es el caso normal de una venta rápida.
                     totalEl.dataset.raw = total;
                     updatePosChange?.();
                 }
 
-                // Modal "buscar en todos los productos", compartido entre
-                // todas las líneas (no hay un solo <select> con todo el
-                // catálogo -- puede haber miles de productos -- así que se
-                // busca por AJAX igual que el campo incremental de cada
-                // línea, solo que en formato tabla dentro de un modal).
+                /**
+                 * Engancha el modal "buscar en todos los productos",
+                 * compartido entre todas las líneas (no hay un solo
+                 * <select> con todo el catálogo -- puede haber miles de
+                 * productos -- así que se busca por AJAX igual que el
+                 * campo incremental de cada línea, solo que en formato
+                 * tabla dentro de un modal). Expone window.openAllProductsModal(row).
+                 * @returns {void}
+                 */
                 function initAllProductsModal() {
                     const searchInput = document.getElementById('all-products-search');
                     const tbody = document.getElementById('all-products-tbody');
@@ -1951,6 +2075,20 @@
                     };
                 }
 
+                /**
+                 * Engancha la búsqueda de producto y todos los campos
+                 * derivados (precio, descuento, bodega) de una línea. El
+                 * selector de bodega es un HSSelect (UI custom de Preline):
+                 * al elegir una opción NO dispara el evento nativo "change"
+                 * del <select>, dispara uno propio "change.hs.select", por
+                 * eso se escuchan ambos. El botón de lupa dentro del campo
+                 * de producto abre el modal "buscar en todos los productos"
+                 * (compartido entre todas las líneas, ver
+                 * window.openAllProductsModal más abajo), sin tocar la
+                 * búsqueda incremental.
+                 * @param {HTMLElement} row
+                 * @returns {void}
+                 */
                 function initLineProductSearch(row) {
                     const searchInput = row.querySelector('.line-product-search');
                     const resultsEl = row.querySelector('.line-product-results');
@@ -1969,11 +2107,15 @@
                         resultsEl.innerHTML = '';
                     }
 
-                    // Selector de lista de precios embebido en el propio campo
-                    // de precio: mismo diseño de select que el resto de la
-                    // app, pero el botón nunca muestra el precio elegido (solo
-                    // una flechita) -- el valor ya se refleja en el campo de
-                    // precio de al lado.
+                    /**
+                     * Llena el selector de lista de precios embebido en el
+                     * propio campo de precio: mismo diseño de select que el
+                     * resto de la app, pero el botón nunca muestra el
+                     * precio elegido (solo una flechita) -- el valor ya se
+                     * refleja en el campo de precio de al lado.
+                     * @param {Array} prices
+                     * @returns {void}
+                     */
                     function fillPriceSelect(prices) {
                         if (! prices.length) {
                             precioSelectWrapper.classList.add('hidden');
@@ -1988,6 +2130,33 @@
                         precioSelectWrapper.classList.remove('hidden');
                     }
 
+                    /**
+                     * Aplica un producto elegido a esta línea: precios,
+                     * bodegas y desbloqueo del botón de borrar. Los precios
+                     * del producto se guardan en la propia fila
+                     * (row.productPrices, no solo en el <select>) para poder
+                     * aplicar "este tipo de precio a todas las líneas" desde
+                     * el selector global sin volver a pedirlos. La bodega
+                     * siempre se ve, pero arranca deshabilitada hasta que se
+                     * encuentra un producto -- si no tiene bodegas propias,
+                     * igual trae "Sin asignar" con lo que haya de cantidad
+                     * disponible; cada opción guarda su stock (data-stock)
+                     * para topar la cantidad máxima según la bodega elegida.
+                     * Sin producto, la línea no se puede borrar: es la que
+                     * queda disponible para seguir buscando (ya no hay botón
+                     * "Agregar línea" aparte). Por la misma razón, en cuanto
+                     * se elige un producto en la ÚLTIMA fila, se agrega una
+                     * fila vacía nueva debajo automáticamente (si la fila ya
+                     * no era la última, quiere decir que se está cambiando
+                     * el producto de una línea existente, y ya hay una fila
+                     * vacía más adelante, no hace falta agregar otra).
+                     * Expuesta como row.applyProduct para que el modal
+                     * "buscar en todos los productos" (compartido entre
+                     * todas las líneas) pueda aplicar el producto elegido a
+                     * ESTA fila en concreto.
+                     * @param {object} product
+                     * @returns {void}
+                     */
                     function applyProduct(product) {
                         row.dataset.productPicked = 'true';
                         row.dataset.tracksInventory = product.tracks_inventory ? 'true' : 'false';
@@ -1997,21 +2166,11 @@
                         unidadInput.value = product.unit_code || 'EA';
                         searchInput.value = (product.code || '') + ' - ' + (product.description || '');
 
-                        // Se guardan los precios del producto en la propia
-                        // fila (no solo en el <select>) para poder aplicar
-                        // "este tipo de precio a todas las líneas" desde el
-                        // selector global, sin tener que volver a pedirlos.
                         row.productPrices = product.prices || [];
 
                         fillPriceSelect(product.prices || []);
                         setLinePriceValue(row, (product.prices && product.prices.length) ? product.prices[0].price : (product.unit_price || 0));
 
-                        // La bodega siempre se ve, pero arranca deshabilitada
-                        // hasta que se encuentra un producto -- si no tiene
-                        // bodegas propias, igual trae "Sin asignar" con lo que
-                        // haya de cantidad disponible. Cada opción guarda su
-                        // stock (data-stock) para topar la cantidad máxima
-                        // según la bodega elegida.
                         rebuildSelect(bodegaSelect, (product.warehouses || []).map((warehouse) => ({
                             value: warehouse.warehouse_id || '',
                             label: warehouse.warehouse_name + ' (' + warehouse.stock + ')',
@@ -2019,9 +2178,6 @@
                         })));
                         bodegaSelect.disabled = false;
 
-                        // Sin producto, la línea no se puede borrar: es la
-                        // que queda disponible para seguir buscando (ya no
-                        // hay botón "Agregar línea" aparte).
                         const deleteBtn = row.querySelector('.line-delete-btn');
                         if (deleteBtn) {
                             deleteBtn.disabled = false;
@@ -2030,13 +2186,6 @@
                         updateCantidadLimits(row);
                         recalcLine(row);
 
-                        // Ya no hay botón "Agregar línea": en cuanto se elige
-                        // un producto en la ÚLTIMA fila, se agrega una fila
-                        // vacía nueva debajo automáticamente (si la fila ya
-                        // no era la última, quiere decir que se está
-                        // cambiando el producto de una línea existente, y ya
-                        // hay una fila vacía más adelante -- no hace falta
-                        // agregar otra).
                         const allRows = document.querySelectorAll('#documentLinesBody .document-line');
                         if (row === allRows[allRows.length - 1]) {
                             const newRow = addDocumentLine();
@@ -2044,9 +2193,6 @@
                         }
                     }
 
-                    // Expuesto para que el modal "buscar en todos los
-                    // productos" (compartido entre todas las líneas) pueda
-                    // aplicar el producto elegido a ESTA fila en concreto.
                     row.applyProduct = applyProduct;
 
                     function renderResults(products) {
@@ -2115,11 +2261,6 @@
                         }
                     });
 
-                    // El selector de bodega es un HSSelect (UI custom de
-                    // Preline): al elegir una opción NO dispara el evento
-                    // nativo "change" del <select>, dispara uno propio
-                    // "change.hs.select" -- de ahí que el tope de cantidad
-                    // se quedara pegado a la primera bodega.
                     bodegaSelect.addEventListener('change', () => {
                         updateCantidadLimits(row);
                         recalcLine(row);
@@ -2131,26 +2272,23 @@
 
                     precioDisplay.addEventListener('input', () => {
                         handleLinePriceInput(row, precioDisplay.value);
-                        // El precio cambia el subtotal, que es el tope del
-                        // descuento cuando es de tipo "valor fijo".
                         handleLineDiscountInput(row, row.querySelector('.line-descuento-display').value);
                         recalcLine(row);
                     });
 
-                    // Botón de lupa dentro del campo: abre el modal
-                    // "buscar en todos los productos" (compartido entre
-                    // todas las líneas), sin tocar la búsqueda incremental
-                    // de arriba. window.openAllProductsModal se define una
-                    // sola vez, fuera de esta función (ver más abajo).
                     row.querySelector('.line-product-search-open-modal')?.addEventListener('click', () => {
                         window.openAllProductsModal(row);
                     });
                 }
 
-                // La base gravable del formulario de "agregar impuesto"
-                // siempre arranca en cantidad x precio (el subtotal de la
-                // línea) cada vez que se abre, para que quede seleccionada
-                // por defecto sin tener que escribirla a mano.
+                /**
+                 * Precarga la base gravable del formulario de "agregar
+                 * impuesto" con cantidad x precio (el subtotal de la línea)
+                 * cada vez que se abre, para que quede seleccionada por
+                 * defecto sin tener que escribirla a mano.
+                 * @param {HTMLElement} button
+                 * @returns {void}
+                 */
                 window.prefillNewTaxBase = function (button) {
                     const row = button.closest('.document-line');
                     const panel = button.closest('.hs-dropdown').querySelector('.hs-dropdown-menu');
@@ -2162,6 +2300,13 @@
                     baseDisplay.select();
                 };
 
+                /**
+                 * Guarda el impuesto del mini formulario como un badge en la
+                 * línea, y limpia el formulario para la próxima vez que se
+                 * abra.
+                 * @param {HTMLElement} button
+                 * @returns {void}
+                 */
                 window.saveLineTax = function (button) {
                     const row = button.closest('.document-line');
                     const panel = button.closest('.hs-dropdown-menu');
@@ -2199,7 +2344,6 @@
                     const baseLabel = base !== null ? ' · ' + formatMoney(base) : '';
                     badge.querySelector('.line-tax-label').textContent = (taxNames[tipo] || tipo) + ' ' + porcentajeLabel + '%' + baseLabel;
 
-                    // Se limpia el mini formulario para la próxima vez que se abra.
                     setSelectValue(tipoSelect, '01');
                     setLinePriceValue(row, '19', porcentajeInput, panel.querySelector('.line-newtax-porcentaje-display'));
                     baseInput.value = '';
@@ -2213,15 +2357,20 @@
                     recalcLine(row);
                 };
 
+                /**
+                 * Quita un impuesto de una línea. El botón "+" de "agregar
+                 * impuesto" puede estar viviendo dentro de esta misma fila
+                 * de impuesto (si era la última) -- se saca antes de borrar
+                 * la fila para no perderlo.
+                 * @param {HTMLElement} button
+                 * @returns {void}
+                 */
                 window.removeLineTax = function (button) {
                     const row = button.closest('.document-line');
                     const taxRow = button.closest('.line-tax-row');
                     const badgesBody = row.querySelector('.line-taxes-body');
                     const dropdown = row.querySelector('.hs-dropdown');
 
-                    // El botón "+" puede estar viviendo dentro de esta misma
-                    // fila (si era la última) -- se saca antes de borrar la
-                    // fila para no perderlo.
                     if (taxRow.contains(dropdown)) {
                         badgesBody.after(dropdown);
                     }
@@ -2231,6 +2380,24 @@
                     recalcLine(row);
                 };
 
+                /**
+                 * Agrega una nueva línea de producto vacía al documento.
+                 * updateCantidadLimits(row) sincroniza el componente +/-
+                 * desde el arranque (queda igual que el de la plantilla,
+                 * pero se reconstruye para que su estado interno no dependa
+                 * de lo que haya en el atributo del HTML nada más). El
+                 * máximo de descuento/impuesto cambia según el tipo elegido
+                 * (100 para porcentaje, el subtotal de la línea para valor
+                 * fijo): si el valor ya escrito queda por encima del nuevo
+                 * tope, se recorta también. Los listeners de "input"/cantidad se
+                 * enganchan por delegación en la propia fila (row), para
+                 * cubrir también las filas de impuesto que se agregan
+                 * dinámicamente después; los botones +/- del campo de
+                 * cantidad no disparan un evento "input" nativo (el plugin
+                 * solo pone el valor a mano), así que también se escucha su
+                 * propio evento "change.hs.inputNumber".
+                 * @returns {HTMLElement} La fila creada.
+                 */
                 window.addDocumentLine = function () {
                     const template = document.getElementById('documentLineTemplate');
                     const html = template.innerHTML.replaceAll('__INDEX__', lineIndex);
@@ -2246,10 +2413,6 @@
 
                     initLineSelects(row);
                     initLineProductSearch(row);
-                    // Sincroniza el componente +/- desde el arranque (queda
-                    // igual que el de la plantilla, pero se reconstruye para
-                    // que su estado interno no dependa de lo que haya en el
-                    // atributo del HTML nada más).
                     updateCantidadLimits(row);
 
                     const descuentoDisplay = row.querySelector('.line-descuento-display');
@@ -2264,16 +2427,10 @@
                     descuentoTipoSelect.addEventListener('change', () => {
                         descuentoTipoHidden.value = descuentoTipoSelect.value;
                         updateDiscountPrefix(row);
-                        // El máximo cambia según el tipo (100 vs. el
-                        // subtotal): si el valor ya escrito queda por encima
-                        // del nuevo tope, se recorta también.
                         handleLineDiscountInput(row, row.querySelector('.line-descuento-display').value);
                         recalcLine(row);
                     });
 
-                    // Igual que el descuento: el porcentaje del formulario de
-                    // "agregar impuesto" no pasa de 100, y la base gravable no
-                    // pasa del subtotal de la línea (cantidad x precio).
                     const newTaxPorcentajeHidden = row.querySelector('.line-newtax-porcentaje');
                     const newTaxPorcentajeDisplay = row.querySelector('.line-newtax-porcentaje-display');
                     const newTaxBaseHidden = row.querySelector('.line-newtax-base');
@@ -2289,8 +2446,6 @@
                         handleCappedPriceInput(newTaxBaseDisplay.value, newTaxBaseHidden, newTaxBaseDisplay, cantidad * precio);
                     });
 
-                    // Delegación: cubre también las filas de impuesto, que se
-                    // agregan dinámicamente después de este punto.
                     row.addEventListener('input', (event) => {
                         if (event.target.matches('.line-cantidad')) {
                             handleLineDiscountInput(row, row.querySelector('.line-descuento-display').value);
@@ -2300,9 +2455,6 @@
                         }
                     });
 
-                    // Los botones +/- del campo de cantidad no disparan un
-                    // evento "input" nativo (el plugin solo pone el valor a
-                    // mano), así que hay que escuchar su propio evento.
                     row.querySelector('[data-hs-input-number]')?.addEventListener('change.hs.inputNumber', () => {
                         handleLineDiscountInput(row, row.querySelector('.line-descuento-display').value);
                         recalcLine(row);
@@ -2324,10 +2476,14 @@
                     }
                 };
 
-                // Solo existe en modo POS -- el bloque "efectivo recibido"
-                // solo tiene sentido si el PRIMER medio de pago es efectivo
-                // (código 10); con cualquier otro medio (tarjeta,
-                // transferencia) no hay nada que cobrar en físico.
+                /**
+                 * Muestra/oculta el bloque "efectivo recibido", que solo
+                 * tiene sentido si el PRIMER medio de pago es efectivo
+                 * (código 10); con cualquier otro medio (tarjeta,
+                 * transferencia) no hay nada que cobrar en físico. Solo
+                 * existe en modo POS.
+                 * @returns {void}
+                 */
                 function updatePosCashSectionVisibility() {
                     const section = document.getElementById('pos-cash-section');
                     if (! section) {
@@ -2408,6 +2564,22 @@
                     button.closest('.charge-line').remove();
                 };
 
+                /**
+                 * Wiring inicial de la pantalla del documento. El orden de
+                 * los tres init de submit importa: la limpieza de líneas
+                 * vacías (initEmptyLineSubmitCleanup) tiene que registrarse
+                 * ANTES que el envío por fetch del POS (initPosAjaxCheckout),
+                 * para que ya haya quitado la línea sin producto del DOM
+                 * antes de que se arme el FormData (los listeners de
+                 * "submit" corren en el orden en que se registraron). El
+                 * popover "aplicar tipo de precio a todas las líneas" pone,
+                 * por cada línea que YA tenga producto elegido, el precio de
+                 * ese tipo si el producto lo tiene (si no, la línea se deja
+                 * tal como estaba); usa "--auto-close:false" así que se
+                 * cierra a mano con clics realmente afuera, mismo motivo que
+                 * los popovers de impuestos por línea.
+                 * @returns {void}
+                 */
                 function init() {
                     const tipoDocumentoSelect = document.getElementById('doc-tipo_documento');
                     tipoDocumentoSelect.addEventListener('change', () => applyDocumentType(tipoDocumentoSelect.value));
@@ -2442,21 +2614,12 @@
                         });
                     }
 
-                    // Orden importa: la limpieza de líneas vacías tiene que
-                    // registrarse ANTES que el envío por fetch del POS, para
-                    // que ya haya quitado la línea sin producto del DOM antes
-                    // de que se arme el FormData (los listeners de "submit"
-                    // corren en el orden en que se registraron).
                     initEmptyLineSubmitCleanup();
                     initSubmitProcessingState();
                     initPosAjaxCheckout();
 
                     initAllProductsModal();
 
-                    // Popover "aplicar tipo de precio a todas las líneas":
-                    // por cada línea que YA tenga producto elegido, si ese
-                    // producto tiene un precio de ese tipo se lo pone; si no
-                    // lo tiene, la línea se deja tal como estaba.
                     const bulkPriceTypeDropdown = document.getElementById('doc-bulk-price-type-btn')?.closest('.hs-dropdown');
                     if (bulkPriceTypeDropdown) {
                         document.querySelectorAll('.doc-bulk-price-type-option').forEach((option) => {
@@ -2484,10 +2647,6 @@
                             });
                         });
 
-                        // Mismo motivo que en los popovers de impuestos por
-                        // línea: con "--auto-close:false" Preline deja de
-                        // cerrar el panel solo, así que se cierra a mano con
-                        // clics realmente afuera.
                         document.addEventListener('click', (event) => {
                             if (! bulkPriceTypeDropdown.classList.contains('open')) {
                                 return;
