@@ -206,6 +206,19 @@ class DocumentoEmitidoController extends Controller
      * Trae, por cada coincidencia, sus precios (con el nombre del tipo) y
      * sus bodegas con stock (con el nombre), más una entrada "sin asignar"
      * si el producto controla inventario.
+     *
+     * El filtro de bodega/stock (parámetro warehouse_id) solo lo pide la
+     * pantalla de venta del POS (ver pos/sell.blade.php); el selector de
+     * líneas de facturación no lo manda y sigue sin filtrar por stock (ahí sí
+     * puede hacer falta referenciar un producto sin existencias). "all" =
+     * todas las bodegas, pero igual exige más de 1 unidad en total; un id
+     * puntual exige más de 1 unidad en ESA bodega (elemMatch: ambas
+     * condiciones sobre el mismo elemento del arreglo embebido, no en
+     * cualquiera).
+     *
+     * @param  Request  $request  Query params: q (texto de búsqueda),
+     *                            warehouse_id (opcional: vacío, "all" o un ID).
+     * @return \Illuminate\Http\JsonResponse Lista de productos en el shape de mapProductsForJs().
      */
     public function productSearch(Request $request)
     {
@@ -222,14 +235,6 @@ class DocumentoEmitidoController extends Controller
                         ->orWhere('description', 'like', '%' . $query . '%');
                 });
             })
-            // Filtro de bodega/stock -- solo lo pide la pantalla de venta
-            // del POS (ver pos/sell.blade.php); el selector de líneas de
-            // facturación no manda "warehouse_id" y sigue sin filtrar por
-            // stock (ahí sí puede hacer falta referenciar un producto sin
-            // existencias). "all" = todas las bodegas, pero igual exige más
-            // de 1 unidad en total; un id puntual exige más de 1 unidad en
-            // ESA bodega (elemMatch: ambas condiciones sobre el mismo
-            // elemento del arreglo embebido, no en cualquiera).
             ->when($warehouseId === 'all', function ($builder) {
                 $builder->where('stock', '>', 1);
             })
@@ -477,6 +482,17 @@ class DocumentoEmitidoController extends Controller
      * (ver CashShiftController::store()), así que no hay nada que elegir
      * por venta.
      *
+     * Una venta puede pagarse con más de un medio (mitad efectivo, mitad
+     * tarjeta, etc.); lo que venga en payment_method_amount debe sumar
+     * exactamente el total (el POS no maneja impuestos por línea, así que el
+     * total es solo cantidad × precio unitario) -- si no cuadra, se rechaza
+     * antes de tocar inventario o numeración.
+     *
+     * @param  Request  $request  Debe traer cliente_*, items[] y opcionalmente payment_method_id[]/payment_method_amount[].
+     * @param  Company  $company  Empresa emisora.
+     * @param  CashShift  $shift  Turno abierto bajo el que se numera esta venta.
+     * @param  IssueDocumentService  $service  Servicio que arma y guarda el DocumentoPos.
+     * @return DocumentoPos Venta ya creada (talonario, con la resolución FV del turno).
      * @throws InvalidArgumentException|RuntimeException Errores de validación de negocio, pensados para mostrarse tal cual al usuario.
      */
     public function issuePosSale(Request $request, Company $company, CashShift $shift, IssueDocumentService $service): DocumentoPos
@@ -503,6 +519,8 @@ class DocumentoEmitidoController extends Controller
             'payment_means_id.*' => ['nullable', 'string', 'in:1,2'],
             'payment_method_id' => ['nullable', 'array'],
             'payment_method_id.*' => ['nullable', 'string'],
+            'payment_method_amount' => ['nullable', 'array'],
+            'payment_method_amount.*' => ['nullable', 'numeric', 'min:0'],
             'payment_due_date' => ['nullable', 'array'],
             'payment_due_date.*' => ['nullable', 'date'],
 
@@ -542,6 +560,17 @@ class DocumentoEmitidoController extends Controller
             ->map(fn (?string $id) => $id ? $paymentMethods->get($id)?->dian_payment_means_code : null)
             ->all();
 
+        $saleTotal = round(collect($data['items'])->sum(fn (array $item) => $item['cantidad'] * $item['precio_unitario']), 2);
+        $paymentAmounts = array_map(fn ($amount) => round((float) ($amount ?? 0), 2), $data['payment_method_amount'] ?? []);
+        $assignedTotal = round(array_sum($paymentAmounts), 2);
+
+        if (! empty($paymentMethodIds) && abs($assignedTotal - $saleTotal) > 0.01) {
+            throw new InvalidArgumentException(__('The amounts assigned to the payment methods (:assigned) do not match the sale total (:total).', [
+                'assigned' => number_format($assignedTotal, 2),
+                'total' => number_format($saleTotal, 2),
+            ]));
+        }
+
         $data['tipo_documento'] = '01';
         $data['tipo_operacion'] = $data['tipo_operacion'] ?? '10';
         $data['cliente_tipo_persona'] = $data['cliente_tipo_persona'] ?? '2';
@@ -550,10 +579,29 @@ class DocumentoEmitidoController extends Controller
 
         $documentoPos = $service->issuePosSale($company, ['document' => $this->buildDocumentJson($company, $data)], $shift->fvResolution, $shift);
 
-        $firstPaymentMethod = $paymentMethods->get($data['payment_method_id'][0] ?? null);
+        $payments = collect($data['payment_method_id'] ?? [])
+            ->map(function (?string $id, int $index) use ($paymentMethods, $paymentAmounts) {
+                if (! $id) {
+                    return null;
+                }
+                $method = $paymentMethods->get($id);
+
+                return [
+                    'payment_method_id' => $id,
+                    'payment_method_name' => $method?->name,
+                    'dian_code' => $method?->dian_payment_means_code,
+                    'amount' => $paymentAmounts[$index] ?? 0,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $firstPayment = $payments[0] ?? null;
         $documentoPos->update([
-            'payment_method_id' => $firstPaymentMethod ? (string) $firstPaymentMethod->_id : null,
-            'payment_method_name' => $firstPaymentMethod?->name,
+            'payment_method_id' => $firstPayment['payment_method_id'] ?? null,
+            'payment_method_name' => $firstPayment['payment_method_name'] ?? null,
+            'payments' => $payments,
         ]);
 
         return $documentoPos;
