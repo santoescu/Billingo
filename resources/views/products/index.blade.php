@@ -948,9 +948,12 @@
                     unassignedInput.classList.toggle('dark:text-red-400', unassigned < 0);
                 }
 
-                // Reconstruye cada select de bodega deshabilitando las que ya
-                // están elegidas en OTRA fila, para que un mismo producto no
-                // pueda repetir bodega.
+                /**
+                 * Reconstruye cada select de bodega deshabilitando las que ya
+                 * están elegidas en OTRA fila, para que un mismo producto no
+                 * pueda repetir bodega.
+                 * @returns {void}
+                 */
                 function refreshWarehouseSelectOptions() {
                     const selects = Array.from(document.querySelectorAll('.warehouse-stock-warehouse'));
                     const usedByOthers = (self) => selects
@@ -978,6 +981,18 @@
                     });
                 }
 
+                /**
+                 * Agrega una fila de stock por bodega al formulario de
+                 * producto. El valor de stock se fija ANTES de inicializar
+                 * el componente +/- (HSInputNumber): si se pone después, el
+                 * contador queda desincronizado con lo que se ve (el botón
+                 * +/- seguiría pensando que arrancó en 0). Los botones +/-
+                 * no disparan un evento "input" nativo, por eso también se
+                 * escucha "change.hs.inputNumber".
+                 * @param {string} [warehouseId] Bodega preseleccionada.
+                 * @param {number} [stock] Stock inicial de esa bodega.
+                 * @returns {HTMLElement} La fila creada.
+                 */
                 window.addProductWarehouseLine = function (warehouseId, stock) {
                     const template = document.getElementById('warehouseStockLineTemplate');
                     const html = template.innerHTML.replaceAll('__INDEX__', warehouseStockLineIndex);
@@ -1003,10 +1018,6 @@
                     }
                     warehouseSelect.addEventListener('change', refreshWarehouseSelectOptions);
 
-                    // El valor real se fija ANTES de inicializar el
-                    // componente +/-: si se pone después, el contador queda
-                    // desincronizado con lo que se ve (el botón +/- seguiría
-                    // pensando que arrancó en 0).
                     const stockInput = row.querySelector('.warehouse-stock-value');
                     stockInput.value = stock ?? 0;
 
@@ -1015,7 +1026,6 @@
                     }
 
                     stockInput.addEventListener('input', recalcUnassignedStock);
-                    // Los botones +/- no disparan un evento "input" nativo.
                     row.querySelector('[data-hs-input-number]')?.addEventListener('change.hs.inputNumber', recalcUnassignedStock);
 
                     refreshWarehouseSelectOptions();
@@ -1038,9 +1048,12 @@
 
                 let extraPriceLineIndex = 0;
 
-                // Reconstruye cada select de tipo de precio deshabilitando los
-                // que ya están elegidos en OTRA fila, para no repetir el mismo
-                // tipo de precio dos veces en un mismo producto.
+                /**
+                 * Reconstruye cada select de tipo de precio deshabilitando
+                 * los que ya están elegidos en OTRA fila, para no repetir el
+                 * mismo tipo de precio dos veces en un mismo producto.
+                 * @returns {void}
+                 */
                 function refreshPriceTypeSelectOptions() {
                     const selects = Array.from(document.querySelectorAll('.extra-price-type'));
                     const usedByOthers = (self) => selects
@@ -1068,9 +1081,16 @@
                     });
                 }
 
-                // El campo visible usa formato colombiano (punto de miles, coma de
-                // centavos); el campo oculto guarda el valor con punto decimal
-                // estándar (el que espera el backend).
+                /**
+                 * Formatea un valor decimal al formato visible colombiano
+                 * (punto de miles, coma de centavos) -- el campo oculto
+                 * (rawDecimalValue) guarda el valor con punto decimal
+                 * estándar, el que espera el backend.
+                 * @param {string} intPart Parte entera, solo dígitos.
+                 * @param {string} decPart Parte decimal, solo dígitos (máx. 2).
+                 * @param {boolean} hasComma Si el usuario ya escribió la coma decimal.
+                 * @returns {string}
+                 */
                 function formatCop(intPart, decPart, hasComma) {
                     if (!intPart && !hasComma) {
                         return '';
@@ -1086,8 +1106,15 @@
                     return decPart ? `${intPart || '0'}.${decPart}` : (intPart || '0');
                 }
 
+                /**
+                 * Precarga el precio visible/oculto de una fila a partir de
+                 * un valor crudo con punto decimal, tal como viene del
+                 * backend (ej. "12345.67").
+                 * @param {HTMLElement} row
+                 * @param {string|number} rawValue
+                 * @returns {void}
+                 */
                 function setExtraPriceValue(row, rawValue) {
-                    // rawValue viene del backend con punto decimal (ej. "12345.67").
                     const display = row.querySelector('.extra-price-display');
                     const hidden = row.querySelector('.extra-price-value');
                     const str = String(rawValue ?? '');
@@ -1103,9 +1130,15 @@
                     display.value = formatCop(intPart, decPart, decRaw !== undefined);
                 }
 
+                /**
+                 * Reformatea el precio mientras el usuario escribe. Lo que
+                 * ve/escribe usa coma para centavos; se quitan los puntos de
+                 * miles que el propio formatCop() agregó al formatear.
+                 * @param {HTMLElement} row
+                 * @param {string} typedValue
+                 * @returns {void}
+                 */
                 function handleExtraPriceInput(row, typedValue) {
-                    // Lo que el usuario ve/escribe usa coma para centavos; quitamos
-                    // los puntos de miles que nosotros mismos agregamos al formatear.
                     let str = String(typedValue ?? '').replace(/\./g, '');
                     const commaIndex = str.indexOf(',');
                     let intPart, decPart, hasComma;
@@ -1225,10 +1258,16 @@
                     }
                 };
 
-                // Mismo parseo que formatCop/rawDecimalValue (líneas 917-930),
-                // aplicado a los dos campos de "registrar entrada" que no son
-                // filas repetibles (por eso no reusan handleExtraPriceInput,
-                // que está acoplado a `.extra-price-*` dentro de una fila).
+                /**
+                 * Mismo parseo que formatCop/rawDecimalValue, aplicado a
+                 * campos sueltos por id (no filas repetibles como en extra
+                 * price -- por eso no reusa handleExtraPriceInput, que está
+                 * acoplado a `.extra-price-*` dentro de una fila).
+                 * @param {string} typedValue Lo que el usuario escribió.
+                 * @param {string} hiddenId Id del input oculto (valor con punto decimal).
+                 * @param {string} displayId Id del input visible (formato colombiano).
+                 * @returns {void}
+                 */
                 function handleDecimalDisplayInput(typedValue, hiddenId, displayId) {
                     let str = String(typedValue ?? '').replace(/\./g, '');
                     const commaIndex = str.indexOf(',');
@@ -1264,6 +1303,16 @@
                     form.action = @json(route('products.stock-entries.store', ['product' => '__ID__'])).replace('__ID__', productId);
                 };
 
+                /**
+                 * Abre el modal de corrección de costo promedio, precargando
+                 * el costo actual (puede ser 0) con el mismo parseo que usa
+                 * setExtraPriceValue para un valor crudo con punto decimal
+                 * viniendo del backend.
+                 * @param {string} productId
+                 * @param {string} productName
+                 * @param {number} currentAverageCost
+                 * @returns {void}
+                 */
                 window.openAverageCostPanel = function (productId, productName, currentAverageCost) {
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
@@ -1273,9 +1322,6 @@
                     const form = document.getElementById('averageCostForm');
                     document.getElementById('ac-product-name').textContent = productName;
 
-                    // Precarga el costo actual (puede ser 0) con el mismo
-                    // parseo que usa setExtraPriceValue para un valor crudo
-                    // con punto decimal viniendo del backend.
                     const str = String(currentAverageCost ?? 0);
                     const [intRaw, decRaw] = str.split('.');
                     const intPart = (intRaw ?? '').replace(/\D/g, '');
@@ -1408,10 +1454,16 @@
                     }
                 };
 
-                // Arma las opciones de un select "nombre nuevo o ya existente":
-                // primera opción = el encabezado de la columna (crea uno nuevo
-                // con ese nombre), seguida de los que ya existen (sin repetir
-                // el encabezado si ya coincide con uno existente).
+                /**
+                 * Arma las opciones de un select "nombre nuevo o ya
+                 * existente": primera opción = el encabezado de la columna
+                 * (crea uno nuevo con ese nombre), seguida de los que ya
+                 * existen (sin repetir el encabezado si ya coincide con uno
+                 * existente).
+                 * @param {string} header
+                 * @param {string[]} existingNames
+                 * @returns {string} HTML de las <option>.
+                 */
                 function buildNameOptions(header, existingNames) {
                     const isExisting = existingNames.includes(header);
                     const seen = new Set([header]);
@@ -1587,6 +1639,20 @@
                     setProductImagePreview(null);
                 };
 
+                /**
+                 * Abre el panel de crear/editar producto, precargando todos
+                 * sus campos. form.dataset.isNew marca si el costo inicial
+                 * aplica: solo tiene sentido al CREAR (define el primer
+                 * costo promedio del producto) -- al editar, para sumar
+                 * stock con su propio costo se usa "Register entry", que sí
+                 * queda registrado como un movimiento del kardex. El stock
+                 * total se fija directo por fuera del componente +/-
+                 * (HSInputNumber), así que hay que reconstruirlo para que el
+                 * contador arranque sincronizado con lo que se ve (si no, el
+                 * primer clic en +/- parte del valor viejo, no del nuevo).
+                 * @param {object} [product] Producto a editar, o vacío para crear uno nuevo.
+                 * @returns {void}
+                 */
                 window.openProductPanel = function (product) {
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
@@ -1594,10 +1660,6 @@
                     }
 
                     const form = document.getElementById('productForm');
-                    // El costo inicial solo tiene sentido al CREAR (define el
-                    // primer costo promedio del producto) -- al editar, para
-                    // sumar stock con su propio costo se usa "Register entry",
-                    // que sí queda registrado como un movimiento del kardex.
                     form.dataset.isNew = product?.id ? 'false' : 'true';
                     document.getElementById('pr-initial_unit_cost').value = '';
                     document.getElementById('pr-initial_unit_cost-display').value = '';
@@ -1617,11 +1679,6 @@
 
                     const stockTotalInput = document.getElementById('pr-stock_total');
                     stockTotalInput.value = product?.stock ?? 0;
-                    // El valor se pone directo por fuera del componente +/-,
-                    // así que hay que reconstruirlo para que el contador
-                    // arranque sincronizado con lo que se ve (si no, el
-                    // primer clic en +/- parte del valor viejo, no del
-                    // nuevo).
                     if (window.HSInputNumber) {
                         const wrapper = stockTotalInput.closest('[data-hs-input-number]');
                         HSInputNumber.getInstance(wrapper, true)?.element?.destroy();
@@ -1660,6 +1717,20 @@
                     }
                 };
 
+                /**
+                 * Wiring inicial de la pantalla de productos: toggle de
+                 * inventario, preview de imagen, campos decimales, tabla y
+                 * el dropzone de importación. Los botones +/- del stock no
+                 * disparan un evento "input" nativo, por eso también se
+                 * escucha "change.hs.inputNumber". El dropzone de
+                 * importación no sube el archivo (autoProcessQueue: false):
+                 * solo se usa para elegirlo, y se copia al <input
+                 * type="file"> real que sí viaja con la petición al
+                 * analizar el archivo; como no hay subida real, la barra de
+                 * progreso nunca se movería sola, así que se marca como
+                 * completa apenas se elige el archivo.
+                 * @returns {void}
+                 */
                 function init() {
                     const checkbox = document.getElementById('pr-tracks_inventory');
 
@@ -1695,7 +1766,6 @@
                     });
 
                     document.getElementById('pr-stock_total').addEventListener('input', recalcUnassignedStock);
-                    // Los botones +/- no disparan un evento "input" nativo.
                     document.getElementById('pr-stock_total').closest('[data-hs-input-number]')?.addEventListener('change.hs.inputNumber', recalcUnassignedStock);
 
                     document.getElementById('productForm').addEventListener('submit', (event) => {
@@ -1709,9 +1779,6 @@
                         columnDefs: [{ targets: -1, orderable: false }],
                     });
 
-                    // El dropzone no sube el archivo (autoProcessQueue: false): solo lo
-                    // usamos para elegirlo. Lo copiamos al <input type="file"> real que
-                    // sí viaja con la petición al analizar el archivo.
                     const importUploadEl = document.getElementById('import-file-upload');
                     const importFileInput = document.getElementById('import-file-input');
 
@@ -1727,8 +1794,6 @@
                             transfer.items.add(file);
                             importFileInput.files = transfer.files;
 
-                            // No hay subida real, así que la barra nunca se movería
-                            // sola: la marcamos como completa apenas se elige el archivo.
                             const previewElement = file.previewElement;
                             if (previewElement) {
                                 previewElement.classList.add('complete');
