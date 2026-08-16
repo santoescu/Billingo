@@ -211,12 +211,19 @@
             (function () {
                 const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
 
+                /**
+                 * Reconstruye el <select> de ciudad para un departamento (Preline's
+                 * destroy() prepends the original <select> to its grandparent, which
+                 * puts it before the field's <label> -- move it back to the end).
+                 * @param {HTMLSelectElement} citySelect
+                 * @param {string} departmentCode
+                 * @param {string} [selectedCityCode='']
+                 * @returns {void}
+                 */
                 function rebuildCitySelect(citySelect, departmentCode, selectedCityCode = '') {
                     const instance = window.HSSelect && HSSelect.getInstance(citySelect);
                     if (instance && typeof instance.destroy === 'function') {
                         instance.destroy();
-                        // Preline's destroy() prepends the original <select> to its grandparent,
-                        // which puts it before the field's <label>. Move it back to the end.
                         citySelect.parentElement.appendChild(citySelect);
                     }
 
@@ -258,6 +265,21 @@
                     refreshDv(identificationInput, dvInput, isNit);
                 }
 
+                /**
+                 * Wiring inicial del formulario: ciudad en cascada por
+                 * departamento, DV automático, y validación del certificado
+                 * digital contra la DIAN antes de guardar.
+                 *
+                 * El dropzone del certificado no sube el archivo
+                 * (autoProcessQueue: false): solo se usa para elegirlo, y se
+                 * copia al <input type="file"> real que sí viaja con el
+                 * resto del formulario al guardar la empresa. Como no hay
+                 * subida real, la barra de progreso nunca se movería sola,
+                 * así que se marca como completa apenas se elige el archivo
+                 * (para que se vea igual que en "editar").
+                 *
+                 * @returns {void}
+                 */
                 function init() {
                     const departmentSelect = document.getElementById('department_code');
                     const citySelect = document.getElementById('city_code');
@@ -285,9 +307,6 @@
                         refreshDv(identificationInput, dvInput, identificationTypeSelect.value === '31');
                     });
 
-                    // El dropzone no sube el archivo (autoProcessQueue: false): solo lo
-                    // usamos para elegirlo. Lo copiamos al <input type="file"> real que
-                    // sí viaja con el resto del formulario al guardar la empresa.
                     const certificateUploadEl = document.getElementById('certificate-upload');
                     const certificateInput = document.getElementById('dian_certificate_input');
                     const certificatePasswordInput = document.getElementById('dian_certificate_password');
@@ -349,9 +368,6 @@
                             certificateInput.files = transfer.files;
                             markCertificateUnvalidated();
 
-                            // No hay subida real (autoProcessQueue: false), así que la barra
-                            // nunca se movería sola: la marcamos como completa apenas se elige
-                            // el archivo, para que se vea igual que en "editar".
                             const previewElement = file.previewElement;
                             if (previewElement) {
                                 previewElement.classList.add('complete');
