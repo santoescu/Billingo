@@ -1,12 +1,23 @@
 <script>
+    /**
+     * Inicializa (o reinicializa) una DataTable con paginación propia
+     * (estilo Preline). "livewire:navigated" se dispara tanto en la carga
+     * inicial de la página como en cada navegación SPA -- sin destruir la
+     * instancia previa, una vista que escucha DOMContentLoaded Y
+     * livewire:navigated (para que la tabla se reconstruya al volver por
+     * SPA) termina llamando esto dos veces en la primera carga, y
+     * DataTables truena con "Cannot reinitialise DataTable". Por la misma
+     * razón, el bind de búsqueda usa un evento con namespace + .off() antes
+     * de .on(): si esta función se llama otra vez sobre el mismo input, no
+     * se acumulan binds duplicados apuntando cada uno a una instancia
+     * distinta de la tabla.
+     *
+     * @param {string} selector Selector de la tabla.
+     * @param {string} searchSelector Selector del input de búsqueda.
+     * @param {object} [options={}] pageLength, zeroRecords, columnDefs.
+     * @returns {object} Instancia de DataTable.
+     */
     window.initWorkflowDataTable = function(selector, searchSelector, options = {}) {
-        // "livewire:navigated" se dispara tanto en la carga inicial de la
-        // página como en cada navegación SPA -- sin este chequeo, una
-        // vista que escucha DOMContentLoaded Y livewire:navigated (para
-        // que la tabla se reconstruya al volver por SPA) termina llamando
-        // esto dos veces en la primera carga, y DataTables truena con
-        // "Cannot reinitialise DataTable". Se destruye la instancia previa
-        // (si la hay) antes de crear una nueva, en vez de dejar que falle.
         if ($.fn.DataTable.isDataTable(selector)) {
             $(selector).DataTable().destroy();
         }
@@ -23,10 +34,6 @@
             },
         });
 
-        // Evento con namespace + .off() antes de .on(): si initWorkflowDataTable()
-        // se llama otra vez sobre el mismo input (misma razón que el destroy()
-        // de arriba), no se acumulan binds duplicados apuntando cada uno a una
-        // instancia distinta de la tabla.
         $(searchSelector).off('keyup.workflowDataTable').on('keyup.workflowDataTable', function () {
             table.search(this.value).draw();
         });
