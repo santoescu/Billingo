@@ -389,12 +389,19 @@
                 document.getElementById('edit-company-certificate-existing').classList.toggle('hidden', !filename);
             }
 
+            /**
+             * Reconstruye el <select> de ciudad para un departamento (Preline's
+             * destroy() prepends the original <select> to its grandparent, which
+             * puts it before the field's <label> -- move it back to the end).
+             * @param {HTMLSelectElement} citySelect
+             * @param {string} departmentCode
+             * @param {string} [selectedCityCode='']
+             * @returns {void}
+             */
             function rebuildCitySelect(citySelect, departmentCode, selectedCityCode = '') {
                 const instance = window.HSSelect && HSSelect.getInstance(citySelect);
                 if (instance && typeof instance.destroy === 'function') {
                     instance.destroy();
-                    // Preline's destroy() prepends the original <select> to its grandparent,
-                    // which puts it before the field's <label>. Move it back to the end.
                     citySelect.parentElement.appendChild(citySelect);
                 }
 
