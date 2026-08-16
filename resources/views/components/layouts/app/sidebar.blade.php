@@ -354,12 +354,13 @@
         if (window.HSAccordion && typeof window.HSAccordion.autoInit === 'function') window.HSAccordion.autoInit();
     }
 
-    // El bloque al inicio del <body> ya le puso la clase a <body> antes del
-    // primer pintado (evita el parpadeo). Acá se sincroniza el propio div
-    // del sidebar (Preline se fija en ESA clase, no en la de <body>, para
-    // saber si el próximo click debe minimizar o restaurar) y se deja un
-    // observer que guarda cualquier cambio futuro (clicks en el botón de
-    // minimizar) para la próxima carga de página.
+    /**
+     * El bloque al inicio del <body> ya le puso la clase a <body> antes del
+     * primer pintado (evita el parpadeo). Acá se sincroniza el propio div
+     * del sidebar (Preline se fija en ESA clase, no en la de <body>, para
+     * saber si el próximo click debe minimizar o restaurar).
+     * @returns {void}
+     */
     function applyStoredSidebarState() {
         const sidebar = document.getElementById('hs-sidebar-content-push-to-mini-sidebar');
         if (! sidebar) return;
@@ -370,6 +371,14 @@
     }
 
     let sidebarObserverStarted = false;
+
+    /**
+     * Deja un observer que guarda en localStorage cualquier cambio futuro
+     * del estado minimizado/expandido del sidebar (clicks en el botón de
+     * minimizar), para poder aplicarlo de nuevo en la próxima carga de
+     * página (ver applyStoredSidebarState()).
+     * @returns {void}
+     */
     function watchSidebarState() {
         if (sidebarObserverStarted) return;
         sidebarObserverStarted = true;
