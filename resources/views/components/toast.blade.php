@@ -2,14 +2,12 @@
     x-data="{ show: false, message: '', type: 'info' }"
     x-init="
         @if(session('toast'))
-            // Mostrar si hay sesión flash
             show = true;
             message = '{{ session('toast.message') }}';
             type = '{{ session('toast.type') }}';
             setTimeout(() => show = false, 3000);
         @endif
 
-        // Escuchar evento Livewire/Alpine
         window.addEventListener('toast', (event) => {
             show = true;
             message = event.detail.message;

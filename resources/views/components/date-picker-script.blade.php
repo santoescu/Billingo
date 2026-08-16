@@ -169,11 +169,15 @@
                     }
                 });
 
-                // API pública para que código externo (p. ej. autocompletar
-                // con datos de una consulta) actualice el valor sin abrir el
-                // calendario -- asignar hidden.value directamente no alcanza
-                // porque selectedDate/viewYear/viewMonth quedan en un cierre
-                // interno que el calendario no vuelve a leer solo.
+                /**
+                 * API pública para que código externo (p. ej. autocompletar
+                 * con datos de una consulta) actualice el valor sin abrir el
+                 * calendario -- asignar hidden.value directamente no alcanza
+                 * porque selectedDate/viewYear/viewMonth quedan en un cierre
+                 * interno que el calendario no vuelve a leer solo.
+                 * @param {string|null} dateString Fecha en formato ISO (YYYY-MM-DD), o null/vacío para limpiar.
+                 * @returns {void}
+                 */
                 root.datepickerSetValue = function (dateString) {
                     if (! dateString) {
                         selectedDate = null;
@@ -195,9 +199,11 @@
             });
         }
 
-        // Expuesto para que código externo (p. ej. al insertar dinámicamente
-        // una fila con un date-picker nuevo, como en el bloque de pagos)
-        // pueda inicializar los datepickers recién añadidos al DOM.
+        /**
+         * Expuesto para que código externo (p. ej. al insertar dinámicamente
+         * una fila con un date-picker nuevo, como en el bloque de pagos)
+         * pueda inicializar los datepickers recién añadidos al DOM.
+         */
         window.initDatePickers = initDatePickers;
 
         if (document.readyState === 'loading') {

@@ -23,17 +23,21 @@
 </div>
 
 <script>
-    // Mientras un modal está "procesando" (enviando un form, esperando un
-    // fetch), no debería poder cerrarse -- ni con clic afuera, ni con el
-    // botón "X", ni con Escape -- porque si no, alguien impaciente lo cierra
-    // pensando que no pasó nada mientras la petición sigue en el servidor.
-    //
-    // El backdrop de Preline cierra el modal SIN revisar ninguna bandera
-    // (backdropClick() llama this.close() directo), así que interceptar el
-    // evento de clic no es confiable. En vez de eso, se reemplaza el método
-    // close() de la instancia del overlay por uno que no hace nada mientras
-    // está "bloqueado" -- así, sin importar qué lo dispare (fondo, X,
-    // Escape), no se cierra hasta llamar a stop().
+    /**
+     * Mientras un modal está "procesando" (enviando un form, esperando un
+     * fetch), no debería poder cerrarse -- ni con clic afuera, ni con el
+     * botón "X", ni con Escape -- porque si no, alguien impaciente lo cierra
+     * pensando que no pasó nada mientras la petición sigue en el servidor.
+     *
+     * El backdrop de Preline cierra el modal SIN revisar ninguna bandera
+     * (backdropClick() llama this.close() directo), así que interceptar el
+     * evento de clic no es confiable. En vez de eso, se reemplaza el método
+     * close() de la instancia del overlay por uno que no hace nada mientras
+     * está "bloqueado" -- así, sin importar qué lo dispare (fondo, X,
+     * Escape), no se cierra hasta llamar a stop().
+     *
+     * @returns {{start: function(string): void, stop: function(string): void}}
+     */
     window.appModalProcessing = (function () {
         function overlayInstance(selector) {
             if (!window.HSOverlay || !selector) return null;
@@ -60,14 +64,18 @@
         };
     })();
 
-    // Reemplaza confirm()/alert() nativos del navegador (feos y no
-    // personalizables) por un modal propio, reutilizado en toda la app para
-    // confirmar borrados. Dos formas de usarlo:
-    //   - En un <form onsubmit="return window.appConfirmDialog.open(event, this, '...')">
-    //     -- al aceptar, deshabilita el botón, muestra un spinner de
-    //     "Procesando..." y envía el formulario de verdad.
-    //   - window.appConfirmDialog.ask('...').then(ok => ...) -- para flujos
-    //     con fetch() que ya manejan su propio estado de carga.
+    /**
+     * Reemplaza confirm()/alert() nativos del navegador (feos y no
+     * personalizables) por un modal propio, reutilizado en toda la app para
+     * confirmar borrados. Dos formas de usarlo:
+     *   - En un <form onsubmit="return window.appConfirmDialog.open(event, this, '...')">
+     *     -- al aceptar, deshabilita el botón, muestra un spinner de
+     *     "Procesando..." y envía el formulario de verdad.
+     *   - window.appConfirmDialog.ask('...').then(ok => ...) -- para flujos
+     *     con fetch() que ya manejan su propio estado de carga.
+     *
+     * @returns {{open: function, ask: function, cancel: function, accept: function}}
+     */
     window.appConfirmDialog = (function () {
         let pendingForm = null;
         let pendingResolve = null;
