@@ -172,6 +172,15 @@
                     const visibleGroups = groups.slice(0, 5);
                     const olderGroups = groups.slice(5);
 
+                    /**
+                     * Pinta una fila del timeline del kardex. rowClasses usa
+                     * p-2 -m-2 (se cancelan visualmente, mismo espacio que
+                     * antes) para darle aire al fondo resaltado del hover sin
+                     * que quede pegado al texto -- mismo patrón de fila
+                     * clickeable que notifications-bell.blade.php.
+                     * @param {object} movement
+                     * @returns {string} HTML de la fila.
+                     */
                     const renderItem = (movement) => {
                         const isIn = movement.type === 'in';
                         const sign = isIn ? '+' : '-';
@@ -179,10 +188,6 @@
                         const title = `${isIn ? '{{ __('Entry') }}' : '{{ __('Exit') }}'} — ${sign}${movement.quantity} ({{ __('at') }} ${formatMoneyCop(movement.unit_cost)})`;
                         const descriptionParts = [movement.reason_label, movement.warehouse_name, `{{ __('Balance') }}: ${movement.balance_after}`].filter(Boolean);
 
-                        // p-2 -m-2 se cancelan visualmente (mismo espacio que antes),
-                        // pero le dan aire al fondo resaltado del hover para que no
-                        // quede pegado al texto -- mismo padding que ya usa el patrón
-                        // de fila clickeable de notifications-bell.blade.php.
                         const rowClasses = 'relative p-2 -m-2 rounded-lg'
                             + (movement.url ? ' group hover:bg-gray-100 dark:hover:bg-neutral-700' : '');
 
