@@ -96,10 +96,12 @@
 
     @push('scripts')
         <script>
+            /**
+             * table.order([]).draw(): sin esto, DataTables reordena por la
+             * primera columna visible (la fecha, como texto) y pisa el orden
+             * más nuevo -> más viejo que ya viene armado desde el backend.
+             */
             document.addEventListener('DOMContentLoaded', function () {
-                // Sin esto, DataTables reordena por la primera columna visible
-                // (la fecha, como texto) y pisa el orden más nuevo -> más
-                // viejo que ya viene armado desde el backend.
                 const table = initWorkflowDataTable('#documentsTable', '#hs-table-with-pagination-search');
                 table.order([]).draw();
             });
