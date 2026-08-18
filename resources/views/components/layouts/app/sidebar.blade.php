@@ -3,6 +3,7 @@
     $myModules = session('selected_company.modules', []);
     $hasInvoicing = array_key_exists('invoicing', $myModules);
     $hasPos = array_key_exists('pos', $myModules);
+    $hasCotizaciones = array_key_exists('cotizaciones', $myModules);
 
     $sections = [
         
@@ -55,6 +56,24 @@
         ],
 
         [
+            'label' => __('Quotations'),
+            'items' => array_key_exists('cotizaciones', $myModules) ? [
+                [
+                    'name' => __('New quotation'),
+                    'icon' => 'document-plus',
+                    'url' => route('quotations.create'),
+                    'current' => request()->routeIs('quotations.create') || request()->routeIs('quotations.store'),
+                ],
+                [
+                    'name' => __('Quotations'),
+                    'icon' => 'document-text',
+                    'url' => route('quotations.index'),
+                    'current' => request()->routeIs('quotations.index') || request()->routeIs('quotations.show'),
+                ],
+            ] : [],
+        ],
+
+        [
             'label' => __('Payroll'),
             'items' => array_key_exists('payroll', $myModules) ? [
                 
@@ -76,19 +95,19 @@
         [
             'label' => __('Company'),
             'items' => session('selected_company') ? array_values(array_filter([
-                ($hasInvoicing || $hasPos) ? [
+                ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
                     'name' => __('Clients'),
                     'icon' => 'user-group',
                     'url' => route('clients.index'),
                     'current' => request()->routeIs('clients.*'),
                 ] : null,
-                ($hasInvoicing || $hasPos) ? [
+                ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
                     'name' => __('Inventory'),
                     'icon' => 'cube',
                     'url' => route('products.index'),
                     'current' => request()->routeIs('products.*') || request()->routeIs('warehouses.*'),
                 ] : null,
-                ($hasInvoicing || $hasPos) ? [
+                ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
                     'name' => __('Resolutions'),
                     'icon' => 'document-check',
                     'url' => route('dian.resolutions.index'),
@@ -344,6 +363,12 @@
     </div>
 </div>
 <script>
+    // El sidebar (con este bloque) se vuelve a insertar en cada navegación
+    // Livewire (wire:navigate), y el navegador re-ejecuta el <script> tal
+    // cual sin limpiar el scope global del anterior -- sin este IIFE,
+    // "let sidebarObserverStarted" tronaba con "already declared" al volver
+    // a correr el mismo bloque en la página siguiente.
+    (function () {
     function initPreline() {
         if (window.HSStaticMethods && typeof window.HSStaticMethods.autoInit === 'function') {
             window.HSStaticMethods.autoInit();
@@ -404,6 +429,7 @@
             }
         } catch (e) {}
     });
+    })();
 </script>
 <!-- End Sidebar -->
 

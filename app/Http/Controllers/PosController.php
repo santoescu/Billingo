@@ -10,7 +10,6 @@ use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
 use App\Models\FiscalResponsibility;
 use App\Models\PaymentMeansCode;
-use App\Models\ThirdParty;
 use App\Models\User;
 use App\Services\Dian\IssueDocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -31,11 +30,19 @@ class PosController extends Controller
      * el tooltip de inventario/precio del grid no salga vacío hasta la
      * primera búsqueda.
      *
+     * Si viene "from_quotation" en la URL (al convertir una cotización
+     * pendiente en venta, ver QuotationController::show()), precarga el
+     * cliente y las líneas de esa cotización en la primera pre-cuenta (ver
+     * "initialQuotation*" en pos/sell.blade.php); el "quotation_id" queda en
+     * la vista para que el checkout enlace la cotización con la venta que
+     * resulte (ver checkout() más abajo).
+     *
      * @param  Request  $request  Petición actual (empresa activa en sesión).
      * @param  DocumentoEmitidoController  $documentController  Provee mapProductsForJs() para reusar el mismo mapeo que el AJAX de búsqueda.
+     * @param  QuotationController  $quotationController  Resuelve y traduce la cotización a precargar, si aplica.
      * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse Vista pos.sell, o redirect a pos.shift si no hay turno abierto.
      */
-    public function create(Request $request, DocumentoEmitidoController $documentController)
+    public function create(Request $request, DocumentoEmitidoController $documentController, QuotationController $quotationController)
     {
         $company = $this->currentCompany($request);
 
@@ -49,6 +56,9 @@ class PosController extends Controller
 
         $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
 
+        $quotation = $quotationController->resolveFromQuotation($company, $request->query('from_quotation'));
+        $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $documentController) : null;
+
         return view('pos.sell', [
             'shift' => $shift,
             'company' => $company,
@@ -59,32 +69,8 @@ class PosController extends Controller
             'defaultClient' => $this->defaultClient($company),
             'departments' => Department::orderBy('descripcion')->get(),
             'fiscalResponsibilities' => FiscalResponsibility::orderBy('codigo')->get(),
-        ]);
-    }
-
-    /**
-     * "Consumidor final" propio de la empresa: se crea una sola vez (la
-     * primera venta que lo necesite) con la identificación genérica que usa
-     * el comercio colombiano para mostrador, para que siempre haya un
-     * cliente válido y ya existente en third_parties sin obligar al cajero a
-     * buscar o crear uno en cada venta -- ver DocumentJsonMapper::resolveCustomerParty(),
-     * que solo exige los datos completos del cliente si todavía no existe.
-     */
-    private function defaultClient(Company $company): ThirdParty
-    {
-        $client = $company->clients()->where('identificacion', '222222222222')->first();
-
-        if ($client) {
-            return $client;
-        }
-
-        return ThirdParty::create([
-            'company_id' => (string) $company->_id,
-            'roles' => ['cliente'],
-            'name' => __('Final consumer'),
-            'identification_type' => '13',
-            'identificacion' => '222222222222',
-            'person_type' => '2',
+            'quotationId' => $quotation ? (string) $quotation->_id : null,
+            'quotationPrefill' => $quotationPrefill,
         ]);
     }
 
@@ -181,16 +167,22 @@ class PosController extends Controller
         ]);
 
         if ($cashReceived !== null) {
-            
+
             session()->put('pos_cash_received.' . $documentoPos->_id, $cashReceived);
+        }
+
+        $quotationId = $request->input('quotation_id');
+        if ($quotationId) {
+            $company->quotations()->where('_id', $quotationId)->update(['documento_pos_id' => (string) $documentoPos->_id]);
         }
 
         return response()->json([
             'sale_id' => (string) $documentoPos->_id,
             'numeral' => $documentoPos->numeral,
             'total_formatted' => $documentoPos->total_formatted,
-            'can_issue_electronic' => (bool) $shift->invoicing_resolution_id,
+            'can_issue_electronic' => (bool) $shift->invoicing_resolution_id && $company->hasModule('invoicing'),
             'receipt_url' => route('pos.sales.receipt-pdf', $documentoPos->_id),
+            'receipt_preview_url' => route('pos.sales.receipt-preview', $documentoPos->_id),
             'show_url' => route('pos.sales.show', $documentoPos->_id),
             'issue_electronic_url' => route('pos.sales.issue-electronic', $documentoPos->_id),
         ]);
@@ -212,6 +204,10 @@ class PosController extends Controller
 
         if ($documentoPos->documento_emitido_id) {
             return response()->json(['message' => __('This sale was already issued as an electronic invoice.')], 422);
+        }
+
+        if (! $company->hasModule('invoicing')) {
+            return response()->json(['message' => __('This company does not have the electronic invoicing module enabled.')], 422);
         }
 
         $shift = $documentoPos->shift;
@@ -287,7 +283,39 @@ class PosController extends Controller
         return view('pos.sales.show', compact('company', 'documento', 'paymentMeansCode'));
     }
 
+    /**
+     * Descarga el recibo de la venta (dispara la descarga del archivo). Ver
+     * receiptPreview() para la variante embebida en el navegador, con su
+     * propia URL en vez de "?inline=1" (mismo query string para ambos casos
+     * se veía feo en la barra de direcciones al abrir el link en pestaña
+     * nueva).
+     */
     public function receiptPdf(Request $request, string $sale)
+    {
+        [$pdf, $filename] = $this->buildReceiptPdf($request, $sale);
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Igual que receiptPdf(), pero para mostrarlo embebido (iframe de vista
+     * previa del modal de resultado, o "Ver PDF" en pestaña nueva) en vez de
+     * descargarlo.
+     */
+    public function receiptPreview(Request $request, string $sale)
+    {
+        [$pdf, $filename] = $this->buildReceiptPdf($request, $sale);
+
+        return $pdf->stream($filename);
+    }
+
+    /**
+     * Arma el recibo de la venta, compartido entre receiptPdf() (descarga) y
+     * receiptPreview() (embebido).
+     *
+     * @return array{0: \Barryvdh\DomPDF\PDF, 1: string} PDF armado y nombre de archivo sugerido.
+     */
+    private function buildReceiptPdf(Request $request, string $sale): array
     {
         $company = $this->currentCompany($request);
 
@@ -310,11 +338,9 @@ class PosController extends Controller
             'cashReceived',
             'isElectronic',
             'uuid',
-        ))->setPaper([0, 0, 226.77, 800], 'portrait'); 
+        ))->setPaper([0, 0, 226.77, 800], 'portrait');
 
-        $filename = 'recibo-' . $documento->numeral . '.pdf';
-
-        return $request->boolean('inline') ? $pdf->stream($filename) : $pdf->download($filename);
+        return [$pdf, 'recibo-' . $documento->numeral . '.pdf'];
     }
 
     private function openShiftFor($company, Request $request): ?CashShift

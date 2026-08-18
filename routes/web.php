@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CashShiftController;
+use App\Http\Controllers\CatalogLinkController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyMemberController;
 use App\Http\Controllers\DianController;
@@ -11,6 +12,8 @@ use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceTypeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
+use App\Http\Controllers\PublicCatalogController;
+use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\SuperadminController;
 use App\Http\Controllers\ThirdPartyController;
@@ -25,6 +28,19 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
+
+// Catálogo público de cotizaciones: sin auth, el link (y la empresa/bodega
+// a la que quedó atado) se resuelve por el token de la URL (ver
+// PublicCatalogController::resolveLink()), no por sesión -- un cliente
+// final nunca tiene cuenta en el sistema.
+Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
+    Route::get('/', [PublicCatalogController::class, 'show'])->name('show');
+    Route::get('products', [PublicCatalogController::class, 'productSearch'])->name('products');
+    Route::get('client', [PublicCatalogController::class, 'findClient'])->name('client.show');
+    Route::post('client', [PublicCatalogController::class, 'storeClient'])->name('client.store');
+    Route::post('quotations', [PublicCatalogController::class, 'store'])->name('quotations.store');
+    Route::get('quotations/{quotation}/pdf', [PublicCatalogController::class, 'pdf'])->name('quotations.pdf');
+});
 
 Route::get('dashboard', function () {
     $companies = auth()->user()->companiesWithMembership();
@@ -68,7 +84,7 @@ Route::middleware(['auth'])->group(function () {
         });
     });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('clients')->name('clients.')->group(function () {
             Route::get('/', [ThirdPartyController::class, 'index'])->defaults('role', 'cliente')->name('index');
             Route::post('/', [ThirdPartyController::class, 'store'])->defaults('role', 'cliente')->name('store');
@@ -84,7 +100,7 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('{thirdParty}', [ThirdPartyController::class, 'destroy'])->defaults('role', 'proveedor')->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
             Route::post('/', [ProductController::class, 'store'])->name('store');
@@ -99,29 +115,39 @@ Route::middleware(['auth'])->group(function () {
             Route::post('import', [ProductImportController::class, 'import'])->name('import');
         });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('warehouses')->name('warehouses.')->group(function () {
             Route::post('/', [WarehouseController::class, 'store'])->name('store');
             Route::put('{warehouse}', [WarehouseController::class, 'update'])->name('update');
             Route::delete('{warehouse}', [WarehouseController::class, 'destroy'])->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('price-types')->name('price-types.')->group(function () {
             Route::post('/', [PriceTypeController::class, 'store'])->name('store');
             Route::put('{priceType}', [PriceTypeController::class, 'update'])->name('update');
             Route::delete('{priceType}', [PriceTypeController::class, 'destroy'])->name('destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    // Búsqueda de cliente/producto del formulario de facturación: compartida
+    // de verdad entre invoicing/pos/cotizaciones (los tres arman líneas de
+    // documento con el mismo selector). El resto del módulo de documentos
+    // (crear, listar, ver, emitir) queda en un grupo aparte, solo para
+    // 'invoicing' -- tener el módulo 'pos' o 'cotizaciones' habilitado NO
+    // debe dar acceso a emitir facturas electrónicas reales por su cuenta.
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
+        ->prefix('documents')->name('documents.')->group(function () {
+            Route::get('create/client-search', [DocumentoEmitidoController::class, 'clientSearch'])->name('create-client-search');
+            Route::get('create/product-search', [DocumentoEmitidoController::class, 'productSearch'])->name('create-product-search');
+        });
+
+    Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
         ->prefix('documents')->name('documents.')->group(function () {
             Route::get('/', [DocumentoEmitidoController::class, 'index'])->name('index');
             Route::get('create', [DocumentoEmitidoController::class, 'create'])->name('create');
             Route::get('create/options', [DocumentoEmitidoController::class, 'createOptions'])->name('create-options');
             Route::get('create/factura-lookup', [DocumentoEmitidoController::class, 'facturaLookup'])->name('create-factura-lookup');
             Route::get('create/validate-uuid', [DocumentoEmitidoController::class, 'validateUuid'])->name('create-validate-uuid');
-            Route::get('create/client-search', [DocumentoEmitidoController::class, 'clientSearch'])->name('create-client-search');
-            Route::get('create/product-search', [DocumentoEmitidoController::class, 'productSearch'])->name('create-product-search');
             Route::post('/', [DocumentoEmitidoController::class, 'store'])->name('store');
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
             Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
@@ -135,6 +161,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('sales', [PosController::class, 'sales'])->name('sales.index');
             Route::get('sales/{sale}', [PosController::class, 'showSale'])->name('sales.show');
             Route::get('sales/{sale}/receipt.pdf', [PosController::class, 'receiptPdf'])->name('sales.receipt-pdf');
+            Route::get('sales/{sale}/receipt-preview', [PosController::class, 'receiptPreview'])->name('sales.receipt-preview');
             Route::post('sales/{sale}/issue-electronic', [PosController::class, 'issueElectronic'])->name('sales.issue-electronic');
             Route::post('shifts', [CashShiftController::class, 'store'])->name('shifts.store');
             Route::get('shifts/{shift}', [CashShiftController::class, 'show'])->name('shifts.show');
@@ -145,7 +172,23 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
         });
 
-    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor'])
+    Route::middleware(['company.selected', 'company.role:cotizaciones,administrador,vendedor,auditor'])
+        ->prefix('quotations')->name('quotations.')->group(function () {
+            Route::get('/', [QuotationController::class, 'create'])->name('create');
+            Route::post('/', [QuotationController::class, 'store'])->name('store');
+            Route::get('list', [QuotationController::class, 'index'])->name('index');
+            Route::get('{quotation}', [QuotationController::class, 'show'])->name('show');
+            Route::get('{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
+            Route::get('{quotation}/preview', [QuotationController::class, 'preview'])->name('preview');
+        });
+
+    Route::middleware(['company.selected', 'company.role:cotizaciones,administrador,vendedor,auditor'])
+        ->prefix('catalog-links')->name('catalog-links.')->group(function () {
+            Route::post('/', [CatalogLinkController::class, 'store'])->name('store');
+            Route::delete('{catalogLink}', [CatalogLinkController::class, 'destroy'])->name('destroy');
+        });
+
+    Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('dian')->name('dian.')->group(function () {
             Route::get('resolutions', [DianController::class, 'resolutions'])->name('resolutions.index');
             Route::post('resolutions/sync', [DianController::class, 'syncResolutions'])->name('resolutions.sync');

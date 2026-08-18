@@ -238,6 +238,9 @@
                 const paymentMethods = @json($paymentMethodsJs);
                 const paymentSelectConfigAttr = @json($paymentSelectConfig);
 
+                const quotationId = @json($quotationId ?? null);
+                const quotationPrefill = @json($quotationPrefill ?? null);
+
                 // Pre-cuentas: cada una es un cliente + carrito + medio de
                 // pago independientes, para poder atender a un cliente sin
                 // perder lo que ya tenía armado otro que sigue decidiendo.
@@ -1302,6 +1305,9 @@
                     if (efectivoRecibido !== '') {
                         body.append('efectivo_recibido', efectivoRecibido);
                     }
+                    if (quotationId) {
+                        body.append('quotation_id', quotationId);
+                    }
                     cart.forEach((line, index) => {
                         body.append(`items[${index}][codigo]`, line.code);
                         body.append(`items[${index}][codigo_barras]`, line.barcode || '');
@@ -1333,7 +1339,7 @@
                         currentSale = data;
                         document.getElementById('pos-result-numeral').textContent = data.numeral;
                         document.getElementById('pos-result-message').classList.add('hidden');
-                        document.getElementById('pos-result-preview').src = data.receipt_url + '?inline=1';
+                        document.getElementById('pos-result-preview').src = data.receipt_preview_url;
                         const issueBtn = document.getElementById('pos-result-issue-electronic-btn');
                         issueBtn.classList.toggle('hidden', ! data.can_issue_electronic);
                         issueBtn.disabled = false;
@@ -1391,7 +1397,7 @@
                             ? '{{ __('Sale completed and accepted by the DIAN.') }}'
                             : '{{ __('The sale was sent, but the DIAN did not accept the electronic invoice yet.') }}';
                         issueBtn.classList.add('hidden');
-                        document.getElementById('pos-result-preview').src = currentSale.receipt_url + '?inline=1';
+                        document.getElementById('pos-result-preview').src = currentSale.receipt_preview_url;
                     } catch (error) {
                         messageBox.className = 'mb-3 rounded-md p-3 text-sm bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400';
                         messageBox.textContent = error.message || '{{ __('Could not issue the electronic invoice.') }}';
@@ -1410,7 +1416,7 @@
 
                 window.posPrintReceipt = function () {
                     if (currentSale) {
-                        window.open(currentSale.receipt_url + '?inline=1', '_blank');
+                        window.open(currentSale.receipt_preview_url, '_blank');
                     }
                 };
 
@@ -1456,6 +1462,27 @@
 
                     const ticket = makeTicket();
                     activeTicketId = ticket.id;
+                    if (quotationPrefill) {
+                        ticket.client = { ...quotationPrefill.client };
+                        ticket.cart = quotationPrefill.lines.map((line) => {
+                            const warehouse = line.warehouse_id
+                                ? (line.product.warehouses || []).find((w) => w.warehouse_id === line.warehouse_id)
+                                : null;
+                            return {
+                                ...makeCartLine(line.product, warehouse?.warehouse_id ?? null, warehouse?.warehouse_name ?? null, warehouse?.stock ?? null),
+                                qty: line.qty,
+                                // El precio siempre es el que quedó guardado en
+                                // la cotización, no el que makeCartLine tomó
+                                // del catálogo actual (que puede ser otra
+                                // lista de precios distinta a la que se usó
+                                // al cotizar) -- por eso también se limpia
+                                // priceTypeId, igual que cuando el cajero
+                                // escribe un precio a mano.
+                                unit_price: line.unit_price,
+                                priceTypeId: null,
+                            };
+                        });
+                    }
                     renderTickets();
                     renderActiveTicket();
 

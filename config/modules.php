@@ -22,4 +22,9 @@ return [
         'roles' => ['administrador', 'cajero', 'auditor'],
     ],
 
+    'cotizaciones' => [
+        'name' => 'Cotizaciones',
+        'roles' => ['administrador', 'vendedor', 'auditor'],
+    ],
+
 ];

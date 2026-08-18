@@ -44,14 +44,17 @@ class DianController extends Controller
      * numeración aquí, sin sincronizar nada con la DIAN. Lo mismo aplica a
      * "Factura de venta" (código interno 'FV', no es un código DIAN real):
      * el soporte de toda venta del POS (ver IssueDocumentService::issuePosSale())
-     * -- misma numeración manual que las notas, sin límite de rango.
+     * -- misma numeración manual que las notas, sin límite de rango. Igual
+     * "Cotización" (código interno 'COT', tampoco es un código DIAN real):
+     * numera las cotizaciones (ver IssueDocumentService::issueQuotation()),
+     * que no se envían a la DIAN ni descuentan inventario.
      */
     public function storeManualResolution(Request $request)
     {
         $company = $this->currentCompany($request);
 
         $data = $request->validate([
-            'document_type' => ['required', 'in:91,92,FV'], 
+            'document_type' => ['required', 'in:91,92,FV,COT'],
             'prefix' => ['required', 'string', 'max:10'],
             'range_from' => ['required', 'integer', 'min:1'],
         ]);

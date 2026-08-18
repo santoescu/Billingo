@@ -13,6 +13,7 @@ use App\Models\PaymentMeansCode;
 use App\Models\PaymentMethod;
 use App\Models\PriceType;
 use App\Models\Product;
+use App\Models\Quotation;
 use App\Models\Resolution;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
@@ -56,8 +57,17 @@ class DocumentoEmitidoController extends Controller
      * facturas referenciables y clientes se cargan por AJAX (ver
      * createOptions()/clientSearch()) para no recargar la página ni cargar
      * de una vez catálogos que pueden tener miles de registros.
+     *
+     * Si viene "from_quotation" en la URL (al convertir una cotización
+     * pendiente en factura electrónica, ver QuotationController::show()),
+     * precarga el cliente y las líneas de esa cotización (ver
+     * "quotationPrefill" en documents/create.blade.php).
+     *
+     * @param  Request  $request
+     * @param  QuotationController  $quotationController  Resuelve y traduce la cotización a precargar, si aplica.
+     * @return \Illuminate\View\View
      */
-    public function create(Request $request)
+    public function create(Request $request, QuotationController $quotationController)
     {
         $company = $this->currentCompany($request);
 
@@ -70,6 +80,10 @@ class DocumentoEmitidoController extends Controller
 
         $priceTypes = $company->priceTypes()->orderBy('name')->get();
 
+        $quotation = $quotationController->resolveFromQuotation($company, $request->query('from_quotation'));
+        $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $this) : null;
+        $quotationId = $quotation ? (string) $quotation->_id : null;
+
         return view('documents.create', compact(
             'company',
             'paymentMeansCodes',
@@ -78,6 +92,8 @@ class DocumentoEmitidoController extends Controller
             'fiscalResponsibilities',
             'clients',
             'priceTypes',
+            'quotationPrefill',
+            'quotationId',
         ));
     }
 
@@ -371,6 +387,10 @@ class DocumentoEmitidoController extends Controller
             return back()->withErrors(['message' => __('Could not issue the document.')])->withInput();
         }
 
+        if ($quotationId = $request->input('quotation_id')) {
+            $this->currentCompany($request)->quotations()->where('_id', $quotationId)->update(['documento_emitido_id' => (string) $documento->_id]);
+        }
+
         session()->flash('toast', [
             'type' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED ? 'success' : 'error',
             'message' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED
@@ -605,6 +625,54 @@ class DocumentoEmitidoController extends Controller
         ]);
 
         return $documentoPos;
+    }
+
+    /**
+     * Valida el request y arma + guarda una cotización: no hay pago ni
+     * turno de caja de por medio (a diferencia de issuePosSale()), y el
+     * inventario NO se descuenta -- una cotización no es una venta todavía.
+     *
+     * @param  Request  $request  Debe traer cliente_* e items[] (mismo shape que issuePosSale(), sin campos de pago).
+     * @param  Company  $company  Empresa emisora.
+     * @param  Resolution  $resolution  Resolución manual tipo 'COT' de la empresa.
+     * @param  IssueDocumentService  $service  Servicio que arma y guarda la Quotation.
+     * @return Quotation Cotización ya creada.
+     */
+    public function issueQuotation(Request $request, Company $company, Resolution $resolution, IssueDocumentService $service): Quotation
+    {
+        $data = $request->validate([
+            'issue_date' => ['nullable', 'date'],
+            'issue_time' => ['nullable', 'string', 'max:20'],
+
+            'cliente_tipo_identificacion' => ['required', 'string', 'max:2'],
+            'cliente_identificacion' => ['required', 'string', 'max:20'],
+            'cliente_nombre' => ['required', 'string', 'max:255'],
+
+            'cliente_tipo_persona' => ['nullable', 'string', 'in:1,2'],
+            'cliente_responsabilidades' => ['nullable', 'array'],
+            'cliente_direccion' => ['nullable', 'string', 'max:255'],
+            'cliente_departamento_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_ciudad_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'cliente_email' => ['nullable', 'email', 'max:255'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.codigo' => ['required', 'string', 'max:50'],
+            'items.*.codigo_barras' => ['nullable', 'string', 'max:50'],
+            'items.*.descripcion' => ['required', 'string', 'max:500'],
+            'items.*.unidad_medida' => ['nullable', 'string', 'max:10'],
+            'items.*.cantidad' => ['required', 'numeric', 'min:0.01'],
+            'items.*.precio_unitario' => ['required', 'numeric', 'min:0'],
+            'items.*.bodega_id' => ['nullable', 'string'],
+        ]);
+
+        $data['tipo_documento'] = '01';
+        $data['tipo_operacion'] = '10';
+        $data['cliente_tipo_persona'] = $data['cliente_tipo_persona'] ?? '2';
+        $data['prefix'] = $resolution->prefix;
+        $data['secuencial'] = 0;
+
+        return $service->issueQuotation($company, ['document' => $this->buildDocumentJson($company, $data)], $resolution);
     }
 
     /**

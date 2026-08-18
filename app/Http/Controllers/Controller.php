@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\CompanyMember;
+use App\Models\ThirdParty;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -53,5 +54,33 @@ abstract class Controller
         }
 
         return $company;
+    }
+
+    /**
+     * "Consumidor final" propio de la empresa: se crea una sola vez (la
+     * primera venta o cotización que lo necesite) con la identificación
+     * genérica que usa el comercio colombiano para mostrador, para que
+     * siempre haya un cliente válido y ya existente en third_parties sin
+     * obligar al usuario a buscar o crear uno cada vez -- ver
+     * DocumentJsonMapper::resolveCustomerParty(), que solo exige los datos
+     * completos del cliente si todavía no existe. Usado por POS y
+     * Cotizaciones.
+     */
+    protected function defaultClient(Company $company): ThirdParty
+    {
+        $client = $company->clients()->where('identificacion', '222222222222')->first();
+
+        if ($client) {
+            return $client;
+        }
+
+        return ThirdParty::create([
+            'company_id' => (string) $company->_id,
+            'roles' => ['cliente'],
+            'name' => __('Final consumer'),
+            'identification_type' => '13',
+            'identificacion' => '222222222222',
+            'person_type' => '2',
+        ]);
     }
 }

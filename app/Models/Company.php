@@ -83,6 +83,18 @@ class Company extends Model
     }
 
     /**
+     * Links públicos de catálogo/cotizaciones (compartibles con clientes
+     * finales, sin login) -- una empresa puede tener varios: uno general
+     * (sin bodega) que muestra el stock de todas juntas, y opcionalmente
+     * uno por bodega puntual, para mandarle a cada sucursal/cliente el link
+     * que solo le muestra lo que hay ahí.
+     */
+    public function catalogLinks()
+    {
+        return $this->hasMany(CatalogLink::class);
+    }
+
+    /**
      * Calcula el dígito de verificación de un NIT usando el algoritmo módulo 11 de la DIAN.
      */
     public static function calculateVerificationDigit(string $identification): string
@@ -183,6 +195,11 @@ class Company extends Model
     public function documentosPos()
     {
         return $this->hasMany(DocumentoPos::class);
+    }
+
+    public function quotations()
+    {
+        return $this->hasMany(Quotation::class);
     }
 
     public function paymentMethods()

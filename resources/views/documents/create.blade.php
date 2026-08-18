@@ -93,6 +93,9 @@
 
     <form id="documentForm" method="POST" action="{{ ($posMode ?? false) ? route('pos.checkout') : route('documents.store') }}" class="flex flex-col gap-6">
         @csrf
+        @if ($quotationId ?? null)
+            <input type="hidden" name="quotation_id" value="{{ $quotationId }}">
+        @endif
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
@@ -717,6 +720,7 @@
             (function () {
                 const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
                 const allClientsById = @json($clients->keyBy('id'));
+                const quotationPrefill = @json($quotationPrefill ?? null);
                 let lineIndex = 0;
                 let paymentLineIndex = 0;
                 let chargeLineIndex = 0;
@@ -1591,7 +1595,7 @@
                             currentSale = data;
                             numeralLabel.textContent = data.numeral;
                             messageBox.classList.add('hidden');
-                            preview.src = data.receipt_url + '?inline=1';
+                            preview.src = data.receipt_preview_url;
                             issueElectronicBtn.classList.toggle('hidden', ! data.can_issue_electronic);
                             issueElectronicBtn.disabled = false;
                             issueElectronicBtn.textContent = '{{ __('Issue electronic invoice') }}';
@@ -1636,7 +1640,7 @@
                                 ? '{{ __('Sale completed and accepted by the DIAN.') }}'
                                 : '{{ __('The sale was sent, but the DIAN did not accept the electronic invoice yet.') }}';
                             issueElectronicBtn.classList.add('hidden');
-                            preview.src = currentSale.receipt_url + '?inline=1';
+                            preview.src = currentSale.receipt_preview_url;
                         } catch (error) {
                             messageBox.className = 'mb-3 rounded-md p-3 text-sm bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400';
                             messageBox.textContent = error.message || '{{ __('Could not issue the electronic invoice.') }}';
@@ -1655,7 +1659,7 @@
 
                     window.posPrintReceipt = function () {
                         if (currentSale) {
-                            window.open(currentSale.receipt_url + '?inline=1', '_blank');
+                            window.open(currentSale.receipt_preview_url, '_blank');
                         }
                     };
 
@@ -2654,6 +2658,37 @@
                             if (! bulkPriceTypeDropdown.contains(event.target)) {
                                 HSDropdown.close(bulkPriceTypeDropdown);
                             }
+                        });
+                    }
+
+                    if (quotationPrefill) {
+                        applyClientToFields(quotationPrefill.client, departmentSelect);
+                        quotationPrefill.lines.forEach((line) => {
+                            const row = addDocumentLine();
+                            row.applyProduct(line.product);
+                            const cantidadInput = row.querySelector('.line-cantidad');
+                            if (cantidadInput) {
+                                cantidadInput.value = line.qty;
+                                cantidadInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            if (line.warehouse_id) {
+                                const bodegaSelect = row.querySelector('.line-bodega');
+                                setSelectValue(bodegaSelect, line.warehouse_id);
+                                bodegaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            // El precio siempre es el que quedó guardado en la
+                            // cotización, no el que applyProduct() tomó del
+                            // catálogo actual (que puede ser otra lista de
+                            // precios distinta a la que se usó al cotizar) --
+                            // por eso también se deja el selector de tipo de
+                            // precio sin selección, igual que cuando se
+                            // escribe un precio a mano.
+                            setLinePriceValue(row, line.unit_price);
+                            const precioSelect = row.querySelector('.line-precio-select');
+                            if (precioSelect) {
+                                setSelectValue(precioSelect, '');
+                            }
+                            recalcLine(row);
                         });
                     }
 

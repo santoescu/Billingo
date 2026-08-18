@@ -9,6 +9,7 @@
         '91' => __('Credit note'),
         '92' => __('Debit note'),
         'FV' => __('Sales invoice'),
+        'COT' => __('Quotation'),
     ];
 
     $basicSelectConfig = \App\Support\SelectConfig::basic();
@@ -129,13 +130,14 @@
             </button>
         </div>
         <div class="overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-            <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('The DIAN does not authorize numbering ranges for credit/debit notes or non-electronic sales invoices: define your own prefix and starting number.') }}</p>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('The DIAN does not authorize numbering ranges for credit/debit notes, non-electronic sales invoices, or quotations: define your own prefix and starting number.') }}</p>
             <form method="POST" action="{{ route('dian.resolutions.manual') }}" class="space-y-4">
                 @csrf
                 <div>
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select name="document_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="FV">{{ __('Sales invoice') }}</option>
+                        <option value="COT">{{ __('Quotation') }}</option>
                         <option value="91">91 - {{ __('Credit note') }}</option>
                         <option value="92">92 - {{ __('Debit note') }}</option>
                     </select>

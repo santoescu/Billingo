@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
 use App\Models\Product;
+use App\Models\Quotation;
 use App\Models\Resolution;
 use App\Models\StockMovement;
 use App\Models\ThirdParty;
@@ -126,6 +127,52 @@ class IssueDocumentService
         $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, (string) $shift->user_id);
 
         return $documento;
+    }
+
+    /**
+     * Crea una cotización: colección "quotations", totalmente separada de
+     * "documentos_pos"/"documentos_emitidos", numerada con la Resolution
+     * manual tipo 'COT'. Igual que issuePosSale() calcula los totales con
+     * el mismo DocumentTotalsCalculator que usaría la factura real, pero a
+     * diferencia de esa NO descuenta inventario (una cotización no es una
+     * venta todavía) y no depende de ningún turno de caja. Si después se
+     * convierte en una venta de POS o en una factura electrónica, eso pasa
+     * por las pantallas normales de esos módulos, precargadas con el
+     * cliente/líneas de esta cotización (ver QuotationController::show()).
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $request  Mismo shape que espera issue() ({"document": {...}}).
+     * @param  Resolution  $resolution  Resolución manual tipo 'COT'.
+     * @return Quotation Cotización guardada.
+     */
+    public function issueQuotation(Company $company, array $request, Resolution $resolution): Quotation
+    {
+        $payload = $this->mapper->map($company, $request);
+
+        $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
+
+        $numero = $resolution->claimNextNumber();
+        $numeral = trim($resolution->prefix . $numero, '-');
+
+        $quotation = Quotation::create([
+            'company_id' => (string) $company->_id,
+            'resolution_id' => (string) $resolution->_id,
+            'prefix' => $resolution->prefix,
+            'numeral' => $numeral,
+            'secuencial' => (string) $numero,
+            'cliente_id' => $payload['cliente_id'] ?? null,
+            'payload' => $payload,
+            'issue_date' => $this->resolveIssueDateTime($payload),
+            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            'total' => $calculo['totales']['payable_amount'],
+            'currency' => $payload['moneda'] ?? 'COP',
+            'notes' => $payload['notas'] ?? null,
+        ]);
+
+        $this->syncProducts($company, $payload['lineas'] ?? []);
+
+        return $quotation;
     }
 
     /**

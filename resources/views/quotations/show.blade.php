@@ -1,0 +1,135 @@
+@php
+    $customer = $documento->payload['accounting_customer_party'] ?? [];
+    $lineas = $documento->payload['lineas'] ?? [];
+@endphp
+
+<x-layouts.app :title="$documento->numeral">
+    @include('partials.tittle', [
+        'title' => $documento->numeral,
+        'subheading' => $documento->status_label,
+    ])
+
+    <div class="mb-6">
+        <a href="{{ route('quotations.index') }}" class="text-sm font-medium text-accent hover:underline">&larr; {{ __('Back to quotations') }}</a>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Customer') }}</h3>
+                </div>
+                <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Name') }}</div>
+                        <div class="text-gray-800 dark:text-neutral-200">{{ $customer['razon_social'] ?? '—' }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Identification') }}</div>
+                        <div class="text-gray-800 dark:text-neutral-200">{{ $customer['identificacion'] ?? '—' }}{{ isset($customer['dv']) && $customer['dv'] !== null ? '-' . $customer['dv'] : '' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Lines') }}</h3>
+                </div>
+                <div class="overflow-hidden">
+                    <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                        <thead class="bg-gray-50 dark:bg-neutral-700">
+                            <tr>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Quantity') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Unit price') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                            @forelse ($lineas as $linea)
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200">{{ $linea['descripcion'] ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $linea['cantidad'] ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ number_format((float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Lines')]) }}</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-6">
+            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Summary') }}</h3>
+                </div>
+                <div class="p-4 flex flex-col gap-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Status') }}</span>
+                        <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Issue date') }}</span>
+                        <span class="text-gray-800 dark:text-neutral-200">{{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Subtotal') }}</span>
+                        <span class="text-gray-800 dark:text-neutral-200">{{ number_format((float) $documento->subtotal, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Tax') }}</span>
+                        <span class="text-gray-800 dark:text-neutral-200">{{ number_format((float) $documento->tax_total, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between font-semibold">
+                        <span class="text-gray-800 dark:text-neutral-200">{{ __('Total') }}</span>
+                        <span class="text-gray-800 dark:text-neutral-200">{{ $documento->total_formatted }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Convert quotation') }}</h3>
+                </div>
+                <div class="p-4 flex flex-col gap-3 text-sm">
+                    @if ($documento->is_converted)
+                        @if ($documento->documento_pos_id)
+                            <p class="text-gray-600 dark:text-neutral-400">{{ __('This quotation was converted into a POS sale.') }}</p>
+                            <a href="{{ route('pos.sales.show', $documento->documento_pos_id) }}">
+                                <flux:button type="button" variant="filled" icon="shopping-cart">{{ __('View POS sale') }}</flux:button>
+                            </a>
+                        @endif
+                        @if ($documento->documento_emitido_id)
+                            <p class="text-gray-600 dark:text-neutral-400">{{ __('This quotation was issued as an electronic invoice.') }}</p>
+                            <a href="{{ route('documents.show', $documento->documento_emitido_id) }}">
+                                <flux:button type="button" variant="filled" icon="document-text">{{ __('View electronic invoice') }}</flux:button>
+                            </a>
+                        @endif
+                    @elseif ($canConvertToPos || $canConvertToInvoicing)
+                        <p class="text-gray-600 dark:text-neutral-400">{{ __('Convert this quotation into a sale, reusing the client and lines.') }}</p>
+                        @if ($canConvertToPos)
+                            <a href="{{ route('pos.create', ['from_quotation' => $documento->_id]) }}">
+                                <flux:button type="button" variant="primary" icon="shopping-cart" class="w-full">{{ __('Convert to POS sale') }}</flux:button>
+                            </a>
+                        @endif
+                        @if ($canConvertToInvoicing)
+                            <a href="{{ route('documents.create', ['from_quotation' => $documento->_id]) }}">
+                                <flux:button type="button" variant="filled" icon="bolt" class="w-full">{{ __('Issue electronic invoice') }}</flux:button>
+                            </a>
+                        @endif
+                    @else
+                        <p class="text-gray-600 dark:text-neutral-400">{{ __('This company has no POS or electronic invoicing module enabled, so this quotation cannot be converted into a sale.') }}</p>
+                    @endif
+                </div>
+            </div>
+
+            <a href="{{ route('quotations.pdf', $documento->_id) }}">
+                <flux:button type="button" variant="filled" icon="arrow-down-tray" class="w-full">{{ __('Download PDF') }}</flux:button>
+            </a>
+        </div>
+    </div>
+</x-layouts.app>

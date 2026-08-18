@@ -1,3 +1,8 @@
+import ClipboardJS from 'clipboard';
+window.ClipboardJS = ClipboardJS;
+import clipboardHelper from 'preline/helpers/clipboard';
+window.hsClipboardHelper = clipboardHelper;
+
 import "preline";
 import '@preline/select'
 import '@preline/overlay';
