@@ -33,6 +33,8 @@ class Company extends Model
         'dian_test_set_zip_key',
         'dian_habilitado',
         'api_token',
+        'logo_data',
+        'logo_mime',
     ];
 
     const DIAN_AMBIENTE_PRODUCCION = '1';
@@ -42,10 +44,12 @@ class Company extends Model
         'dian_certificate_password',
         'dian_certificate_content',
         'api_token',
+        'logo_data',
     ];
 
     protected $appends = [
         'dian_certificate_filename',
+        'logo_url',
     ];
 
     protected function casts(): array
@@ -185,6 +189,19 @@ class Company extends Model
         }
 
         return $this->dian_certificate_original_name ?: __('Certificate');
+    }
+
+    /**
+     * Igual que Product::getImageUrlAttribute() -- guardado en base64 en el
+     * documento de Mongo, no en disco (ver comentario allá).
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (! $this->logo_data || ! $this->logo_mime) {
+            return null;
+        }
+
+        return 'data:' . $this->logo_mime . ';base64,' . $this->logo_data;
     }
 
     public function documentosEmitidos()

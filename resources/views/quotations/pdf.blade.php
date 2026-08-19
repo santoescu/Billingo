@@ -46,6 +46,9 @@
     <table class="header-table">
         <tr>
             <td style="width: 60%;">
+                @if ($company->logo_url)
+                    <img src="{{ $company->logo_url }}" alt="" style="max-height: 50px; max-width: 160px; margin-bottom: 6px;">
+                @endif
                 <p class="company-name">{{ $company->name }}</p>
                 <p class="company-sub">NIT {{ $company->identificacion }}{{ $company->dv ? '-' . $company->dv : '' }}</p>
                 @if ($company->address)

@@ -37,6 +37,8 @@ class CompanyController extends Controller
             );
         }
 
+        $data = array_merge($data, $this->handleLogoUpload($request));
+
         $company = Company::create($data);
 
         $this->storeCertificateIfUploaded($request, $company);
@@ -72,6 +74,13 @@ class CompanyController extends Controller
                 $company->dian_certificate_content,
                 $data['dian_certificate_password'],
             );
+        }
+
+        if ($request->boolean('remove_logo')) {
+            $data['logo_data'] = null;
+            $data['logo_mime'] = null;
+        } else {
+            $data = array_merge($data, $this->handleLogoUpload($request));
         }
 
         $company->update($data);
@@ -252,6 +261,30 @@ class CompanyController extends Controller
         ]);
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * Igual que ProductController::handleImageUpload(): la foto se guarda
+     * en base64 directo en el documento de Mongo, nada se escribe en disco.
+     *
+     * @return array{logo_data?: string, logo_mime?: string} Vacío si no vino ningún logo nuevo.
+     */
+    private function handleLogoUpload(Request $request): array
+    {
+        if (! $request->hasFile('logo')) {
+            return [];
+        }
+
+        $request->validate([
+            'logo' => 'image|max:1024',
+        ]);
+
+        $file = $request->file('logo');
+
+        return [
+            'logo_data' => base64_encode(file_get_contents($file->getRealPath())),
+            'logo_mime' => $file->getMimeType(),
+        ];
     }
 
     private function validatedCompanyData(Request $request): array
