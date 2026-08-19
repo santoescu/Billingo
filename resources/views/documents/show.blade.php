@@ -184,6 +184,20 @@
                         <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment method') }}</span>
                         <span class="text-gray-800 dark:text-neutral-200">{{ $paymentMeansCode->medio ?? $documento->payment_means_code ?? '—' }}</span>
                     </div>
+                    @if ($documento->is_credit)
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment status') }}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->payment_status_badge_classes }}">{{ $documento->payment_status_label }}</span>
+                                <form method="POST" action="{{ route('documents.toggle-paid', $documento->_id) }}">
+                                    @csrf
+                                    <button type="submit" class="text-xs font-medium text-accent hover:underline">
+                                        {{ $documento->is_paid ? __('Mark as pending') : __('Mark as paid') }}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
                     <flux:separator variant="subtle" />
                     <div>
                         <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('UUID') }}</div>
