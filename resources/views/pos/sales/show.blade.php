@@ -127,6 +127,12 @@
                         <a href="{{ route('documents.show', $documento->documento_emitido_id) }}">
                             <flux:button type="button" variant="filled" icon="document-text">{{ __('View electronic invoice') }}</flux:button>
                         </a>
+                    @elseif ($canIssueElectronic)
+                        <div id="sale-issue-electronic-message" class="hidden rounded-md p-3 text-sm"></div>
+                        <p class="text-gray-600 dark:text-neutral-400">{{ __('This sale was not issued as an electronic invoice.') }}</p>
+                        <flux:button type="button" id="sale-issue-electronic-btn" variant="primary" icon="bolt" onclick="window.saleIssueElectronic()">
+                            {{ __('Issue electronic invoice') }}
+                        </flux:button>
                     @else
                         <p class="text-gray-600 dark:text-neutral-400">{{ __('This sale was not issued as an electronic invoice.') }}</p>
                     @endif
@@ -138,4 +144,65 @@
             </a>
         </div>
     </div>
+
+    @if ($canIssueElectronic)
+        @push('scripts')
+            <script>
+                /**
+                 * Emite electrónica una venta ya guardada (pantalla de
+                 * detalle, no el modal justo después de cobrar) -- el modal
+                 * de "window.posIssueElectronic()" en pos/sell.blade.php
+                 * solo existe mientras esa pestaña sigue con la venta que
+                 * se acaba de cobrar en memoria (variable "currentSale");
+                 * al volver más tarde desde el listado de ventas no hay
+                 * ese estado, así que esta pantalla necesita su propio
+                 * botón que pegue directo con la URL del documento.
+                 * @returns {void}
+                 */
+                window.saleIssueElectronic = async function () {
+                    const btn = document.getElementById('sale-issue-electronic-btn');
+                    const messageBox = document.getElementById('sale-issue-electronic-message');
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+                    btn.disabled = true;
+                    btn.textContent = '{{ __('Processing...') }}';
+
+                    try {
+                        const response = await fetch('{{ route('pos.sales.issue-electronic', $documento->_id) }}', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                        });
+                        const data = await response.json();
+
+                        if (! response.ok) {
+                            throw new Error(data.message || '{{ __('Could not issue the electronic invoice.') }}');
+                        }
+
+                        if (data.document_url) {
+                            window.location.href = data.document_url;
+                            return;
+                        }
+
+                        window.location.reload();
+                    } catch (error) {
+                        /**
+                         * No se vuelve a habilitar el botón: todo lo que
+                         * puede rechazar esto (módulo desactivado, sin
+                         * resolución electrónica, medio de pago sin mapeo
+                         * DIAN) necesita que el usuario arregle algo en
+                         * otra pantalla primero -- reintentar con el mismo
+                         * clic nunca lo resuelve.
+                         */
+                        messageBox.className = 'rounded-md p-3 text-sm bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400';
+                        messageBox.textContent = error.message || '{{ __('Could not issue the electronic invoice.') }}';
+                        messageBox.classList.remove('hidden');
+                        btn.classList.add('hidden');
+                    }
+                };
+            </script>
+        @endpush
+    @endif
 </x-layouts.app>

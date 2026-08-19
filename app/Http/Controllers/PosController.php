@@ -280,7 +280,18 @@ class PosController extends Controller
             ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
             : null;
 
-        return view('pos.sales.show', compact('company', 'documento', 'paymentMeansCode'));
+        /**
+         * Mismas condiciones que issueElectronic() (menos las de datos del
+         * cliente, esas las valida el propio endpoint al emitir) -- para no
+         * mostrar el botón si de entrada no va a poder emitirse, en vez de
+         * dejar que el usuario le dé clic y se entere ahí del error.
+         */
+        $canIssueElectronic = ! $documento->documento_emitido_id
+            && $company->hasModule('invoicing')
+            && $documento->shift?->invoicingResolution
+            && ! empty($documento->payment_means_code);
+
+        return view('pos.sales.show', compact('company', 'documento', 'paymentMeansCode', 'canIssueElectronic'));
     }
 
     /**
