@@ -211,9 +211,20 @@
                     <iframe id="pos-result-preview" class="w-full rounded-lg border border-gray-200 dark:border-neutral-700" style="height: 50vh;" title="{{ __('Receipt preview') }}"></iframe>
                 </div>
                 <div class="p-4 pt-0 grid grid-cols-2 gap-2">
-                    <flux:button type="button" id="pos-result-issue-electronic-btn" variant="primary" icon="bolt" class="col-span-2 hidden" onclick="window.posIssueElectronic()">
-                        {{ __('Issue electronic invoice') }}
-                    </flux:button>
+                    {{-- El "hidden" se pone en este div envolvente, no
+                         directo en el flux:button: flux:button siempre trae
+                         su propia clase "inline-flex" (así se le pase
+                         "hidden" en $attributes), y en el CSS compilado esa
+                         clase queda definida DESPUÉS de ".hidden" -- mismo
+                         nivel de especificidad, empate que gana la que está
+                         más abajo en la hoja, así que el botón nunca se
+                         llegaba a ocultar de verdad por más que se le
+                         alternara la clase por JS. --}}
+                    <div id="pos-result-issue-electronic-wrapper" class="col-span-2 hidden">
+                        <flux:button type="button" id="pos-result-issue-electronic-btn" variant="primary" icon="bolt" class="w-full" onclick="window.posIssueElectronic()">
+                            {{ __('Issue electronic invoice') }}
+                        </flux:button>
+                    </div>
                     <flux:button type="button" variant="filled" icon="printer" onclick="window.posPrintReceipt()">{{ __('Print') }}</flux:button>
                     <flux:button type="button" variant="filled" icon="arrow-down-tray" onclick="window.posDownloadReceipt()">{{ __('Download') }}</flux:button>
                     <flux:button type="button" variant="filled" icon="receipt-percent" class="col-span-2" onclick="window.posGoToSales()">{{ __('Go to sales') }}</flux:button>
@@ -1341,7 +1352,7 @@
                         document.getElementById('pos-result-message').classList.add('hidden');
                         document.getElementById('pos-result-preview').src = data.receipt_preview_url;
                         const issueBtn = document.getElementById('pos-result-issue-electronic-btn');
-                        issueBtn.classList.toggle('hidden', ! data.can_issue_electronic);
+                        document.getElementById('pos-result-issue-electronic-wrapper').classList.toggle('hidden', ! data.can_issue_electronic);
                         issueBtn.disabled = false;
                         issueBtn.textContent = '{{ __('Issue electronic invoice') }}';
 
@@ -1396,13 +1407,22 @@
                         messageBox.textContent = data.accepted
                             ? '{{ __('Sale completed and accepted by the DIAN.') }}'
                             : '{{ __('The sale was sent, but the DIAN did not accept the electronic invoice yet.') }}';
-                        issueBtn.classList.add('hidden');
+                        document.getElementById('pos-result-issue-electronic-wrapper').classList.add('hidden');
                         document.getElementById('pos-result-preview').src = currentSale.receipt_preview_url;
                     } catch (error) {
+                        /**
+                         * No se vuelve a mostrar el botón: todo lo que
+                         * puede rechazar esto (módulo desactivado, sin
+                         * resolución electrónica, medio de pago sin
+                         * mapeo DIAN, cliente sin dirección) necesita que
+                         * el usuario vaya a arreglar algo en otra pantalla
+                         * -- reintentar con el mismo clic nunca lo
+                         * resuelve, así que dejar el botón visible solo
+                         * invita a un segundo clic que va a fallar igual.
+                         */
                         messageBox.className = 'mb-3 rounded-md p-3 text-sm bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400';
                         messageBox.textContent = error.message || '{{ __('Could not issue the electronic invoice.') }}';
-                        issueBtn.disabled = false;
-                        issueBtn.textContent = '{{ __('Issue electronic invoice') }}';
+                        document.getElementById('pos-result-issue-electronic-wrapper').classList.add('hidden');
                     }
 
                     messageBox.classList.remove('hidden');
