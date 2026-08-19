@@ -26,21 +26,38 @@
             ];
         @endphp
 
-        <div class="flex gap-3">
-            <flux:field class="w-60 shrink-0 [&>.hs-select]:max-w-[15rem]">
-                <flux:label>{{ __('Identification type') }}</flux:label>
-                <select id="identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                    <option value="">{{ __('Select...') }}</option>
-                    @foreach ($identificationTypes as $code => $label)
-                        <option value="{{ $code }}" @selected(old('identification_type') == $code)>{{ $code }} - {{ $label }}</option>
-                    @endforeach
-                </select>
-            </flux:field>
-            <div class="flex-1">
-                <flux:input id="identificacion" name="identificacion" :label="__('Identification')" value="{{ old('identificacion') }}" required />
+        <div class="flex items-stretch gap-3">
+            <div class="shrink-0 relative w-32 aspect-square">
+                <button type="button" onclick="document.getElementById('logo').click()" class="relative block size-full rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Logo') }}">
+                    <img id="logo-preview" src="" alt="" class="hidden size-full object-cover object-center">
+                    <span id="logo-placeholder" class="flex items-center justify-center size-full bg-accent/10 text-accent">
+                        <svg class="shrink-0 size-11" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    </span>
+                </button>
+                <input type="file" id="logo" name="logo" accept="image/*" class="hidden">
+                <button type="button" id="logo-remove-btn" class="hidden absolute -top-1.5 -end-1.5 size-5 items-center justify-center rounded-full bg-white text-gray-500 border border-gray-200 shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 focus:outline-hidden dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-400" onclick="removeCompanyLogo()" aria-label="{{ __('Remove image') }}" title="{{ __('Remove image') }}">
+                    <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                </button>
             </div>
-            <div id="dv_wrapper" class="hidden w-16 shrink-0">
-                <flux:input id="dv" name="dv" :label="__('DV')" maxlength="1" value="{{ old('dv') }}" readonly />
+
+            <div class="flex-1 flex flex-col gap-3">
+                <flux:field class="[&>.hs-select]:max-w-full">
+                    <flux:label>{{ __('Identification type') }}</flux:label>
+                    <select id="identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                        <option value="">{{ __('Select...') }}</option>
+                        @foreach ($identificationTypes as $code => $label)
+                            <option value="{{ $code }}" @selected(old('identification_type') == $code)>{{ $code }} - {{ $label }}</option>
+                        @endforeach
+                    </select>
+                </flux:field>
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <flux:input id="identificacion" name="identificacion" :label="__('Identification')" value="{{ old('identificacion') }}" required />
+                    </div>
+                    <div id="dv_wrapper" class="hidden w-16 shrink-0">
+                        <flux:input id="dv" name="dv" :label="__('DV')" maxlength="1" value="{{ old('dv') }}" readonly />
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -265,6 +282,31 @@
                     refreshDv(identificationInput, dvInput, isNit);
                 }
 
+                function setLogoPreview(url) {
+                    const img = document.getElementById('logo-preview');
+                    const placeholder = document.getElementById('logo-placeholder');
+                    const removeBtn = document.getElementById('logo-remove-btn');
+
+                    if (url) {
+                        img.src = url;
+                        img.classList.remove('hidden');
+                        placeholder.classList.add('hidden');
+                        removeBtn.classList.remove('hidden');
+                        removeBtn.classList.add('flex');
+                    } else {
+                        img.src = '';
+                        img.classList.add('hidden');
+                        placeholder.classList.remove('hidden');
+                        removeBtn.classList.add('hidden');
+                        removeBtn.classList.remove('flex');
+                    }
+                }
+
+                window.removeCompanyLogo = function () {
+                    document.getElementById('logo').value = '';
+                    setLogoPreview(null);
+                };
+
                 /**
                  * Wiring inicial del formulario: ciudad en cascada por
                  * departamento, DV automático, y validación del certificado
@@ -305,6 +347,16 @@
                     });
                     identificationInput.addEventListener('input', () => {
                         refreshDv(identificationInput, dvInput, identificationTypeSelect.value === '31');
+                    });
+
+                    document.getElementById('logo').addEventListener('change', (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) {
+                            return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => setLogoPreview(reader.result);
+                        reader.readAsDataURL(file);
                     });
 
                     const certificateUploadEl = document.getElementById('certificate-upload');

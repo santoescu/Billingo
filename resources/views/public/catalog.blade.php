@@ -18,9 +18,14 @@
 @endphp
 
 <x-layouts.public :title="$company->name . ' — ' . __('Catalog')">
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold text-gray-800 dark:text-white">{{ $company->name }}</h1>
-        <p class="text-sm text-zinc-500 dark:text-neutral-400">{{ __('Browse the catalog and build your own quotation.') }}</p>
+    <div class="mb-6 flex items-center gap-3">
+        @if ($company->logo_url)
+            <img src="{{ $company->logo_url }}" alt="" class="size-12 rounded-lg object-cover shrink-0">
+        @endif
+        <div>
+            <h1 class="text-xl font-semibold text-gray-800 dark:text-white">{{ $company->name }}</h1>
+            <p class="text-sm text-zinc-500 dark:text-neutral-400">{{ __('Browse the catalog and build your own quotation.') }}</p>
+        </div>
     </div>
 
     <div id="catalog-error" class="hidden mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"></div>

@@ -20,6 +20,9 @@
 </head>
 <body>
     <div class="center">
+        @if ($company->logo_url)
+            <img src="{{ $company->logo_url }}" alt="" style="max-height: 40px; max-width: 120px; margin-bottom: 4px;">
+        @endif
         <h1>{{ $company->name }}</h1>
         <p class="muted">NIT {{ $company->identificacion }}{{ $company->dv ? '-' . $company->dv : '' }}</p>
         <p class="bold">{{ $documento->numeral }}</p>
