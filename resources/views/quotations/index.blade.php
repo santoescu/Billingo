@@ -29,23 +29,28 @@
                              botón usa el helper de clipboard real de Preline
                              (ClipboardJS + preline/dist/helper-clipboard,
                              clase "js-clipboard" + data-clipboard-target),
-                             no un click handler propio -- ver app.js. --}}
+                             no un click handler propio -- ver app.js. SIN la
+                             clase "hs-tooltip"/burbuja emergente: el propio
+                             helper de Preline llama internamente a
+                             "window.HSTooltip.show()" en el success callback,
+                             y esa llamada revienta con "Cannot read
+                             properties of undefined (reading 'show')" en
+                             navegación por wire:navigate (el tooltip nunca
+                             queda inicializado a tiempo) -- el swap de ícono
+                             (lápiz -> check verde) ya es suficiente feedback
+                             visual, sin depender de esa burbuja. --}}
                         <div class="flex-1 min-w-0 flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
                             <span class="shrink-0 max-w-[9rem] truncate inline-flex items-center px-3 border-e border-zinc-200 dark:border-white/10 text-xs font-medium text-zinc-500 dark:text-neutral-400" title="{{ $link->label ?: ($link->warehouse?->name ?? __('All warehouses')) }}">
                                 {{ $link->label ?: ($link->warehouse?->name ?? __('All warehouses')) }}
                             </span>
                             <input type="text" readonly id="catalog-link-url-{{ $link->_id }}" value="{{ route('public.catalog.show', $link->token) }}"
                                 class="flex-1 min-w-0 bg-transparent border-0 text-zinc-700 dark:text-zinc-300 text-sm h-9 px-3 focus:outline-hidden focus:ring-0">
-                            <button type="button" class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                            <button type="button" class="js-clipboard relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
                                 data-clipboard-target="#catalog-link-url-{{ $link->_id }}"
                                 data-clipboard-action="copy"
-                                data-clipboard-success-text="{{ __('Copied') }}"
-                                aria-label="{{ __('Copy') }}">
+                                aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
                                 <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                                 <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                                    <span class="js-clipboard-success-text">{{ __('Copy') }}</span>
-                                </span>
                             </button>
                         </div>
 
@@ -199,15 +204,31 @@
 
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
+            /**
+             * Se registra tanto en "DOMContentLoaded" (carga real de la
+             * página) como en "livewire:navigated" (navegación por
+             * wire:navigate desde el sidebar, que NO dispara
+             * "DOMContentLoaded" de nuevo) -- sin el segundo listener,
+             * entrar a Cotizaciones por un link del sidebar dejaba el botón
+             * de copiar el link público sin funcionar (nunca se llamaba a
+             * window.hsClipboardHelper). El botón de "Nuevo link" usa un
+             * guard con dataset.bound para no acumular listeners si esta
+             * función se llama más de una vez sobre el mismo botón.
+             * @returns {void}
+             */
+            function initQuotationsPage() {
                 const table = initWorkflowDataTable('#quotationsTable', '#hs-table-with-pagination-search');
                 table.order([]).draw();
 
-                document.getElementById('catalog-link-add-btn')?.addEventListener('click', () => {
-                    if (window.HSOverlay) {
-                        HSOverlay.open('#catalog-link-modal');
-                    }
-                });
+                const addLinkBtn = document.getElementById('catalog-link-add-btn');
+                if (addLinkBtn && ! addLinkBtn.dataset.bound) {
+                    addLinkBtn.dataset.bound = 'true';
+                    addLinkBtn.addEventListener('click', () => {
+                        if (window.HSOverlay) {
+                            HSOverlay.open('#catalog-link-modal');
+                        }
+                    });
+                }
 
                 @if ($errors->any())
                     if (window.HSOverlay) {
@@ -224,7 +245,10 @@
                 // depender de su auto-init en window "load" para que
                 // también funcione si esta tarjeta se vuelve a pintar.
                 window.hsClipboardHelper?.('.js-clipboard');
-            });
+            }
+
+            document.addEventListener('DOMContentLoaded', initQuotationsPage);
+            document.addEventListener('livewire:navigated', initQuotationsPage);
         </script>
     @endpush
 </x-layouts.app>
