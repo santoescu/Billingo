@@ -895,6 +895,26 @@ class DocumentoEmitidoController extends Controller
     }
 
     /**
+     * Marca/desmarca una factura a crédito como pagada -- solo tiene
+     * sentido para payment_means_id = credit (las de contado y las ventas
+     * POS ya se consideran pagadas al momento de emitirse).
+     */
+    public function togglePaid(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+        abort_unless($documento->is_credit, 422);
+
+        $documento->paid_at = $documento->is_paid ? null : now();
+        $documento->save();
+
+        return back();
+    }
+
+    /**
      * Recibo en PDF (formato angosto, tipo ticket) para descargar -- usado
      * sobre todo por el checkout del POS, pero disponible para cualquier
      * documento ya emitido. Reusa los mismos datos que documents.show(), sin

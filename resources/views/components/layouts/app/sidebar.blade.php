@@ -9,14 +9,20 @@
         
         [
             'label' => null,
-            'items' => [
+            'items' => array_values(array_filter([
                 [
-                    'name' => __('Dashboard'),
+                    'name' => __('Companies'),
                     'icon' => 'home',
                     'url' => route('dashboard'),
                     'current' => request()->routeIs('dashboard'),
                 ],
-            ],
+                session('selected_company') ? [
+                    'name' => __('Panel'),
+                    'icon' => 'chart-bar',
+                    'url' => route('panel'),
+                    'current' => request()->routeIs('panel'),
+                ] : null,
+            ])),
         ],
 
         [

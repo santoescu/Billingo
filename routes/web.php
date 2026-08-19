@@ -4,6 +4,7 @@ use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CatalogLinkController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyMemberController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DianController;
 use App\Http\Controllers\DocumentoEmitidoController;
 use App\Http\Controllers\NotificationController;
@@ -21,8 +22,6 @@ use App\Livewire\Settings\Appearance;
 use App\Livewire\Settings\Language;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Profile;
-use App\Models\Department;
-use App\Models\FiscalResponsibility;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -42,13 +41,9 @@ Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
     Route::get('quotations/{quotation}/pdf', [PublicCatalogController::class, 'pdf'])->name('quotations.pdf');
 });
 
-Route::get('dashboard', function () {
-    $companies = auth()->user()->companiesWithMembership();
-    $fiscalResponsibilities = FiscalResponsibility::orderBy('codigo')->get();
-    $departments = Department::orderBy('descripcion')->get();
-
-    return view('dashboard', compact('companies', 'fiscalResponsibilities', 'departments'));
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('panel', [DashboardController::class, 'panel'])->middleware(['auth', 'verified'])->name('panel');
+Route::get('panel/pdf', [DashboardController::class, 'panelPdf'])->middleware(['auth', 'verified'])->name('panel.pdf');
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
@@ -151,6 +146,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [DocumentoEmitidoController::class, 'store'])->name('store');
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
             Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
+            Route::post('{documento}/toggle-paid', [DocumentoEmitidoController::class, 'togglePaid'])->name('toggle-paid');
         });
 
     Route::middleware(['company.selected', 'company.role:pos,administrador,cajero,auditor'])

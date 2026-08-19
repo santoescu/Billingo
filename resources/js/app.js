@@ -23,3 +23,6 @@ window.$ = window.jQuery = $;
 
 import '@preline/copy-markup';
 import 'datatables.net-dt';
+
+import ApexCharts from 'apexcharts';
+window.ApexCharts = ApexCharts;

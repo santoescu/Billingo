@@ -15,6 +15,7 @@
         "@preline/select": "^4.2.0",
         "@preline/tabs": "^4.2.0",
         "@tailwindcss/vite": "^4.0.7",
+        "apexcharts": "^6.10.0",
         "autoprefixer": "^10.4.20",
         "axios": "^1.7.4",
         "clipboard": "^2.0.11",
