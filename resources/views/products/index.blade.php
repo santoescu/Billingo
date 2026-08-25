@@ -91,6 +91,9 @@
                         </div>
 
                         <div class="flex gap-2">
+                            <flux:button variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
+                                {{ __('Export to Excel') }}
+                            </flux:button>
                             <flux:button variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
                                 {{ __('Import from Excel') }}
                             </flux:button>
@@ -485,6 +488,80 @@
         </div>
     </div>
 
+    <!-- Modal: exportar productos a Excel -->
+    <div id="product-export-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-export-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+            <div class="w-full max-h-[calc(100vh-3.5rem)] flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="product-export-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Export to Excel') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#product-export-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4 flex flex-col gap-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    <p class="text-sm text-zinc-500 dark:text-neutral-400">{{ __('Code, description and barcode are always included. Choose any other columns you want in the file.') }}</p>
+
+                    <div>
+                        <p class="text-xs font-medium text-zinc-500 dark:text-neutral-400 uppercase mb-2">{{ __('General') }}</p>
+                        <ul class="flex flex-col">
+                            <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                <input type="checkbox" class="export-field-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="unit_code" id="export-field-unit_code">
+                                <label for="export-field-unit_code" class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Unit') }}</label>
+                            </li>
+                            <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                <input type="checkbox" class="export-field-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="tracks_inventory" id="export-field-tracks_inventory">
+                                <label for="export-field-tracks_inventory" class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Tracks inventory (SI/NO)') }}</label>
+                            </li>
+                            <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                <input type="checkbox" class="export-field-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="stock" id="export-field-stock">
+                                <label for="export-field-stock" class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Unassigned stock') }}</label>
+                            </li>
+                            <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                <input type="checkbox" class="export-field-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="cost" id="export-field-cost">
+                                <label for="export-field-cost" class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Cost') }}</label>
+                            </li>
+                        </ul>
+                    </div>
+
+                    @if ($priceTypes->isNotEmpty())
+                        <div>
+                            <p class="text-xs font-medium text-zinc-500 dark:text-neutral-400 uppercase mb-2">{{ __('Price types') }}</p>
+                            <ul class="flex flex-col">
+                                @foreach ($priceTypes as $priceType)
+                                    <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                        <input type="checkbox" class="export-price-type-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="{{ $priceType->_id }}" id="export-price-type-{{ $priceType->_id }}">
+                                        <label for="export-price-type-{{ $priceType->_id }}" class="text-sm text-gray-800 dark:text-neutral-200">{{ $priceType->name }}</label>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if ($warehouses->isNotEmpty())
+                        <div>
+                            <p class="text-xs font-medium text-zinc-500 dark:text-neutral-400 uppercase mb-2">{{ __('Warehouses') }}</p>
+                            <ul class="flex flex-col">
+                                @foreach ($warehouses as $warehouse)
+                                    <li class="inline-flex items-center gap-x-2 py-2.5 px-3 -mt-px first:rounded-t-lg last:rounded-b-lg border border-gray-200 dark:border-neutral-700">
+                                        <input type="checkbox" class="export-warehouse-checkbox shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800" value="{{ $warehouse->_id }}" id="export-warehouse-{{ $warehouse->_id }}">
+                                        <label for="export-warehouse-{{ $warehouse->_id }}" class="text-sm text-gray-800 dark:text-neutral-200">{{ $warehouse->name }}</label>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                </div>
+                <div class="flex justify-end p-4 border-t border-gray-200 dark:border-neutral-700">
+                    <flux:button type="button" variant="primary" icon="arrow-down-tray" onclick="submitExport()">{{ __('Export') }}</flux:button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: importar productos desde Excel -->
     <div id="product-import-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-import-modal-label">
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-4xl sm:w-full m-3 sm:mx-auto">
@@ -581,6 +658,26 @@
                             <tbody id="import-mapping-rows" class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
                         </table>
                     </div>
+
+                    {{-- Solo importa para productos que YA existen (se
+                         encuentran por código): un producto nuevo simplemente
+                         arranca con lo que traiga el archivo, no hay nada que
+                         sobrescribir o sumarle todavía. --}}
+                    <div>
+                        <p class="text-xs font-medium text-zinc-500 dark:text-neutral-400 uppercase mb-2">{{ __('For existing products, stock and warehouses in the file should:') }}</p>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-x-2">
+                                <input type="radio" name="import-stock-mode" value="overwrite" id="import-stock-mode-overwrite" checked class="shrink-0 size-4 border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800">
+                                <span class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Overwrite') }}</span>
+                            </label>
+                            <label class="flex items-center gap-x-2">
+                                <input type="radio" name="import-stock-mode" value="add" id="import-stock-mode-add" class="shrink-0 size-4 border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800">
+                                <span class="text-sm text-gray-800 dark:text-neutral-200">{{ __('Add to current stock') }}</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-zinc-500 dark:text-neutral-400 mt-1">{{ __('"Add" registers the difference as a stock entry (kardex), same as a manual entry.') }}</p>
+                    </div>
+
                     <div class="flex justify-between items-center">
                         <flux:button type="button" id="import-back-btn" variant="filled" onclick="resetImportModal()">{{ __('Back') }}</flux:button>
                         <flux:button type="button" id="import-submit-btn" variant="primary" onclick="submitImport()">
@@ -1373,6 +1470,71 @@
                 const existingPriceTypeNames = @json($priceTypes->pluck('name'));
                 let importToken = null;
 
+                // Mismos encabezados que arma ProductExportController::export() --
+                // si el archivo subido es justo el que se acaba de exportar (o se
+                // editó a mano sin tocar los títulos de columna), el mapeo se
+                // preselecciona solo y no hay que repetirlo a mano.
+                const importHeaderTargets = {
+                    '{{ __('Code') }}': 'code',
+                    '{{ __('Description') }}': 'description',
+                    '{{ __('Barcode') }}': 'barcode',
+                    '{{ __('Unit') }}': 'unit_code',
+                    '{{ __('Tracks inventory (SI/NO)') }}': 'tracks_inventory',
+                    '{{ __('Unassigned stock') }}': 'stock',
+                    '{{ __('Cost') }}': 'cost',
+                };
+                const importPricePrefix = '{{ __('Price') }}: ';
+                const importWarehousePrefix = '{{ __('Warehouse') }}: ';
+
+                /**
+                 * @param {string} header Encabezado tal cual viene en la fila 1 del Excel.
+                 * @returns {object} target/companion -- target = importIgnoreValue si no reconoce el encabezado.
+                 */
+                function guessImportTarget(header) {
+                    if (importHeaderTargets[header]) {
+                        return { target: importHeaderTargets[header], companion: null };
+                    }
+                    if (header.startsWith(importPricePrefix)) {
+                        return { target: 'price', companion: header.slice(importPricePrefix.length) };
+                    }
+                    if (header.startsWith(importWarehousePrefix)) {
+                        return { target: 'warehouse_stock', companion: header.slice(importWarehousePrefix.length) };
+                    }
+
+                    return { target: importIgnoreValue, companion: null };
+                }
+
+                window.openExportModal = function () {
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#product-export-modal');
+                    }
+                };
+
+                /**
+                 * Arma la URL de descarga con los campos elegidos (código,
+                 * descripción y código de barras siempre van, no dependen
+                 * de ningún checkbox) y navega ahí -- es una descarga de
+                 * archivo, no un fetch, así el navegador maneja el
+                 * Content-Disposition sin JS de por medio.
+                 * @returns {void}
+                 */
+                window.submitExport = function () {
+                    const params = new URLSearchParams();
+
+                    document.querySelectorAll('.export-field-checkbox:checked').forEach((el) => {
+                        params.append('fields[]', el.value);
+                    });
+                    document.querySelectorAll('.export-price-type-checkbox:checked').forEach((el) => {
+                        params.append('price_type_ids[]', el.value);
+                    });
+                    document.querySelectorAll('.export-warehouse-checkbox:checked').forEach((el) => {
+                        params.append('warehouse_ids[]', el.value);
+                    });
+
+                    window.location.href = @json(route('products.export')) + '?' + params.toString();
+                };
+
                 window.openImportModal = function () {
                     resetImportModal();
                     if (window.HSOverlay) {
@@ -1395,6 +1557,7 @@
                     document.getElementById('import-analyze-label').classList.remove('hidden');
                     document.getElementById('import-analyze-spinner').classList.add('hidden');
                     document.getElementById('import-analyze-btn').disabled = false;
+                    document.getElementById('import-stock-mode-overwrite').checked = true;
                     window.appModalProcessing.stop('#product-import-modal');
 
                     const uploadEl = document.getElementById('import-file-upload');
@@ -1464,18 +1627,18 @@
                  * @param {string[]} existingNames
                  * @returns {string} HTML de las <option>.
                  */
-                function buildNameOptions(header, existingNames) {
-                    const isExisting = existingNames.includes(header);
-                    const seen = new Set([header]);
+                function buildNameOptions(preselected, existingNames) {
+                    const isExisting = existingNames.includes(preselected);
+                    const seen = new Set([preselected]);
                     const extra = existingNames.filter((name) => {
                         if (seen.has(name)) return false;
                         seen.add(name);
                         return true;
                     });
 
-                    const headerLabel = isExisting ? escapeHtml(header) : `${escapeHtml(header)} ({{ __('new') }})`;
+                    const headerLabel = isExisting ? escapeHtml(preselected) : `${escapeHtml(preselected)} ({{ __('new') }})`;
 
-                    return `<option value="${escapeHtml(header)}" selected>${headerLabel}</option>`
+                    return `<option value="${escapeHtml(preselected)}" selected>${headerLabel}</option>`
                         + extra.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
                 }
 
@@ -1483,13 +1646,18 @@
                     document.getElementById('import-row-count').textContent =
                         '{{ __('Rows found') }}: ' + rowCount;
 
-                    const optionsHtml = importTargetOptions
-                        .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
-                        .join('');
-
                     const container = document.getElementById('import-mapping-rows');
                     container.innerHTML = headers.map((header, index) => {
                         const samples = sample.map((row) => escapeHtml(row[index] ?? '')).filter(Boolean).join(', ');
+                        const guess = guessImportTarget(header);
+                        const optionsHtml = importTargetOptions
+                            .map(([value, label]) => `<option value="${value}" ${value === guess.target ? 'selected' : ''}>${escapeHtml(label)}</option>`)
+                            .join('');
+                        // Sin adivinar, el nombre del tipo de precio/bodega
+                        // por defecto es el propio encabezado (caso: el
+                        // usuario mapea a mano una columna que ya se llama
+                        // como el tipo de precio/bodega que quiere usar).
+                        const companionName = guess.companion ?? header;
 
                         return `
                             <tr class="import-mapping-row" data-column="${index}">
@@ -1499,14 +1667,14 @@
                                     <select class="import-target-select hidden" data-hs-select='${basicSelectConfigJson}'>
                                         ${optionsHtml}
                                     </select>
-                                    <div class="import-price-name hidden mt-2">
+                                    <div class="import-price-name mt-2 ${guess.target === 'price' ? '' : 'hidden'}">
                                         <select class="import-price-name-select hidden" data-hs-select='${searchableSelectConfigJson}'>
-                                            ${buildNameOptions(header, existingPriceTypeNames)}
+                                            ${buildNameOptions(companionName, existingPriceTypeNames)}
                                         </select>
                                     </div>
-                                    <div class="import-warehouse-name hidden mt-2">
+                                    <div class="import-warehouse-name mt-2 ${guess.target === 'warehouse_stock' ? '' : 'hidden'}">
                                         <select class="import-warehouse-name-select hidden" data-hs-select='${searchableSelectConfigJson}'>
-                                            ${buildNameOptions(header, existingWarehouseNames)}
+                                            ${buildNameOptions(companionName, existingWarehouseNames)}
                                         </select>
                                     </div>
                                 </td>
@@ -1550,6 +1718,8 @@
                         return;
                     }
 
+                    const stockMode = document.getElementById('import-stock-mode-add').checked ? 'add' : 'overwrite';
+
                     const submitBtn = document.getElementById('import-submit-btn');
                     const backBtn = document.getElementById('import-back-btn');
                     const labelEl = document.getElementById('import-submit-label');
@@ -1567,7 +1737,7 @@
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                             },
-                            body: JSON.stringify({ token: importToken, mapping }),
+                            body: JSON.stringify({ token: importToken, mapping, stock_mode: stockMode }),
                         });
                         const data = await response.json();
 

@@ -1114,5 +1114,11 @@
     "Mark as pending": "Marcar como pendiente",
     "Mark as paid": "Marcar como pagada",
     "Pending payment": "Pendiente de pago",
-    "Logo": "Logo"
+    "Logo": "Logo",
+    "Export to Excel": "Exportar a Excel",
+    "Code, description and barcode are always included. Choose any other columns you want in the file.": "El código, la descripción y el código de barras siempre se incluyen. Elige las demás columnas que quieras en el archivo.",
+    "For existing products, stock and warehouses in the file should:": "Para productos que ya existen, el stock y las bodegas del archivo deben:",
+    "Overwrite": "Sobrescribir",
+    "Add to current stock": "Sumar al stock actual",
+    "\"Add\" registers the difference as a stock entry (kardex), same as a manual entry.": "\"Sumar\" registra la diferencia como una entrada de inventario (kardex), igual que una entrada manual."
 }

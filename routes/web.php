@@ -12,6 +12,7 @@ use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceTypeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\QuotationController;
@@ -99,6 +100,9 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
             Route::post('/', [ProductController::class, 'store'])->name('store');
+            Route::post('import/preview', [ProductImportController::class, 'preview'])->name('import.preview');
+            Route::post('import', [ProductImportController::class, 'import'])->name('import');
+            Route::get('export', [ProductExportController::class, 'export'])->name('export');
             Route::get('{product}', [ProductController::class, 'show'])->name('show');
             Route::put('{product}', [ProductController::class, 'update'])->name('update');
             Route::post('{product}/image', [ProductController::class, 'updateImage'])->name('image.update');
@@ -106,8 +110,6 @@ Route::middleware(['auth'])->group(function () {
             Route::post('{product}/stock-entries', [ProductController::class, 'storeStockEntry'])->name('stock-entries.store');
             Route::post('{product}/average-cost', [ProductController::class, 'correctAverageCost'])->name('average-cost.update');
             Route::get('{product}/kardex', [ProductController::class, 'kardex'])->name('kardex');
-            Route::post('import/preview', [ProductImportController::class, 'preview'])->name('import.preview');
-            Route::post('import', [ProductImportController::class, 'import'])->name('import');
         });
 
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PriceType;
 use App\Models\Product;
+use App\Models\StockMovement;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -73,7 +74,10 @@ class ProductImportController extends Controller
             'mapping.*.target' => ['required', 'string', 'in:code,description,barcode,unit_code,tracks_inventory,stock,warehouse_stock,price,cost'],
             'mapping.*.price_type_name' => ['nullable', 'string', 'max:255'],
             'mapping.*.warehouse_name' => ['nullable', 'string', 'max:255'],
+            'stock_mode' => ['nullable', 'string', 'in:overwrite,add'],
         ]);
+
+        $stockMode = $data['stock_mode'] ?? 'overwrite';
 
         $path = $this->resolveImportPath($data['token']);
         abort_unless($path, 404);
@@ -83,6 +87,7 @@ class ProductImportController extends Controller
         $textTargets = ['code', 'description', 'barcode', 'unit_code', 'tracks_inventory'];
 
         $hasWarehouseMapping = collect($data['mapping'])->contains('target', 'warehouse_stock');
+        $hasTracksInventoryMapping = collect($data['mapping'])->contains('target', 'tracks_inventory');
 
         $hasInventoryMapping = collect($data['mapping'])
             ->pluck('target')
@@ -192,6 +197,17 @@ class ProductImportController extends Controller
                 ];
             }
 
+            /**
+             * Si el archivo no trae la columna "Controla inventario",
+             * mantiene lo que el producto ya tenía en vez de asumir "no" --
+             * de lo contrario, cualquier import que solo toque stock/costo
+             * (como el que genera el propio "Exportar a Excel" si no se
+             * marcó esa columna) apagaba el control de inventario y dejaba
+             * el stock en 0 sin que el archivo dijera nada al respecto.
+             */
+            if (! $hasTracksInventoryMapping && $product) {
+                $tracksInventory = (bool) $product->tracks_inventory;
+            }
             $tracksInventory = $tracksInventory || ! empty($newWarehouseEntries);
 
             $productData = [];
@@ -208,29 +224,76 @@ class ProductImportController extends Controller
                 $productData['unit_price'] = $extraPrices[0]['price'];
                 $productData['extra_prices'] = $extraPrices;
             }
-            if ($cost !== null) {
+            $isAddMode = $product && $stockMode === 'add';
+            if ($cost !== null && ! $isAddMode) {
                 $productData['average_cost'] = $cost;
             }
 
+            $addedUnassigned = 0.0;
+            $addedByWarehouse = [];
+
             if ($hasInventoryMapping) {
-                
                 $existingEntries = $product
                     ? collect($product->warehouse_stocks ?? [])->keyBy('warehouse_id')->all()
                     : [];
-                $mergedEntries = $hasWarehouseMapping
-                    ? array_merge($existingEntries, $newWarehouseEntries)
-                    : $existingEntries;
 
-                $totalStock = $unassignedStock + array_sum(array_column($mergedEntries, 'stock'));
+                if ($isAddMode) {
+                    /**
+                     * "Sumar" en vez de "sobrescribir": lo que trae el
+                     * archivo se ADICIONA al stock/bodega que ya tenía el
+                     * producto, en vez de reemplazarlo -- igual que
+                     * ProductController::storeStockEntry() (misma entrada
+                     * de kardex, mismo recálculo de costo promedio
+                     * ponderado con la cantidad realmente agregada).
+                     */
+                    $mergedEntries = $existingEntries;
+                    foreach ($newWarehouseEntries as $warehouseId => $entry) {
+                        $addedByWarehouse[$warehouseId] = (float) $entry['stock'];
+                        $prevQty = (float) ($mergedEntries[$warehouseId]['stock'] ?? 0);
+                        $mergedEntries[$warehouseId] = ['warehouse_id' => $warehouseId, 'stock' => $prevQty + $entry['stock']];
+                    }
+                    $addedUnassigned = $unassignedStock;
+                    $totalStock = (float) ($product->stock ?? 0) + $addedUnassigned + array_sum($addedByWarehouse);
+                } else {
+                    $mergedEntries = $hasWarehouseMapping
+                        ? array_merge($existingEntries, $newWarehouseEntries)
+                        : $existingEntries;
+
+                    $totalStock = $unassignedStock + array_sum(array_column($mergedEntries, 'stock'));
+                }
 
                 $productData['warehouse_stocks'] = array_values($mergedEntries);
                 $productData['tracks_inventory'] = $tracksInventory;
                 $productData['stock'] = $tracksInventory ? $totalStock : 0;
+
+                if ($isAddMode && $cost !== null) {
+                    $totalAdded = $addedUnassigned + array_sum($addedByWarehouse);
+                    if ($totalAdded > 0) {
+                        $oldQty = (float) ($product->stock ?? 0);
+                        $oldAvg = (float) ($product->average_cost ?? 0);
+                        $newQty = $oldQty + $totalAdded;
+                        $productData['average_cost'] = $newQty > 0.00001
+                            ? round((($oldQty * $oldAvg) + ($totalAdded * $cost)) / $newQty, 4)
+                            : $cost;
+                    }
+                }
             }
 
             if ($product) {
                 $product->update($productData);
                 $updated++;
+
+                if ($isAddMode) {
+                    $unitCost = $cost ?? (float) ($product->average_cost ?? 0);
+                    if ($addedUnassigned > 0) {
+                        $this->logStockMovement($product, $addedUnassigned, 'import', $request, null, $unitCost);
+                    }
+                    foreach ($addedByWarehouse as $warehouseId => $qty) {
+                        if ($qty > 0) {
+                            $this->logStockMovement($product, $qty, 'import', $request, $warehouseId, $unitCost);
+                        }
+                    }
+                }
             } else {
                 
                 $productData['code'] = $codigo;
@@ -257,6 +320,27 @@ class ProductImportController extends Controller
                 'no_description' => $skippedReasons['no_description'] ?? 0,
                 'no_price' => $skippedReasons['no_price'] ?? 0,
             ],
+        ]);
+    }
+
+    /**
+     * Mismo registro de kardex que ProductController::storeStockEntry(),
+     * para que el stock agregado desde una importación (modo "add") quede
+     * trazable igual que una entrada manual.
+     */
+    private function logStockMovement(Product $product, float $quantity, string $reason, Request $request, ?string $warehouseId, float $unitCost): void
+    {
+        StockMovement::create([
+            'company_id' => $product->company_id,
+            'product_id' => (string) $product->_id,
+            'warehouse_id' => $warehouseId,
+            'type' => 'in',
+            'quantity' => $quantity,
+            'unit_cost' => $unitCost,
+            'total_cost' => round($quantity * $unitCost, 2),
+            'balance_after' => $warehouseId ? $product->stockForWarehouse($warehouseId) : $product->unassigned_stock,
+            'reason' => $reason,
+            'user_id' => (string) $request->user()->_id,
         ]);
     }
 
