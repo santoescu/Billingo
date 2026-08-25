@@ -1120,5 +1120,9 @@
     "For existing products, stock and warehouses in the file should:": "Para productos que ya existen, el stock y las bodegas del archivo deben:",
     "Overwrite": "Sobrescribir",
     "Add to current stock": "Sumar al stock actual",
-    "\"Add\" registers the difference as a stock entry (kardex), same as a manual entry.": "\"Sumar\" registra la diferencia como una entrada de inventario (kardex), igual que una entrada manual."
+    "\"Add\" registers the difference as a stock entry (kardex), same as a manual entry.": "\"Sumar\" registra la diferencia como una entrada de inventario (kardex), igual que una entrada manual.",
+    ":client requested quotation :numeral for :total.": ":client solicitó la cotización :numeral por :total.",
+    ":product is down to :stock units.": ":product bajó a :stock unidades.",
+    "Overdue invoice": "Factura vencida",
+    "Invoice :numeral for :total is overdue.": "La factura :numeral por :total está vencida."
 }

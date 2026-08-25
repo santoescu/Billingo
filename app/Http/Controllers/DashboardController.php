@@ -28,14 +28,6 @@ use Illuminate\Support\Collection;
  */
 class DashboardController extends Controller
 {
-    /**
-     * Umbral fijo para la alerta de "stock bajo": no hay un mínimo
-     * configurable por producto todavía, así que se usa el mismo criterio
-     * que ya existe en otras partes de la app (p. ej. el catálogo público
-     * solo vende con stock > 1) como referencia razonable.
-     */
-    private const LOW_STOCK_THRESHOLD = 5;
-
     private const PERIODS = ['today', 'week', 'month', 'last_month', 'year'];
 
     public function index(Request $request)
@@ -736,7 +728,7 @@ class DashboardController extends Controller
 
         return $company->products()->active()
             ->where('tracks_inventory', true)
-            ->where('stock', '<=', self::LOW_STOCK_THRESHOLD)
+            ->where('stock', '<=', Product::LOW_STOCK_THRESHOLD)
             ->orderBy('stock')
             ->limit(8)
             ->get()

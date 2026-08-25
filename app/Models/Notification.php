@@ -38,4 +38,22 @@ class Notification extends Eloquent
             $this->update(['read_at' => now()]);
         }
     }
+
+    /**
+     * Crea la misma notificación para varios usuarios de una sola vez
+     * (avisos de sistema, sin 'sender_id' -- no viene de un usuario puntual).
+     *
+     * @param  array<int, string>  $userIds
+     */
+    public static function notifyUsers(array $userIds, string $title, string $body, ?string $url = null): void
+    {
+        foreach (array_unique($userIds) as $userId) {
+            self::create([
+                'user_id' => $userId,
+                'title' => $title,
+                'body' => $body,
+                'url' => $url,
+            ]);
+        }
+    }
 }

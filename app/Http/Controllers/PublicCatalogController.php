@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\CatalogLink;
 use App\Models\Company;
+use App\Models\CompanyMember;
+use App\Models\Notification;
+use App\Models\Quotation;
 use App\Models\ThirdParty;
 use App\Models\Warehouse;
 use App\Services\Dian\IssueDocumentService;
@@ -280,6 +283,8 @@ class PublicCatalogController extends Controller
             return response()->json(['message' => __('Could not issue the quotation.')], 500);
         }
 
+        $this->notifyQuotationRecipients($company, $quotation);
+
         return response()->json([
             'numeral' => $quotation->numeral,
             'total_formatted' => $quotation->total_formatted,
@@ -304,5 +309,39 @@ class PublicCatalogController extends Controller
             ->setPaper('letter', 'portrait');
 
         return $pdf->stream('cotizacion-' . $documento->numeral . '.pdf');
+    }
+
+    /**
+     * Avisa a todos los que pueden ver el módulo de cotizaciones de esta
+     * empresa (cualquier rol, no solo administrador) cuando un cliente
+     * arma una desde el catálogo público -- el 'owner' de la empresa
+     * también entra aunque no tenga una entrada explícita en 'modules',
+     * igual que el resto de la app lo trata como con acceso a todo.
+     */
+    private function notifyQuotationRecipients(Company $company, Quotation $quotation): void
+    {
+        $recipientIds = CompanyMember::where('company_id', (string) $company->_id)
+            ->get()
+            ->filter(function (CompanyMember $member) {
+                if ($member->role === 'owner') {
+                    return true;
+                }
+
+                return collect($member->modules ?? [])->contains(fn ($assignment) => ($assignment['module'] ?? null) === 'cotizaciones');
+            })
+            ->pluck('user_id')
+            ->unique()
+            ->all();
+
+        Notification::notifyUsers(
+            $recipientIds,
+            __('New quotation'),
+            __(':client requested quotation :numeral for :total.', [
+                'client' => data_get($quotation->payload, 'accounting_customer_party.razon_social', __('Unknown')),
+                'numeral' => $quotation->numeral,
+                'total' => $quotation->total_formatted,
+            ]),
+            route('quotations.show', ['quotation' => $quotation->_id]),
+        );
     }
 }

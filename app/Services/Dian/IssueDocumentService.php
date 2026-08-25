@@ -6,6 +6,7 @@ use App\Models\CashShift;
 use App\Models\Company;
 use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
+use App\Models\Notification;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\Resolution;
@@ -892,9 +893,10 @@ class IssueDocumentService
             $warehouseId = $linea['bodega_id'] ?? null;
             $balanceAfter = null;
             $unitCost = (float) ($product->average_cost ?? 0);
+            $stockBefore = (float) $product->stock;
 
             if ($warehouseId) {
-                
+
                 foreach ($stocks as &$entry) {
                     if (($entry['warehouse_id'] ?? null) === $warehouseId) {
                         $entry['stock'] = (float) ($entry['stock'] ?? 0) - $cantidad;
@@ -922,7 +924,34 @@ class IssueDocumentService
                 'reason' => 'document:' . $numeral,
                 'user_id' => $userId,
             ]);
+
+            $this->notifyIfLowStockCrossed($company, $product, $stockBefore);
         }
+    }
+
+    /**
+     * Avisa a los administradores de la empresa (cualquier módulo, más el
+     * 'owner') solo el instante en que el stock CRUZA el umbral -- si ya
+     * venía bajo antes de esta venta, no se repite el aviso en cada venta
+     * siguiente mientras se mantenga bajo.
+     */
+    private function notifyIfLowStockCrossed(Company $company, Product $product, float $stockBefore): void
+    {
+        $stockAfter = (float) $product->stock;
+
+        if ($stockBefore <= Product::LOW_STOCK_THRESHOLD || $stockAfter > Product::LOW_STOCK_THRESHOLD) {
+            return;
+        }
+
+        Notification::notifyUsers(
+            $company->administratorUserIds(),
+            __('Low stock'),
+            __(':product is down to :stock units.', [
+                'product' => $product->description,
+                'stock' => rtrim(rtrim(number_format($stockAfter, 2), '0'), '.'),
+            ]),
+            route('products.show', ['product' => $product->_id]),
+        );
     }
 
     /**

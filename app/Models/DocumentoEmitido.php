@@ -43,6 +43,7 @@ class DocumentoEmitido extends Model
         'referencias',
         'notes',
         'paid_at',
+        'overdue_notified_at',
     ];
 
     protected function casts(): array
@@ -55,6 +56,7 @@ class DocumentoEmitido extends Model
             'fecha_expedicion' => 'datetime',
             'due_date' => 'datetime',
             'paid_at' => 'datetime',
+            'overdue_notified_at' => 'datetime',
         ];
     }
 

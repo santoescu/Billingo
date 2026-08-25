@@ -121,6 +121,32 @@ class Company extends Model
         return $this->hasMany(CompanyMember::class);
     }
 
+    /**
+     * IDs de usuario administradores de esta empresa: el 'owner' (acceso
+     * implícito a todo, sin entrada propia en 'modules') más cualquier
+     * miembro con rol 'administrador' en AL MENOS un módulo, sin importar
+     * cuál -- para avisos que le interesan a "quien administra" sin atarlos
+     * a un módulo puntual (alertas de stock bajo, cartera vencida, etc.).
+     *
+     * @return array<int, string>
+     */
+    public function administratorUserIds(): array
+    {
+        return $this->members()
+            ->get()
+            ->filter(function (CompanyMember $member) {
+                if ($member->role === 'owner') {
+                    return true;
+                }
+
+                return collect($member->modules ?? [])->contains(fn ($assignment) => ($assignment['role'] ?? null) === 'administrador');
+            })
+            ->pluck('user_id')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function hasModule(string $module): bool
     {
         return in_array($module, $this->modules ?? [], true);

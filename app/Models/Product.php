@@ -9,6 +9,8 @@ class Product extends Model
     protected $connection = 'mongodb';
     protected $table = 'products';
 
+    public const LOW_STOCK_THRESHOLD = 5;
+
     protected $fillable = [
         'company_id',
         'code',
