@@ -273,6 +273,16 @@
             </div>
         @endif
 
+        @if ($sellerComparison)
+            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800 mb-6">
+                <h3 class="flex items-center justify-between gap-2 mb-3">
+                    <span class="text-sm font-semibold text-gray-800 dark:text-white">{{ __('Sales by seller') }} ({{ $periods[$period] }})</span>
+                    @include('panel.partials.module-badge', ['module' => 'pos'])
+                </h3>
+                <div id="panel-seller-chart"></div>
+            </div>
+        @endif
+
         @if ($paymentMethodBreakdown['invoicing'] || $paymentMethodBreakdown['pos'])
             <div class="grid gap-4 sm:grid-cols-2 mb-6">
                 @if ($paymentMethodBreakdown['invoicing'])
@@ -423,6 +433,46 @@
                                 yaxis: { labels: { formatter: (value) => '$' + Number(value).toLocaleString('es-CO') } },
                                 dataLabels: { enabled: false },
                                 colors: [MODULE_COLORS.pos],
+                            }).render();
+                        }
+                    @endif
+
+                    @if ($sellerComparison)
+                        const sellerEl = document.getElementById('panel-seller-chart');
+                        if (sellerEl && ! sellerEl.dataset.rendered) {
+                            sellerEl.dataset.rendered = 'true';
+                            new ApexCharts(sellerEl, {
+                                chart: { type: 'bar', height: Math.max(260, {{ count($sellerComparison['labels']) }} * 40), toolbar: { show: false } },
+                                plotOptions: { bar: { horizontal: true, distributed: true } },
+                                legend: { show: false },
+                                series: [{ name: @json(__('Sales')), data: @json($sellerComparison['values']) }],
+                                // En barras horizontales, ApexCharts usa
+                                // "xaxis" para el eje numérico (abajo) y
+                                // "yaxis" para los nombres (izquierda) --
+                                // al revés que en una gráfica vertical. El
+                                // formateador de dólares va en xaxis, no en
+                                // yaxis (si no, se aplica sobre los nombres
+                                // de los vendedores). "min: 0" evita que,
+                                // con un solo vendedor, el eje se quede sin
+                                // rango para calcular la escala.
+                                xaxis: {
+                                    categories: @json($sellerComparison['labels']),
+                                    min: 0,
+                                    labels: { formatter: (value) => '$' + Number(value).toLocaleString('es-CO') },
+                                },
+                                dataLabels: { enabled: false },
+                                colors: @json($sellerComparison['labels']).map((_, index) => index === 0 ? MODULE_COLORS.pos : '#bfdbfe'),
+                                // tooltip.y (no tooltip.x) formatea el VALOR
+                                // que se muestra en el tooltip -- "x"/"y" acá
+                                // son roles de dato (categoría/valor), no
+                                // posición visual, así que no se invierten
+                                // con horizontal:true como sí pasa con los
+                                // ejes.
+                                tooltip: {
+                                    y: {
+                                        formatter: (value) => '$' + Number(value).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                                    },
+                                },
                             }).render();
                         }
                     @endif

@@ -12,5 +12,9 @@
             class="py-3 px-1 border-b-2 text-sm font-medium {{ $activeTab === 'shift' ? 'border-accent text-accent' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200' }}">
             {{ __('Cash register') }}
         </a>
+        <a href="{{ route('pos.sellers.index') }}" wire:navigate
+            class="py-3 px-1 border-b-2 text-sm font-medium {{ $activeTab === 'sellers' ? 'border-accent text-accent' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200' }}">
+            {{ __('Sellers') }}
+        </a>
     </nav>
 </div>

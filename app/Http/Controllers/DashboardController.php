@@ -128,6 +128,7 @@ class DashboardController extends Controller
             'invoiceStatusBreakdown' => $this->buildInvoiceStatusBreakdown($data),
             'warehouseComparison' => $this->buildWarehouseComparison($warehouses, $data),
             'cashierComparison' => $this->buildCashierComparison($company, $data),
+            'sellerComparison' => $this->buildSellerComparison($data),
             'paymentMethodBreakdown' => $this->buildPaymentMethodBreakdown($data),
             'topProductsInvoicing' => $this->buildTopProducts($data, 'invoicing'),
             'topProductsPos' => $this->buildTopProducts($data, 'pos'),
@@ -581,6 +582,39 @@ class DashboardController extends Controller
         return [
             'labels' => $totals->keys()->map(fn ($id) => $namesById->get($id, __('Unknown')))->all(),
             'values' => $totals->values()->all(),
+        ];
+    }
+
+    /**
+     * Ventas por vendedor (no por cajero -- una caja puede facturar a
+     * nombre de varios vendedores). A diferencia de los demás comparativos
+     * del panel, SIEMPRE muestra todos los vendedores con ventas en el
+     * periodo, aunque haya uno solo -- el usuario pidió explícitamente ver
+     * el ranking completo, no solo cuando hay algo que comparar.
+     */
+    private function buildSellerComparison(array $data): ?array
+    {
+        if (! isset($data['pos']) || $data['pos']['period']->isEmpty()) {
+            return null;
+        }
+
+        $totals = $data['pos']['period']
+            ->filter(fn ($sale) => $sale->seller_id)
+            ->groupBy('seller_id')
+            ->map(fn (Collection $group) => [
+                'name' => $group->first()->seller_name ?: __('Unknown'),
+                'total' => (float) $group->sum('total'),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        if ($totals->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'labels' => $totals->pluck('name')->all(),
+            'values' => $totals->pluck('total')->all(),
         ];
     }
 

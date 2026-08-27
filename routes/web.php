@@ -16,6 +16,7 @@ use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\SellerController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\SuperadminController;
 use App\Http\Controllers\ThirdPartyController;
@@ -168,6 +169,10 @@ Route::middleware(['auth'])->group(function () {
             Route::post('payment-methods', [PaymentMethodController::class, 'store'])->name('payment-methods.store');
             Route::put('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
             Route::delete('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
+            Route::get('sellers', [SellerController::class, 'index'])->name('sellers.index');
+            Route::post('sellers', [SellerController::class, 'store'])->name('sellers.store');
+            Route::put('sellers/{seller}', [SellerController::class, 'update'])->name('sellers.update');
+            Route::delete('sellers/{seller}', [SellerController::class, 'destroy'])->name('sellers.destroy');
         });
 
     Route::middleware(['company.selected', 'company.role:cotizaciones,administrador,vendedor,auditor'])

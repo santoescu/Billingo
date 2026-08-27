@@ -201,6 +201,22 @@
         </table>
     @endif
 
+    @if ($sellerComparison)
+        <h2>{{ __('Sales by seller') }}</h2>
+        <table class="items">
+            <tr class="items-head">
+                <td>{{ __('Seller') }}</td>
+                <td class="end">{{ __('Total') }}</td>
+            </tr>
+            @foreach ($sellerComparison['labels'] as $index => $label)
+                <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
+                    <td>{{ $label }}</td>
+                    <td class="end">${{ number_format($sellerComparison['values'][$index], 2) }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
     @if ($paymentMethodBreakdown['invoicing'])
         <h2>{{ __('Payment methods') }} &middot; {{ config('modules.invoicing.name') }}</h2>
         <table class="items">

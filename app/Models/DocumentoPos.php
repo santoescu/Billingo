@@ -37,6 +37,8 @@ class DocumentoPos extends Model
         'payments',
         'notes',
         'documento_emitido_id',
+        'seller_id',
+        'seller_name',
     ];
 
     protected function casts(): array

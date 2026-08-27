@@ -108,6 +108,18 @@
                     <div id="pos-client-results" class="hidden absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-white/10 rounded-lg shadow-xl"></div>
                 </div>
                 <p id="pos-client-identificacion" class="mt-1 text-xs text-zinc-500 dark:text-neutral-400">{{ $defaultClient->identificacion }}</p>
+
+                @if ($sellers->isNotEmpty())
+                    <div class="mt-3">
+                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">{{ __('Seller') }}</label>
+                        <select id="pos-seller-select" data-hs-select='{!! $paymentSelectConfig !!}' class="hidden">
+                            <option value="">{{ __('No seller assigned') }}</option>
+                            @foreach ($sellers as $seller)
+                                <option value="{{ $seller->_id }}">{{ $seller->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
             </div>
 
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
@@ -281,6 +293,7 @@
                         payments: paymentMethods.length > 0 ? [{ paymentMethodId: paymentMethods[0].id, amount: 0 }] : [],
                         efectivoRecibido: '',
                         warehouseId: 'all',
+                        sellerId: '',
                     };
                     tickets.push(ticket);
                     return ticket;
@@ -366,6 +379,16 @@
                     document.getElementById('pos-client-search').value = ticket.client.name;
                     document.getElementById('pos-client-identificacion').textContent = ticket.client.identificacion;
                     document.getElementById('pos-client-results').classList.add('hidden');
+
+                    const sellerSelect = document.getElementById('pos-seller-select');
+                    if (sellerSelect) {
+                        const sellerInstance = window.HSSelect && HSSelect.getInstance(sellerSelect);
+                        if (sellerInstance) {
+                            sellerInstance.setValue(ticket.sellerId || '');
+                        } else {
+                            sellerSelect.value = ticket.sellerId || '';
+                        }
+                    }
 
                     renderPaymentLines();
                     document.getElementById('pos-efectivo-display').value = ticket.efectivoRecibido;
@@ -453,7 +476,7 @@
                         card.type = 'button';
                         card.className = 'flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-neutral-700 p-2.5 text-start hover:border-accent hover:shadow-sm focus:outline-hidden focus:ring-2 focus:ring-accent transition';
                         const iconHtml = product.image_url
-                            ? `<img src="${product.image_url}" alt="" class="shrink-0 size-12 rounded-lg object-cover">`
+                            ? `<img src="${product.image_url}" alt="" class="shrink-0 size-12 rounded-lg object-cover zoomable-thumb cursor-zoom-in">`
                             : `<span class="flex items-center justify-center shrink-0 size-12 rounded-lg bg-accent/10 text-accent">
                                 <svg class="shrink-0 size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                             </span>`;
@@ -589,6 +612,25 @@
                     };
                     warehouseSelect.addEventListener('change', onWarehouseChange);
                     warehouseSelect.addEventListener('change.hs.select', onWarehouseChange);
+                }
+
+                /**
+                 * El vendedor es propio de cada pre-cuenta (ticket), igual
+                 * que la bodega -- una caja puede facturar a nombre de
+                 * varios vendedores en pestañas distintas.
+                 * @returns {void}
+                 */
+                function bindSellerSelect() {
+                    const sellerSelect = document.getElementById('pos-seller-select');
+                    if (! sellerSelect) {
+                        return;
+                    }
+
+                    const onSellerChange = () => {
+                        activeTicket().sellerId = sellerSelect.value;
+                    };
+                    sellerSelect.addEventListener('change', onSellerChange);
+                    sellerSelect.addEventListener('change.hs.select', onSellerChange);
                 }
 
                 // --- Carrito ---
@@ -1306,6 +1348,9 @@
                     body.append('cliente_ciudad_codigo', client.city_code || '');
                     body.append('cliente_telefono', client.phone || '');
                     body.append('cliente_email', client.email || '');
+                    if (ticket.sellerId) {
+                        body.append('seller_id', ticket.sellerId);
+                    }
                     ticket.payments.forEach((payment, index) => {
                         if (! payment.paymentMethodId) {
                             return;
@@ -1524,6 +1569,7 @@
                     bindClientControls();
                     bindPaymentControls();
                     bindCheckout();
+                    bindSellerSelect();
 
                     renderProducts(initialProducts);
                     updatePosCashSectionVisibility();

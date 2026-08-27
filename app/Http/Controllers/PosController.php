@@ -53,6 +53,7 @@ class PosController extends Controller
         }
 
         $paymentMethods = $company->paymentMethods()->orderBy('name')->get();
+        $sellers = $company->sellers()->orderBy('name')->get();
 
         $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
 
@@ -63,6 +64,7 @@ class PosController extends Controller
             'shift' => $shift,
             'company' => $company,
             'paymentMethods' => $paymentMethods,
+            'sellers' => $sellers,
             'products' => $documentController->mapProductsForJs($products),
             'warehouses' => $company->warehouses()->orderBy('name')->get(),
             'priceTypes' => $company->priceTypes()->orderBy('name')->get(),

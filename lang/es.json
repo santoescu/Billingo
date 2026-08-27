@@ -1124,5 +1124,13 @@
     ":client requested quotation :numeral for :total.": ":client solicitó la cotización :numeral por :total.",
     ":product is down to :stock units.": ":product bajó a :stock unidades.",
     "Overdue invoice": "Factura vencida",
-    "Invoice :numeral for :total is overdue.": "La factura :numeral por :total está vencida."
+    "Invoice :numeral for :total is overdue.": "La factura :numeral por :total está vencida.",
+    "Seller": "Vendedor",
+    "Sellers": "Vendedores",
+    "The sellers you can pick from when charging a POS sale.": "Los vendedores que puedes elegir al cobrar una venta del POS.",
+    "New seller": "Nuevo vendedor",
+    "Edit seller": "Editar vendedor",
+    "No seller assigned": "Sin vendedor asignado",
+    "Sales by seller": "Ventas por vendedor",
+    "Best seller": "Mejor vendedor"
 }

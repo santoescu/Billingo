@@ -250,6 +250,11 @@ class Company extends Model
         return $this->hasMany(PaymentMethod::class);
     }
 
+    public function sellers()
+    {
+        return $this->hasMany(Seller::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where(function ($query) {

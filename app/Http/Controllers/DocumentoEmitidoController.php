@@ -535,6 +535,8 @@ class DocumentoEmitidoController extends Controller
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
             'cliente_email' => ['nullable', 'email', 'max:255'],
 
+            'seller_id' => ['nullable', 'string'],
+
             'payment_means_id' => ['nullable', 'array'],
             'payment_means_id.*' => ['nullable', 'string', 'in:1,2'],
             'payment_method_id' => ['nullable', 'array'],
@@ -618,10 +620,14 @@ class DocumentoEmitidoController extends Controller
             ->all();
 
         $firstPayment = $payments[0] ?? null;
+        $seller = ! empty($data['seller_id']) ? $company->sellers()->find($data['seller_id']) : null;
+
         $documentoPos->update([
             'payment_method_id' => $firstPayment['payment_method_id'] ?? null,
             'payment_method_name' => $firstPayment['payment_method_name'] ?? null,
             'payments' => $payments,
+            'seller_id' => $seller ? (string) $seller->_id : null,
+            'seller_name' => $seller?->name,
         ]);
 
         return $documentoPos;
