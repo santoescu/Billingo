@@ -1,4 +1,4 @@
-@props(['nameFrom', 'nameTo', 'label' => null, 'valueFrom' => null, 'valueTo' => null])
+@props(['nameFrom', 'nameTo', 'label' => null, 'valueFrom' => null, 'valueTo' => null, 'allowOpenEnd' => false, 'floating' => false])
 
 @php
     $id = 'daterange-' . $nameFrom;
@@ -35,7 +35,7 @@
         <label for="{{ $id }}-input" class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $label }}</label>
     @endif
 
-    <div class="relative" data-daterange>
+    <div class="relative" data-daterange {{ $allowOpenEnd ? 'data-daterange-allow-open-end' : '' }} {{ $floating ? 'data-daterange-floating' : '' }}>
         <input type="text" id="{{ $id }}-input" readonly autocomplete="off"
             class="w-full cursor-pointer bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent"
             placeholder="{{ __('Select period') }}" data-daterange-trigger>

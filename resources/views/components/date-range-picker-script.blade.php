@@ -39,6 +39,8 @@
                 const nextBtn = panel.querySelector('[data-daterange-next="right"]');
                 const cancelBtn = panel.querySelector('[data-daterange-cancel]');
                 const applyBtn = panel.querySelector('[data-daterange-apply]');
+                const allowOpenEnd = root.hasAttribute('data-daterange-allow-open-end');
+                const floating = root.hasAttribute('data-daterange-floating');
 
                 let committedStart = hiddenFrom.value ? new Date(hiddenFrom.value + 'T00:00:00') : null;
                 let committedEnd = hiddenTo.value ? new Date(hiddenTo.value + 'T00:00:00') : null;
@@ -147,21 +149,67 @@
                     renderSide('right');
                 }
 
+                function positionFloatingPanel() {
+                    if (! floating) {
+                        return;
+                    }
+
+                    const triggerRect = trigger.getBoundingClientRect();
+                    const panelWidth = panel.offsetWidth;
+
+                    let left = triggerRect.right - panelWidth;
+                    left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+
+                    let top = triggerRect.bottom + 8;
+                    const panelHeight = panel.offsetHeight;
+                    if (top + panelHeight > window.innerHeight - 8) {
+                        top = Math.max(8, triggerRect.top - panelHeight - 8);
+                    }
+
+                    panel.style.position = 'fixed';
+                    panel.style.margin = '0';
+                    panel.style.left = `${left}px`;
+                    panel.style.top = `${top}px`;
+                    panel.style.zIndex = '100';
+                }
+
                 function openPanel() {
                     document.querySelectorAll('[data-daterange-panel], [data-datepicker-panel]').forEach((p) => {
                         if (p !== panel) p.classList.add('hidden');
                     });
+
+                    // Un ancestro con "transform" (como el panel deslizante de admin) crea un
+                    // containing block propio para los descendientes position:fixed -- el
+                    // calendario ya no se posicionaría relativo al viewport sino a ese ancestro,
+                    // quedando invisible/mal ubicado. Sacarlo al <body> lo libera de eso.
+                    if (floating && panel.parentElement !== document.body) {
+                        document.body.appendChild(panel);
+                    }
+
                     draftStart = committedStart;
                     draftEnd = committedEnd;
                     viewYear = (draftStart || today).getFullYear();
                     viewMonth = (draftStart || today).getMonth();
                     panel.classList.remove('hidden');
                     renderBoth();
+                    positionFloatingPanel();
                 }
 
                 function closePanel() {
                     panel.classList.add('hidden');
                 }
+
+                root.daterangeSetValue = function (from, to) {
+                    committedStart = from ? new Date(from + 'T00:00:00') : null;
+                    committedEnd = to ? new Date(to + 'T00:00:00') : null;
+                    draftStart = committedStart;
+                    draftEnd = committedEnd;
+                    hiddenFrom.value = from ?? '';
+                    hiddenTo.value = to ?? '';
+                    trigger.value = formatDisplay();
+                    viewYear = (committedStart || today).getFullYear();
+                    viewMonth = (committedStart || today).getMonth();
+                };
 
                 trigger.addEventListener('click', () => {
                     if (panel.classList.contains('hidden')) {
@@ -222,9 +270,9 @@
                         return;
                     }
                     committedStart = draftStart;
-                    committedEnd = draftEnd || draftStart;
+                    committedEnd = draftEnd || (allowOpenEnd ? null : draftStart);
                     hiddenFrom.value = toIsoDate(committedStart);
-                    hiddenTo.value = toIsoDate(committedEnd);
+                    hiddenTo.value = committedEnd ? toIsoDate(committedEnd) : '';
                     trigger.value = formatDisplay();
                 }
 
@@ -244,8 +292,8 @@
                 }
 
                 document.addEventListener('click', (event) => {
-                    if (! root.contains(event.target) && ! panel.classList.contains('hidden')) {
-                        if (draftStart && draftEnd) {
+                    if (! root.contains(event.target) && ! panel.contains(event.target) && ! panel.classList.contains('hidden')) {
+                        if (draftStart && (draftEnd || allowOpenEnd)) {
                             applyDraft();
                         }
                         closePanel();

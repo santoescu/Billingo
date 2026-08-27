@@ -70,6 +70,10 @@ class IssueDocumentService
             return $existente;
         }
 
+        if (! $existente) {
+            $this->consumeContractQuota($company, 'invoicing');
+        }
+
         $secuencial = $this->syncResolutionNumbering($resolution, $numeral);
 
         return $this->buildSignSubmitAndPersist(
@@ -101,6 +105,8 @@ class IssueDocumentService
         $payload = $this->mapper->map($company, $request);
 
         $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
+
+        $this->consumeContractQuota($company, 'pos');
 
         $numero = $resolution->claimNextNumber();
         $numeral = trim($resolution->prefix . $numero, '-');
@@ -152,6 +158,8 @@ class IssueDocumentService
 
         $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
 
+        $this->consumeContractQuota($company, 'cotizaciones');
+
         $numero = $resolution->claimNextNumber();
         $numeral = trim($resolution->prefix . $numero, '-');
 
@@ -194,6 +202,8 @@ class IssueDocumentService
         $tipoDocumento = $payload['tipo_documento'];
         $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
 
+        $this->consumeContractQuota($company, 'invoicing');
+
         $numero = $resolution->claimNextNumber();
         $numeral = trim($resolution->prefix . $numero, '-');
 
@@ -224,6 +234,8 @@ class IssueDocumentService
         $payload = $documentoPos->payload;
         $tipoDocumento = $payload['tipo_documento'] ?? '01';
         $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+
+        $this->consumeContractQuota($company, 'invoicing');
 
         $numero = $resolution->claimNextNumber();
         $numeral = trim($resolution->prefix . $numero, '-');
@@ -974,5 +986,24 @@ class IssueDocumentService
         unlink($tmpPath);
 
         return $content;
+    }
+
+    /**
+     * Descuenta un documento del cupo del contrato vigente de la empresa. Toda empresa
+     * necesita un contrato activo (por fechas) para poder emitir documentos, sin excepción.
+     *
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     *
+     * @throws RuntimeException Si la empresa no tiene un contrato vigente o no queda cupo disponible.
+     */
+    private function consumeContractQuota(Company $company, string $module): void
+    {
+        $contract = $company->activeContractFor($module);
+
+        if (! $contract) {
+            throw new RuntimeException(__('This company has no active contract covering this module.'));
+        }
+
+        $contract->claimUsage($module);
     }
 }

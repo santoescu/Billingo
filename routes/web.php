@@ -207,6 +207,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('companies/{companyId}/members', [SuperadminController::class, 'storeMember'])->name('companies.members.store');
         Route::put('companies/{companyId}/members/{userId}', [SuperadminController::class, 'updateMember'])->name('companies.members.update');
         Route::delete('companies/{companyId}/members/{userId}', [SuperadminController::class, 'destroyMember'])->name('companies.members.destroy');
+        Route::post('companies/{companyId}/contracts', [SuperadminController::class, 'storeContract'])->name('companies.contracts.store');
+        Route::put('companies/{companyId}/contracts/{contractId}', [SuperadminController::class, 'updateContract'])->name('companies.contracts.update');
+        Route::delete('companies/{companyId}/contracts/{contractId}', [SuperadminController::class, 'destroyContract'])->name('companies.contracts.destroy');
 
         Route::get('users', [SuperadminController::class, 'users'])->name('users');
         Route::post('users/{userId}/toggle-superadmin', [SuperadminController::class, 'toggleSuperadmin'])->name('users.toggle-superadmin');

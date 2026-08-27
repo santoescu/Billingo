@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\CompanyContract;
 use App\Models\CompanyMember;
 use App\Models\Notification;
 use App\Models\User;
@@ -65,7 +66,15 @@ class SuperadminController extends Controller
             ->sortBy('name')
             ->values();
 
-        return view('admin.company-edit', compact('company', 'members'));
+        // Los vigentes primero (para no tener que buscarlos entre muchos histórios), y dentro
+        // de cada grupo (vigentes / no vigentes) el más reciente primero.
+        $contracts = CompanyContract::where('company_id', $companyId)
+            ->orderByDesc('starts_at')
+            ->get()
+            ->sortByDesc(fn (CompanyContract $contract) => $contract->isWithinDateRange())
+            ->values();
+
+        return view('admin.company-edit', compact('company', 'members', 'contracts'));
     }
 
     /**
@@ -85,6 +94,128 @@ class SuperadminController extends Controller
         session()->flash('toast', [
             'type' => 'success',
             'message' => __('Updated :name', ['name' => __('Company')]),
+        ]);
+
+        return redirect()->route('admin.companies.edit', $companyId);
+    }
+
+    /**
+     * Crear un nuevo contrato para la empresa (no reemplaza los anteriores: quedan como
+     * histórico). El vigente lo decide Company::activeContract() según las fechas.
+     */
+    public function storeContract(Request $request, string $companyId)
+    {
+        $company = Company::findOrFail($companyId);
+
+        $data = $this->validatedContractData($request, $company);
+
+        CompanyContract::create([
+            'company_id' => $companyId,
+            'price' => $data['price'] ?? null,
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'] ?? null,
+            'unlimited' => (bool) ($data['unlimited'] ?? false),
+            'modules' => array_values($data['modules']),
+            'quota_mode' => $data['quota_mode'],
+            'renewal_type' => $data['renewal_type'],
+            'period_started_at' => now(),
+            'shared_limit' => $data['shared_limit'] ?? null,
+            'shared_used' => 0,
+            'invoicing_limit' => $data['invoicing_limit'] ?? null,
+            'invoicing_used' => 0,
+            'pos_limit' => $data['pos_limit'] ?? null,
+            'pos_used' => 0,
+            'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
+            'cotizaciones_used' => 0,
+        ]);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Created :name', ['name' => __('Contract')]),
+        ]);
+
+        return redirect()->route('admin.companies.edit', $companyId);
+    }
+
+    /**
+     * Editar un contrato existente. No toca los contadores de consumo (*_used) -- solo los
+     * límites/fechas/modo; si el superadmin cambia el modo de cupo, el consumo ya acumulado
+     * queda tal cual quedó bajo el modo anterior.
+     */
+    public function updateContract(Request $request, string $companyId, string $contractId)
+    {
+        $contract = CompanyContract::where('company_id', $companyId)->where('_id', $contractId)->firstOrFail();
+        $company = Company::findOrFail($companyId);
+
+        $data = $this->validatedContractData($request, $company);
+
+        $contract->update([
+            'price' => $data['price'] ?? null,
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'] ?? null,
+            'unlimited' => (bool) ($data['unlimited'] ?? false),
+            'modules' => array_values($data['modules']),
+            'quota_mode' => $data['quota_mode'],
+            'renewal_type' => $data['renewal_type'],
+            'shared_limit' => $data['shared_limit'] ?? null,
+            'invoicing_limit' => $data['invoicing_limit'] ?? null,
+            'pos_limit' => $data['pos_limit'] ?? null,
+            'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
+        ]);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Updated :name', ['name' => __('Contract')]),
+        ]);
+
+        return redirect()->route('admin.companies.edit', $companyId);
+    }
+
+    /**
+     * Valida el formulario de crear/editar contrato (mismas reglas en ambos casos). "modules"
+     * son los módulos que este contrato específicamente cubre -- solo puede cubrir módulos que
+     * la empresa tenga activos, y determina contra cuál contrato se descuenta cada documento
+     * (Company::activeContractFor()), así dos contratos vigentes al mismo tiempo no chocan
+     * mientras cubran módulos distintos.
+     */
+    private function validatedContractData(Request $request, Company $company): array
+    {
+        // Los campos opcionales llegan como string vacío (no ausentes) cuando el usuario los
+        // deja en blanco -- 'nullable' no los convierte a null por sí solo, solo se salta el
+        // resto de reglas, así que sin este paso "date"/"integer" fallarían o, peor, se
+        // guardaría '' tal cual (Carbon la interpreta como "ahora").
+        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit']))
+            ->map(fn ($value) => $value === '' ? null : $value)
+            ->all());
+
+        $companyQuotaModules = array_values(array_intersect($company->modules ?? [], CompanyContract::QUOTA_MODULES));
+
+        return $request->validate([
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'unlimited' => ['nullable', 'boolean'],
+            'modules' => ['required', 'array', 'min:1'],
+            'modules.*' => ['string', 'in:' . implode(',', $companyQuotaModules)],
+            'quota_mode' => ['required', 'in:' . CompanyContract::QUOTA_MODE_PER_MODULE . ',' . CompanyContract::QUOTA_MODE_SHARED],
+            'renewal_type' => ['required', 'in:' . CompanyContract::RENEWAL_LIFETIME . ',' . CompanyContract::RENEWAL_MONTHLY],
+            'shared_limit' => ['nullable', 'integer', 'min:1'],
+            'invoicing_limit' => ['nullable', 'integer', 'min:1'],
+            'pos_limit' => ['nullable', 'integer', 'min:1'],
+            'cotizaciones_limit' => ['nullable', 'integer', 'min:1'],
+        ]);
+    }
+
+    /**
+     * Borrar un contrato del histórico de la empresa.
+     */
+    public function destroyContract(string $companyId, string $contractId)
+    {
+        CompanyContract::where('company_id', $companyId)->where('_id', $contractId)->firstOrFail()->delete();
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Deleted :name', ['name' => __('Contract')]),
         ]);
 
         return redirect()->route('admin.companies.edit', $companyId);

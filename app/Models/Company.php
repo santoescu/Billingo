@@ -255,6 +255,27 @@ class Company extends Model
         return $this->hasMany(Seller::class);
     }
 
+    public function contracts()
+    {
+        return $this->hasMany(CompanyContract::class);
+    }
+
+    /**
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @return CompanyContract|null El contrato vigente hoy que cubre ese módulo específico
+     *                              (puede haber otro contrato vigente al mismo tiempo para un
+     *                              módulo distinto -- cada uno se resuelve por separado), el
+     *                              más reciente si hay varios que califican para el mismo módulo.
+     */
+    public function activeContractFor(string $module): ?CompanyContract
+    {
+        return $this->contracts()
+            ->get()
+            ->filter(fn (CompanyContract $contract) => $contract->isWithinDateRange() && $contract->coversModule($module))
+            ->sortByDesc(fn (CompanyContract $contract) => $contract->starts_at)
+            ->first();
+    }
+
     public function scopeActive($query)
     {
         return $query->where(function ($query) {
