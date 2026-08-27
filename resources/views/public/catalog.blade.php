@@ -95,7 +95,7 @@
                 <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
                     <h3 id="catalog-client-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Enter your identification to continue') }}</h3>
                 </div>
-                <div class="p-4 flex flex-col gap-3">
+                <div class="p-4 flex flex-col gap-3 max-h-[80vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
                     <div id="catalog-client-modal-error" class="hidden rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"></div>
                     <div class="flex gap-2">
                         <input type="text" id="catalog-client-identificacion" autocomplete="off" inputmode="numeric"
@@ -115,8 +115,58 @@
                             </select>
                         </div>
                         <flux:input id="catalog-client-new-name" :label="__('Name')" />
-                        <flux:input id="catalog-client-new-phone" :label="__('Phone')" />
-                        <flux:input id="catalog-client-new-email" type="email" :label="__('Email')" />
+                        <div>
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Person type') }}</label>
+                            <select id="catalog-client-new-person_type" data-hs-select='{!! \App\Support\SelectConfig::basic() !!}' class="hidden">
+                                <option value="">{{ __('Select...') }}</option>
+                                <option value="1">{{ __('Legal entity') }}</option>
+                                <option value="2" selected>{{ __('Natural person') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Fiscal responsibilities') }}</label>
+                            <select id="catalog-client-new-fiscal_responsibilities" multiple data-hs-select='{!! \App\Support\SelectConfig::basic() !!}' class="hidden">
+                                @foreach ($fiscalResponsibilities as $responsibility)
+                                    <option value="{{ $responsibility->codigo }}">{{ $responsibility->codigo }} - {{ $responsibility->descripcion }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <flux:input id="catalog-client-new-address" :label="__('Address')" />
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Department') }}</label>
+                                <select id="catalog-client-new-department" data-hs-select='{!! \App\Support\SelectConfig::searchable() !!}' class="hidden">
+                                    <option value="">{{ __('Select...') }}</option>
+                                    @foreach ($departments as $department)
+                                        <option value="{{ $department->codigo }}">{{ $department->descripcion }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('City') }}</label>
+                                <select id="catalog-client-new-city" data-hs-select='{!! \App\Support\SelectConfig::searchable() !!}' class="hidden">
+                                    <option value="">{{ __('Select...') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="catalog-client-new-phone" class="block mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Phone') }}</label>
+                            <div class="relative">
+                                <input type="text" inputmode="numeric" data-numeric-only id="catalog-client-new-phone" class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
+                                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="catalog-client-new-email" class="block mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Email') }}</label>
+                            <div class="relative">
+                                <input type="email" id="catalog-client-new-email" class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
+                                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+                                </div>
+                            </div>
+                        </div>
                         <flux:button type="button" variant="primary" id="catalog-client-create-btn">{{ __('Create client') }}</flux:button>
                     </div>
                 </div>
@@ -154,10 +204,33 @@
                 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
                 const initialProducts = @json($initialProductsJs);
+                const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
 
                 let client = null;
                 let cart = [];
                 let currentQuotation = null;
+
+                function rebuildCitySelect(citySelect, departmentCode, selectedCityCode = '') {
+                    const instance = window.HSSelect && HSSelect.getInstance(citySelect);
+                    if (instance && typeof instance.destroy === 'function') {
+                        instance.destroy();
+                        citySelect.parentElement.appendChild(citySelect);
+                    }
+
+                    const municipios = municipiosByDepartment[departmentCode] || [];
+                    citySelect.innerHTML = '<option value="">{{ __('Select...') }}</option>';
+                    municipios.forEach((municipio) => {
+                        const option = document.createElement('option');
+                        option.value = municipio.codigo;
+                        option.textContent = municipio.descripcion.trim();
+                        option.selected = municipio.codigo === selectedCityCode;
+                        citySelect.appendChild(option);
+                    });
+
+                    if (window.HSSelect) {
+                        new HSSelect(citySelect);
+                    }
+                }
 
                 function formatMoney(value) {
                     return '$' + (value || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -250,6 +323,12 @@
                 }
 
                 function bindClientStep() {
+                    const departmentSelect = document.getElementById('catalog-client-new-department');
+                    const citySelect = document.getElementById('catalog-client-new-city');
+                    rebuildCitySelect(citySelect, departmentSelect.value);
+                    departmentSelect.addEventListener('change', () => rebuildCitySelect(citySelect, departmentSelect.value));
+                    departmentSelect.addEventListener('change.hs.select', () => rebuildCitySelect(citySelect, departmentSelect.value));
+
                     document.getElementById('catalog-client-search-btn').addEventListener('click', async () => {
                         const identificacion = document.getElementById('catalog-client-identificacion').value.trim();
                         if (! identificacion) {
@@ -279,6 +358,13 @@
                         body.append('identification_type', document.getElementById('catalog-client-new-type').value || '13');
                         body.append('identificacion', identificacion);
                         body.append('name', name);
+                        body.append('person_type', document.getElementById('catalog-client-new-person_type').value || '2');
+                        Array.from(document.getElementById('catalog-client-new-fiscal_responsibilities').selectedOptions).forEach((option) => {
+                            body.append('fiscal_responsibilities[]', option.value);
+                        });
+                        body.append('address', document.getElementById('catalog-client-new-address').value.trim());
+                        body.append('department_code', document.getElementById('catalog-client-new-department').value);
+                        body.append('city_code', document.getElementById('catalog-client-new-city').value);
                         body.append('phone', document.getElementById('catalog-client-new-phone').value.trim());
                         body.append('email', document.getElementById('catalog-client-new-email').value.trim());
 
@@ -582,4 +668,6 @@
             })();
         </script>
     @endpush
+
+    <x-numeric-only-script />
 </x-layouts.public>

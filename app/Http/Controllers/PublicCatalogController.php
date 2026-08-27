@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\CatalogLink;
 use App\Models\Company;
 use App\Models\CompanyMember;
+use App\Models\Department;
+use App\Models\FiscalResponsibility;
 use App\Models\Notification;
 use App\Models\Quotation;
 use App\Models\ThirdParty;
@@ -44,6 +46,48 @@ class PublicCatalogController extends Controller
         abort_unless($link, 404);
 
         return $link;
+    }
+
+    /**
+     * Si el catálogo público no está disponible: módulo desactivado o sin un contrato vigente
+     * que cubra "cotizaciones". Al cliente final nunca se le debe mostrar el motivo real (sería
+     * mostrarle un problema de facturación entre nosotros y la empresa) -- siempre el mismo
+     * "servicio no disponible" genérico, sin importar cuál de las dos cosas falló. Si es
+     * específicamente por falta de contrato (no porque el módulo esté desactivado a propósito),
+     * sí se avisa puertas adentro a los administradores, para que sepan por qué sus clientes no
+     * pueden cotizar -- máximo un aviso cada 12 horas por link, para no saturarlos si varios
+     * clientes intentan entrar seguido mientras el contrato sigue vencido.
+     */
+    private function catalogUnavailable(CatalogLink $link): bool
+    {
+        $company = $link->company;
+
+        if (! $company->hasModule('cotizaciones')) {
+            return true;
+        }
+
+        if ($company->activeContractFor('cotizaciones')) {
+            return false;
+        }
+
+        $this->notifyMissingContract($link, $company);
+
+        return true;
+    }
+
+    private function notifyMissingContract(CatalogLink $link, Company $company): void
+    {
+        if ($link->contract_warning_notified_at && $link->contract_warning_notified_at->gt(now()->subHours(12))) {
+            return;
+        }
+
+        $link->update(['contract_warning_notified_at' => now()]);
+
+        Notification::notifyUsers(
+            $company->administratorUserIds(),
+            __('Public catalog unavailable'),
+            __('Someone tried to open the public quotation catalog (":label"), but there is no active contract covering the Quotations module. Renew it so clients can keep quoting.', ['label' => $link->label]),
+        );
     }
 
     /**
@@ -124,17 +168,19 @@ class PublicCatalogController extends Controller
         $link = $this->resolveLink($token);
         $company = $link->company;
 
-        if (! $company->hasModule('cotizaciones')) {
+        if ($this->catalogUnavailable($link)) {
             return view('public.unavailable');
         }
 
-        $products = $this->scopedProductsQuery($link)->orderBy('description')->limit(60)->get();
+        $products = $this->scopedProductsQuery($link)->orderBy('description')->get();
 
         return view('public.catalog', [
             'token' => $token,
             'company' => $company,
             'warehouseId' => $link->warehouse_id,
             'products' => $this->mapProductsForLink($link, $products, $documentController),
+            'departments' => Department::orderBy('descripcion')->get(),
+            'fiscalResponsibilities' => FiscalResponsibility::orderBy('codigo')->get(),
         ]);
     }
 
@@ -142,12 +188,12 @@ class PublicCatalogController extends Controller
     {
         $link = $this->resolveLink($token);
 
-        if (! $link->company->hasModule('cotizaciones')) {
+        if ($this->catalogUnavailable($link)) {
             return response()->json(['message' => __('This service is not available right now.')], 404);
         }
 
         $query = trim((string) $request->query('q', ''));
-        $products = $this->scopedProductsQuery($link, $query)->orderBy('description')->limit(50)->get();
+        $products = $this->scopedProductsQuery($link, $query)->orderBy('description')->get();
 
         return response()->json([
             'products' => $this->mapProductsForLink($link, $products, $documentController),
@@ -165,7 +211,7 @@ class PublicCatalogController extends Controller
         $link = $this->resolveLink($token);
         $company = $link->company;
 
-        if (! $company->hasModule('cotizaciones')) {
+        if ($this->catalogUnavailable($link)) {
             return response()->json(['message' => __('This service is not available right now.')], 404);
         }
 
@@ -180,16 +226,16 @@ class PublicCatalogController extends Controller
     }
 
     /**
-     * Crea el cliente final con los datos mínimos (identificación + nombre,
-     * el resto opcional) -- mismo patrón que ThirdPartyController::store(),
-     * simplificado porque acá no hay un formulario completo de cliente.
+     * Crea el cliente final -- mismos campos que ThirdPartyController::store() (el formulario
+     * completo que usa el staff), simplificado solo en que acá no hay lookup automático contra
+     * el registro de la DIAN (esa consulta requiere sesión de empresa autenticada).
      */
     public function storeClient(Request $request, string $token)
     {
         $link = $this->resolveLink($token);
         $company = $link->company;
 
-        if (! $company->hasModule('cotizaciones')) {
+        if ($this->catalogUnavailable($link)) {
             return response()->json(['message' => __('This service is not available right now.')], 404);
         }
 
@@ -197,9 +243,14 @@ class PublicCatalogController extends Controller
             'identification_type' => ['required', 'string', 'in:11,12,13,21,22,31,41,42,47,48,50,91'],
             'identificacion' => ['required', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:255'],
+            'person_type' => ['nullable', 'string', 'in:1,2'],
+            'fiscal_responsibilities' => ['nullable', 'array'],
+            'fiscal_responsibilities.*' => ['string', 'max:20'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'department_code' => ['nullable', 'string', 'max:10'],
+            'city_code' => ['nullable', 'string', 'max:10'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
         ]);
 
         $existing = $company->clients()->where('identificacion', $data['identificacion'])->first();
@@ -214,10 +265,13 @@ class PublicCatalogController extends Controller
             'identificacion' => $data['identificacion'],
             'dv' => $data['identification_type'] === '31' ? Company::calculateVerificationDigit($data['identificacion']) : null,
             'name' => $data['name'],
-            'person_type' => '2',
+            'person_type' => $data['person_type'] ?? '2',
+            'fiscal_responsibilities' => implode(';', $data['fiscal_responsibilities'] ?? []),
+            'address' => $data['address'] ?? null,
+            'department_code' => $data['department_code'] ?? null,
+            'city_code' => $data['city_code'] ?? null,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
-            'address' => $data['address'] ?? null,
         ]);
 
         return response()->json(['client' => $this->mapClientForJs($client)]);
@@ -254,7 +308,7 @@ class PublicCatalogController extends Controller
         $link = $this->resolveLink($token);
         $company = $link->company;
 
-        if (! $company->hasModule('cotizaciones')) {
+        if ($this->catalogUnavailable($link)) {
             return response()->json(['message' => __('This service is not available right now.')], 404);
         }
 

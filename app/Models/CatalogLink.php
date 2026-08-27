@@ -16,7 +16,15 @@ class CatalogLink extends Model
         'token',
         'primary_price_type_id',
         'visible_price_type_ids',
+        'contract_warning_notified_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'contract_warning_notified_at' => 'datetime',
+        ];
+    }
 
     public function company()
     {
