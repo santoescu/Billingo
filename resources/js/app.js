@@ -70,3 +70,19 @@ document.addEventListener('mouseout', (event) => {
     const thumb = event.target.closest('.zoomable-thumb');
     if (thumb) hideZoomPreview();
 });
+
+// En capture phase: se adelanta al listener de "click" de la tarjeta (POS,
+// cotizaciones, catálogo público -- todas agregan el producto al carrito al
+// hacer click en cualquier parte de la tarjeta). Sin esto, en celular (donde
+// no existe hover) tocar la imagen para verla en grande termina agregando el
+// producto por accidente, porque el toque simplemente hace click.
+document.addEventListener('click', (event) => {
+    const thumb = event.target.closest('.zoomable-thumb');
+    if (! thumb) return;
+    event.stopPropagation();
+    showZoomPreview(thumb);
+}, true);
+
+document.addEventListener('click', (event) => {
+    if (! event.target.closest('.zoomable-thumb')) hideZoomPreview();
+});
