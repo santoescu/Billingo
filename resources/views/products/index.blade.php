@@ -121,7 +121,7 @@
                                         <td class="px-4 py-4">
                                             <div class="flex items-center gap-3">
                                                 @if ($product->image_url)
-                                                    <img src="{{ $product->image_url }}" alt="" class="shrink-0 size-9 rounded-lg object-cover">
+                                                    <img src="{{ $product->image_url }}" alt="" class="shrink-0 size-9 rounded-lg object-cover zoomable-thumb cursor-zoom-in">
                                                 @else
                                                     <span class="flex items-center justify-center shrink-0 size-9 rounded-lg bg-accent/10 text-accent">
                                                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
