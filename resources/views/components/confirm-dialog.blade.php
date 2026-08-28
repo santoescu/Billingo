@@ -5,17 +5,34 @@
                 <h3 id="app-confirm-dialog-title" class="font-bold text-gray-800 dark:text-white mb-1">{{ __('Are you sure?') }}</h3>
                 <p id="app-confirm-dialog-message" class="text-sm text-neutral-600 dark:text-neutral-400 mb-4"></p>
 
+                {{-- El "hidden" va en el <div> envolvente de cada botón, no
+                     directo en el flux:button: flux:button siempre trae su
+                     propia clase "inline-flex" (aunque se le pase "hidden"
+                     en $attributes), y en el CSS compilado esa clase queda
+                     definida DESPUÉS de ".hidden" -- mismo nivel de
+                     especificidad, empate que gana la que está más abajo en
+                     la hoja, así que el botón nunca se llegaba a ocultar de
+                     verdad por más que se le alternara la clase por JS
+                     (mismo problema ya resuelto así en el modal de
+                     resultado del POS). --}}
                 <div class="flex justify-end gap-3">
-                    <flux:button type="button" variant="filled" id="app-confirm-dialog-cancel-btn" onclick="window.appConfirmDialog.cancel()">{{ __('Cancel') }}</flux:button>
-                    <flux:button type="button" variant="danger" id="app-confirm-dialog-accept-btn" onclick="window.appConfirmDialog.accept()">
-                        <span id="app-confirm-dialog-accept-label">{{ __('Delete') }}</span>
-                        <span id="app-confirm-dialog-accept-spinner" class="hidden">
-                            <span class="inline-flex items-center gap-2">
-                                <span class="animate-spin inline-block size-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="{{ __('Loading') }}"></span>
-                                {{ __('Processing...') }}
+                    <div id="app-confirm-dialog-cancel-wrapper">
+                        <flux:button type="button" variant="filled" id="app-confirm-dialog-cancel-btn" onclick="window.appConfirmDialog.cancel()">{{ __('Cancel') }}</flux:button>
+                    </div>
+                    <div id="app-confirm-dialog-accept-wrapper">
+                        <flux:button type="button" variant="danger" id="app-confirm-dialog-accept-btn" onclick="window.appConfirmDialog.accept()">
+                            <span id="app-confirm-dialog-accept-label">{{ __('Delete') }}</span>
+                            <span id="app-confirm-dialog-accept-spinner" class="hidden">
+                                <span class="inline-flex items-center gap-2">
+                                    <span class="animate-spin inline-block size-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="{{ __('Loading') }}"></span>
+                                    {{ __('Processing...') }}
+                                </span>
                             </span>
-                        </span>
-                    </flux:button>
+                        </flux:button>
+                    </div>
+                    <div id="app-confirm-dialog-ok-wrapper" class="hidden">
+                        <flux:button type="button" variant="primary" id="app-confirm-dialog-ok-btn" onclick="window.appConfirmDialog.accept()">{{ __('OK') }}</flux:button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,15 +83,18 @@
 
     /**
      * Reemplaza confirm()/alert() nativos del navegador (feos y no
-     * personalizables) por un modal propio, reutilizado en toda la app para
-     * confirmar borrados. Dos formas de usarlo:
+     * personalizables) por un modal propio, reutilizado en toda la app.
+     * Tres formas de usarlo:
      *   - En un <form onsubmit="return window.appConfirmDialog.open(event, this, '...')">
      *     -- al aceptar, deshabilita el botón, muestra un spinner de
      *     "Procesando..." y envía el formulario de verdad.
-     *   - window.appConfirmDialog.ask('...').then(ok => ...) -- para flujos
-     *     con fetch() que ya manejan su propio estado de carga.
+     *   - window.appConfirmDialog.ask('...').then(ok => ...) -- para
+     *     confirmar/cancelar en flujos con fetch() que ya manejan su propio
+     *     estado de carga.
+     *   - window.appConfirmDialog.notify('...') -- reemplazo directo de
+     *     alert(): un solo botón "OK", sin opción de cancelar.
      *
-     * @returns {object} open(event, form, message), ask(message), cancel(), accept()
+     * @returns {object} open(event, form, message), ask(message), notify(message), cancel(), accept()
      */
     window.appConfirmDialog = (function () {
         let pendingForm = null;
@@ -87,8 +107,11 @@
             document.getElementById('app-confirm-dialog-cancel-btn').disabled = false;
         }
 
-        function show(message) {
+        function show(message, isAlert) {
             document.getElementById('app-confirm-dialog-message').textContent = message || '';
+            document.getElementById('app-confirm-dialog-cancel-wrapper').classList.toggle('hidden', isAlert);
+            document.getElementById('app-confirm-dialog-accept-wrapper').classList.toggle('hidden', isAlert);
+            document.getElementById('app-confirm-dialog-ok-wrapper').classList.toggle('hidden', ! isAlert);
             reset();
             window.appModalProcessing.stop('#app-confirm-dialog');
 
@@ -102,7 +125,7 @@
             event.preventDefault();
             pendingForm = form;
             pendingResolve = null;
-            show(message);
+            show(message, false);
 
             return false;
         }
@@ -111,7 +134,15 @@
             return new Promise((resolve) => {
                 pendingForm = null;
                 pendingResolve = resolve;
-                show(message);
+                show(message, false);
+            });
+        }
+
+        function notify(message) {
+            return new Promise((resolve) => {
+                pendingForm = null;
+                pendingResolve = resolve;
+                show(message, true);
             });
         }
 
@@ -147,6 +178,6 @@
             }
         }
 
-        return { open, ask, cancel, accept };
+        return { open, ask, notify, cancel, accept };
     })();
 </script>

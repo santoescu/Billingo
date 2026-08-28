@@ -370,12 +370,12 @@
                     switchTicket(ticket.id);
                 }
 
-                function closeTicket(id) {
+                async function closeTicket(id) {
                     const ticket = tickets.find((t) => t.id === id);
                     if (! ticket) {
                         return;
                     }
-                    if (ticket.cart.length > 0 && ! confirm('{{ __('This pre-bill has products in the cart. Close it anyway?') }}')) {
+                    if (ticket.cart.length > 0 && ! await window.appConfirmDialog.ask('{{ __('This pre-bill has products in the cart. Close it anyway?') }}')) {
                         return;
                     }
 

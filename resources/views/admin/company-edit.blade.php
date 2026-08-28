@@ -188,7 +188,7 @@
                                 >
                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                                 </button>
-                                <form action="{{ route('admin.companies.contracts.destroy', [$company->_id, $contract->_id]) }}" method="POST" onsubmit="return confirm('{{ __('This action cannot be undone.') }}');">
+                                <form action="{{ route('admin.companies.contracts.destroy', [$company->_id, $contract->_id]) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">

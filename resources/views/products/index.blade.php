@@ -1714,7 +1714,7 @@
                         .filter(Boolean);
 
                     if (mapping.length === 0) {
-                        alert('{{ __('Map at least one column.') }}');
+                        await window.appConfirmDialog.notify('{{ __('Map at least one column.') }}');
                         return;
                     }
 
@@ -1742,7 +1742,7 @@
                         const data = await response.json();
 
                         if (! response.ok) {
-                            alert(data.message || '{{ __('Could not import the file.') }}');
+                            await window.appConfirmDialog.notify(data.message || '{{ __('Could not import the file.') }}');
                             return;
                         }
 
@@ -1763,7 +1763,7 @@
                         document.getElementById('import-step-mapping').classList.add('hidden');
                         document.getElementById('import-step-result').classList.remove('hidden');
                     } catch (error) {
-                        alert(error.message || '{{ __('Could not import the file.') }}');
+                        await window.appConfirmDialog.notify(error.message || '{{ __('Could not import the file.') }}');
                     } finally {
                         submitBtn.disabled = false;
                         backBtn.disabled = false;
@@ -1938,10 +1938,10 @@
                     document.getElementById('pr-stock_total').addEventListener('input', recalcUnassignedStock);
                     document.getElementById('pr-stock_total').closest('[data-hs-input-number]')?.addEventListener('change.hs.inputNumber', recalcUnassignedStock);
 
-                    document.getElementById('productForm').addEventListener('submit', (event) => {
+                    document.getElementById('productForm').addEventListener('submit', async (event) => {
                         if (checkbox.checked && parseFloat(document.getElementById('pr-stock_unassigned').value) < 0) {
                             event.preventDefault();
-                            alert('{{ __('The sum of warehouse quantities cannot exceed the total stock.') }}');
+                            await window.appConfirmDialog.notify('{{ __('The sum of warehouse quantities cannot exceed the total stock.') }}');
                         }
                     });
 
