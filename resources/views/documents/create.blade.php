@@ -613,7 +613,8 @@
                 <div class="w-48">
                     <div class="relative">
                         <input type="hidden" class="line-precio" name="items[__INDEX__][precio_unitario]" value="0">
-                        <input type="text" inputmode="decimal" class="line-precio-display h-10 py-2 px-3 ps-6 pe-9 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
+                        <input type="text" inputmode="decimal" class="line-precio-display h-10 py-2 px-3 ps-6 pe-9 block w-full {{ $canEditPrice ? 'bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300' : 'bg-zinc-50 dark:bg-white/5 text-zinc-500 dark:text-neutral-400 cursor-not-allowed' }} border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0"
+                            @unless ($canEditPrice) readonly title="{{ __('Only an administrator can type a custom price -- pick from the price list instead.') }}" @endunless>
                         <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
                             <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
                         </div>

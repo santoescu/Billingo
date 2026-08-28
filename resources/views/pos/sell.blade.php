@@ -927,7 +927,8 @@
 
                                 <div class="relative h-9">
                                     <input type="text" inputmode="decimal" data-action="price" value="${line.unit_price.toLocaleString('es-CO')}"
-                                        class="h-9 w-full border border-e-0 border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 text-sm ps-5 ${line.prices.length > 0 ? 'pe-7' : 'pe-2'} focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                        ${canEditPrice ? '' : 'readonly title="' + escapeHtml('{{ __('Only an administrator can type a custom price -- pick from the price list instead.') }}') + '"'}
+                                        class="h-9 w-full border border-e-0 border-zinc-200 dark:border-white/10 ${canEditPrice ? 'bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300' : 'bg-zinc-50 dark:bg-white/5 text-zinc-500 dark:text-neutral-400 cursor-not-allowed'} text-sm ps-5 ${line.prices.length > 0 ? 'pe-7' : 'pe-2'} focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
                                     <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
                                         <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
                                     </div>

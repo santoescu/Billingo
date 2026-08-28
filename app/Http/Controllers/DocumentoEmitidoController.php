@@ -15,6 +15,7 @@ use App\Models\PriceType;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\Resolution;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
 use App\Services\Dian\IssueDocumentService;
@@ -84,6 +85,8 @@ class DocumentoEmitidoController extends Controller
         $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $this) : null;
         $quotationId = $quotation ? (string) $quotation->_id : null;
 
+        $canEditPrice = User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []);
+
         return view('documents.create', compact(
             'company',
             'paymentMeansCodes',
@@ -94,6 +97,7 @@ class DocumentoEmitidoController extends Controller
             'priceTypes',
             'quotationPrefill',
             'quotationId',
+            'canEditPrice',
         ));
     }
 
@@ -474,6 +478,8 @@ class DocumentoEmitidoController extends Controller
             'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $data['items'] = $this->enforceCatalogPriceForNonAdmins($company, $data['items'], $company->membership->role, $company->membership->modules ?? []);
+
         $resolution = Resolution::where('company_id', (string) $company->_id)
             ->where('_id', $data['resolution_id'])
             ->first();
@@ -483,7 +489,7 @@ class DocumentoEmitidoController extends Controller
         }
 
         $data['prefix'] = $resolution->prefix;
-        
+
         $data['secuencial'] = $resolution->claimNextNumber();
 
         $document = $this->buildDocumentJson($company, $data);
@@ -571,6 +577,8 @@ class DocumentoEmitidoController extends Controller
             'items.*.impuestos.*.porcentaje' => ['required_with:items.*.impuestos', 'numeric', 'min:0'],
             'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $data['items'] = $this->enforceCatalogPriceForNonAdmins($company, $data['items'], $company->membership->role, $company->membership->modules ?? []);
 
         if (! $shift->fvResolution) {
             throw new InvalidArgumentException(__('The cash shift has no valid sales invoice resolution.'));
@@ -922,6 +930,57 @@ class DocumentoEmitidoController extends Controller
         }
 
         return $document;
+    }
+
+    /**
+     * Si quien hace la petición NO es administrador/owner, revisa que el
+     * "precio_unitario" que mandó el navegador sea alguno de los precios
+     * reales del catálogo de ese producto (el base o cualquiera de sus
+     * listas de precio) -- si no coincide con ninguno (lo escribió a mano
+     * saltándose el bloqueo de la UI, ver "canEditPrice" en
+     * pos/sell.blade.php y documents/create.blade.php), lo reemplaza por el
+     * precio base. No hace falta que el navegador diga qué lista eligió:
+     * cualquier precio que de verdad esté en el catálogo del producto es
+     * válido para un cajero/vendedor, así no haya que sincronizar el tipo de
+     * precio elegido en cada pantalla. Los productos que no existen en el
+     * catálogo (líneas manuales) se dejan tal cual, porque no hay contra qué
+     * validarlos.
+     *
+     * @param  Company  $company  Empresa activa, para resolver los productos por código.
+     * @param  array  $items  Líneas ya validadas ("items.*").
+     * @param  string|null  $role  Rol global de la membresía del usuario en esta empresa.
+     * @param  array  $modules  Roles por módulo de la membresía.
+     * @return array Mismas líneas, con "precio_unitario" forzado al precio base si no coincide con ningún precio real del catálogo y el usuario no es administrador.
+     */
+    private function enforceCatalogPriceForNonAdmins(Company $company, array $items, ?string $role, array $modules): array
+    {
+        if (User::hasCompanyAdminAccess($role, $modules)) {
+            return $items;
+        }
+
+        $codes = collect($items)->pluck('codigo')->filter()->values()->all();
+        $productsByCode = Product::where('company_id', (string) $company->_id)->whereIn('code', $codes)->get()->keyBy('code');
+
+        return collect($items)->map(function (array $item) use ($productsByCode) {
+            $product = $productsByCode->get($item['codigo'] ?? null);
+
+            if (! $product) {
+                return $item;
+            }
+
+            $allowedPrices = collect($product->extra_prices ?? [])
+                ->pluck('price')
+                ->push($product->unit_price)
+                ->map(fn ($price) => round((float) $price, 2));
+
+            $submittedPrice = round((float) ($item['precio_unitario'] ?? 0), 2);
+
+            if (! $allowedPrices->contains($submittedPrice)) {
+                $item['precio_unitario'] = (float) $product->unit_price;
+            }
+
+            return $item;
+        })->values()->all();
     }
 
     /**
