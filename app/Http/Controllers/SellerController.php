@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Seller;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class SellerController extends Controller
@@ -11,14 +12,20 @@ class SellerController extends Controller
     {
         $company = $this->currentCompany($request);
 
-        $sellers = $company->sellers()->orderBy('name')->get();
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
 
-        return view('pos.sellers', compact('company', 'sellers'));
+        $sellers = $company->sellers()->orderBy('name')->get();
+        $isAdmin = true;
+
+        return view('pos.sellers', compact('company', 'sellers', 'isAdmin'));
     }
 
     public function store(Request $request)
     {
         $company = $this->currentCompany($request);
+
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
         $data = $this->validatedData($request);
         $data['company_id'] = (string) $company->_id;
 
@@ -35,6 +42,9 @@ class SellerController extends Controller
     public function update(Request $request, string $seller)
     {
         $company = $this->currentCompany($request);
+
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
         $seller = Seller::where('company_id', (string) $company->_id)->findOrFail($seller);
         $seller->update($this->validatedData($request));
 
@@ -49,6 +59,9 @@ class SellerController extends Controller
     public function destroy(Request $request, string $seller)
     {
         $company = $this->currentCompany($request);
+
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
         $seller = Seller::where('company_id', (string) $company->_id)->findOrFail($seller);
         $seller->delete();
 
