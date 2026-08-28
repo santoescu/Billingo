@@ -184,6 +184,45 @@
                 const defaultClient = @json($defaultClientJs);
                 const initialProducts = @json($initialProductsJs);
 
+                const ticketsStorageKey = 'quote_tickets_' + @json((string) $company->_id);
+
+                /**
+                 * Guarda las pre-cotizaciones en localStorage para que
+                 * sobrevivan a cambiar de pantalla y volver -- antes solo
+                 * vivían en memoria del navegador. Mismo patrón que usa
+                 * pos/sell.blade.php para sus pre-cuentas.
+                 * @returns {void}
+                 */
+                function saveTicketsToStorage() {
+                    try {
+                        localStorage.setItem(ticketsStorageKey, JSON.stringify({ tickets, activeTicketId, nextTicketNumber }));
+                    } catch (error) {
+                        console.warn('No se pudieron guardar las pre-cotizaciones en localStorage', error);
+                    }
+                }
+
+                /**
+                 * Recupera las pre-cotizaciones guardadas para esta empresa,
+                 * si hay alguna y tiene la forma esperada.
+                 * @returns {(Object|null)} Objeto con tickets/activeTicketId/nextTicketNumber, o null si no había nada guardado.
+                 */
+                function loadTicketsFromStorage() {
+                    try {
+                        const raw = localStorage.getItem(ticketsStorageKey);
+                        if (! raw) {
+                            return null;
+                        }
+                        const parsed = JSON.parse(raw);
+                        if (! parsed || ! Array.isArray(parsed.tickets) || parsed.tickets.length === 0) {
+                            return null;
+                        }
+                        return parsed;
+                    } catch (error) {
+                        console.warn('No se pudieron leer las pre-cotizaciones guardadas', error);
+                        return null;
+                    }
+                }
+
                 let nextTicketNumber = 1;
                 let tickets = [];
                 let activeTicketId = null;
@@ -248,8 +287,11 @@
                         tab.className = 'shrink-0 flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium cursor-pointer ' + (isActive
                             ? 'bg-accent/10 text-accent'
                             : 'text-zinc-500 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:bg-neutral-700');
+                        const tabLabel = ticket.client?.name
+                            ? ticket.client.name
+                            : '{{ __('Quotation') }} ' + ticket.number;
                         tab.innerHTML = `
-                            <span>{{ __('Quotation') }} ${ticket.number}${ticket.cart.length ? ' (' + ticket.cart.length + ')' : ''}</span>
+                            <span class="max-w-32 truncate" title="${escapeHtml(tabLabel)}">${escapeHtml(tabLabel)}${ticket.cart.length ? ' (' + ticket.cart.length + ')' : ''}</span>
                             <button type="button" data-action="close" class="rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5" aria-label="{{ __('Close') }}">
                                 <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                             </button>
@@ -261,6 +303,8 @@
                         });
                         bar.appendChild(tab);
                     });
+
+                    saveTicketsToStorage();
                 }
 
                 function renderActiveTicket() {
@@ -916,11 +960,14 @@
                     }
                 };
 
+                /**
+                 * Navega al listado de cotizaciones. Las pendientes ya
+                 * quedan guardadas en localStorage (ver
+                 * saveTicketsToStorage()), así que salir de esta pantalla ya
+                 * no las pierde -- no hace falta pedir confirmación.
+                 * @returns {void}
+                 */
                 window.quoteGoToList = function () {
-                    const hasPendingTickets = tickets.some((t) => t.cart.length > 0);
-                    if (hasPendingTickets && ! confirm('{{ __('You have other quotations open with products. If you leave, you will lose them. Continue?') }}')) {
-                        return;
-                    }
                     window.location.href = '{{ route('quotations.index') }}';
                 };
 
@@ -940,8 +987,20 @@
                     }
                     btn.dataset.bound = 'true';
 
-                    const ticket = makeTicket();
-                    activeTicketId = ticket.id;
+                    /**
+                     * Restaura las pre-cotizaciones guardadas de esta
+                     * empresa (ver saveTicketsToStorage()), en vez de
+                     * arrancar siempre con una vacía.
+                     */
+                    const restored = loadTicketsFromStorage();
+                    if (restored) {
+                        tickets = restored.tickets;
+                        nextTicketNumber = restored.nextTicketNumber || tickets.reduce((max, t) => Math.max(max, t.number || 0), 0) + 1;
+                        activeTicketId = tickets.some((t) => t.id === restored.activeTicketId) ? restored.activeTicketId : tickets[0].id;
+                    } else {
+                        const ticket = makeTicket();
+                        activeTicketId = ticket.id;
+                    }
                     renderTickets();
                     renderActiveTicket();
 

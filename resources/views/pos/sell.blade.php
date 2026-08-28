@@ -272,12 +272,60 @@
 
                 const canEditPrice = @json($canEditPrice ?? false);
 
+                const ticketsStorageKey = 'pos_tickets_' + @json((string) $company->_id);
+
+                /**
+                 * Guarda las pre-cuentas en localStorage para que sobrevivan
+                 * a cambiar de pantalla (Cotizaciones, Caja, etc.) y volver
+                 * -- antes solo vivían en memoria del navegador y se
+                 * perdían apenas se salía de la pantalla de venta. Se llama
+                 * desde renderTickets(), que ya se dispara después de
+                 * prácticamente cualquier cambio (agregar producto, cambiar
+                 * cantidad, cambiar cliente, etc.), así que no hace falta
+                 * enganchar un guardado aparte en cada acción. Envuelto en
+                 * try/catch porque localStorage puede fallar (navegación
+                 * privada, cuota llena) y eso no debería romper la venta.
+                 * @returns {void}
+                 */
+                function saveTicketsToStorage() {
+                    try {
+                        localStorage.setItem(ticketsStorageKey, JSON.stringify({ tickets, activeTicketId, nextTicketNumber }));
+                    } catch (error) {
+                        console.warn('No se pudieron guardar las pre-cuentas en localStorage', error);
+                    }
+                }
+
+                /**
+                 * Recupera las pre-cuentas guardadas para esta empresa, si
+                 * hay alguna y tiene la forma esperada -- cualquier dato
+                 * corrupto o de un esquema viejo se descarta en vez de
+                 * reventar la pantalla.
+                 * @returns {(Object|null)} Objeto con tickets/activeTicketId/nextTicketNumber, o null si no había nada guardado.
+                 */
+                function loadTicketsFromStorage() {
+                    try {
+                        const raw = localStorage.getItem(ticketsStorageKey);
+                        if (! raw) {
+                            return null;
+                        }
+                        const parsed = JSON.parse(raw);
+                        if (! parsed || ! Array.isArray(parsed.tickets) || parsed.tickets.length === 0) {
+                            return null;
+                        }
+                        return parsed;
+                    } catch (error) {
+                        console.warn('No se pudieron leer las pre-cuentas guardadas', error);
+                        return null;
+                    }
+                }
+
                 // Pre-cuentas: cada una es un cliente + carrito + medio de
                 // pago independientes, para poder atender a un cliente sin
                 // perder lo que ya tenía armado otro que sigue decidiendo.
-                // Solo viven en memoria del navegador (se pierden si se
-                // recarga la página antes de cobrar), igual que una
-                // pre-cuenta de papel se pierde si se bota.
+                // Ahora quedan guardadas en localStorage (ver
+                // saveTicketsToStorage()), así que sobreviven a recargar la
+                // página o a salir de esta pantalla y volver -- solo se
+                // pierden si el cajero cierra la pre-cuenta a mano.
                 let nextTicketNumber = 1;
                 let tickets = [];
                 let activeTicketId = null;
@@ -354,8 +402,15 @@
                         tab.className = 'shrink-0 flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium cursor-pointer ' + (isActive
                             ? 'bg-accent/10 text-accent'
                             : 'text-zinc-500 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:bg-neutral-700');
+                        // El nombre de la pestaña es el del cliente elegido en
+                        // esa pre-cuenta (más fácil de reconocer que un
+                        // número); si todavía no se le puso cliente (nombre
+                        // vacío), cae de vuelta al número.
+                        const tabLabel = ticket.client?.name
+                            ? ticket.client.name
+                            : '{{ __('Pre-bill') }} ' + ticket.number;
                         tab.innerHTML = `
-                            <span>{{ __('Pre-bill') }} ${ticket.number}${ticket.cart.length ? ' (' + ticket.cart.length + ')' : ''}</span>
+                            <span class="max-w-32 truncate" title="${escapeHtml(tabLabel)}">${escapeHtml(tabLabel)}${ticket.cart.length ? ' (' + ticket.cart.length + ')' : ''}</span>
                             <button type="button" data-action="close" class="rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5" aria-label="{{ __('Close') }}">
                                 <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                             </button>
@@ -367,6 +422,8 @@
                         });
                         bar.appendChild(tab);
                     });
+
+                    saveTicketsToStorage();
                 }
 
                 /**
@@ -1693,18 +1750,13 @@
                 };
 
                 /**
-                 * Navega a la lista de ventas. "Ir a ventas" navega de
-                 * verdad (sale de esta pantalla), así que las pre-cuentas
-                 * que sigan abiertas con productos se perderían sin avisar
-                 * -- se pierde solo si el cajero confirma que quiere salir
-                 * de todas formas.
+                 * Navega a la lista de ventas. Las pre-cuentas pendientes ya
+                 * quedan guardadas en localStorage (ver
+                 * saveTicketsToStorage()), así que salir de esta pantalla ya
+                 * no las pierde -- no hace falta pedir confirmación.
                  * @returns {void}
                  */
                 window.posGoToSales = function () {
-                    const hasPendingTickets = tickets.some((t) => t.cart.length > 0);
-                    if (hasPendingTickets && ! confirm('{{ __('You have other pre-bills open with products. If you leave, you will lose them. Continue?') }}')) {
-                        return;
-                    }
                     window.location.href = '{{ route('pos.sales.index') }}';
                 };
 
@@ -1732,8 +1784,36 @@
                     }
                     btn.dataset.bound = 'true';
 
-                    const ticket = makeTicket();
-                    activeTicketId = ticket.id;
+                    /**
+                     * Restaura las pre-cuentas guardadas de esta empresa
+                     * (ver saveTicketsToStorage()), salvo en modo edición de
+                     * venta (editSaleId): esa es una sesión propia y
+                     * aislada, no tiene sentido mezclarla con pre-cuentas
+                     * pendientes de otra venta. Si viene de convertir una
+                     * cotización, las pre-cuentas restauradas se conservan
+                     * como pestañas aparte y la de la cotización se agrega
+                     * como una nueva, en vez de reemplazarlas.
+                     */
+                    if (! editSaleId) {
+                        const restored = loadTicketsFromStorage();
+                        if (restored) {
+                            tickets = restored.tickets;
+                            nextTicketNumber = restored.nextTicketNumber || tickets.reduce((max, t) => Math.max(max, t.number || 0), 0) + 1;
+                            activeTicketId = tickets.some((t) => t.id === restored.activeTicketId) ? restored.activeTicketId : tickets[0].id;
+                        }
+                    }
+
+                    let ticket;
+                    if (quotationPrefill) {
+                        ticket = makeTicket();
+                        activeTicketId = ticket.id;
+                    } else {
+                        ticket = activeTicket();
+                        if (! ticket) {
+                            ticket = makeTicket();
+                            activeTicketId = ticket.id;
+                        }
+                    }
                     if (quotationPrefill) {
                         ticket.client = { ...quotationPrefill.client };
                         ticket.cart = quotationPrefill.lines.map((line) => {
