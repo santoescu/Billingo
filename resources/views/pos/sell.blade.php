@@ -694,6 +694,35 @@
                 }
 
                 /**
+                 * Cuánto de esa bodega ya está comprometido por OTRAS líneas
+                 * del mismo producto en el carrito -- el selector de bodega
+                 * por línea deja elegir cualquier bodega de la lista sin
+                 * fijarse si otra línea del mismo producto ya la está
+                 * usando; sin este descuento, dos líneas podían terminar
+                 * pidiendo cada una hasta el stock completo de la MISMA
+                 * bodega (el stock que ve cada línea es el del catálogo, no
+                 * el que ya se restó "en papel" por la otra línea todavía
+                 * sin facturar), y al facturar la bodega quedaba en
+                 * negativo.
+                 * @param {Array} cart
+                 * @param {string} code
+                 * @param {string|null} warehouseId
+                 * @param {number} excludeIndex Índice de la línea que se está evaluando (no cuenta contra sí misma).
+                 * @returns {number}
+                 */
+                function stockClaimedByOtherLines(cart, code, warehouseId, excludeIndex) {
+                    if (! warehouseId) {
+                        return 0;
+                    }
+                    return cart.reduce((sum, other, i) => {
+                        if (i === excludeIndex || other.code !== code || other.warehouseId !== warehouseId) {
+                            return sum;
+                        }
+                        return sum + (other.qty || 0);
+                    }, 0);
+                }
+
+                /**
                  * Agrega un producto al carrito de la pre-cuenta activa,
                  * atrapando cualquier error para que no deje el POS como
                  * "congelado" sin decir nada -- se ve en consola para
@@ -878,6 +907,24 @@
                         const row = document.createElement('div');
                         row.className = 'p-2.5';
 
+                        /**
+                         * Tope real de esta línea: el stock del catálogo
+                         * para su bodega actual, menos lo que ya reservan
+                         * otras líneas del mismo producto en esa misma
+                         * bodega -- se recalcula en cada render (no queda
+                         * "pegado" al valor que tenía cuando se agregó la
+                         * línea), así que si otra línea cambia de bodega o
+                         * de cantidad, este tope se ajusta solo.
+                         */
+                        if (line.warehouseId) {
+                            const rawEntry = (line.availableWarehouses || []).find((w) => w.warehouse_id === line.warehouseId);
+                            const rawStock = rawEntry ? rawEntry.stock : line.warehouseStock;
+                            line.warehouseStock = Math.max(rawStock - stockClaimedByOtherLines(cart, line.code, line.warehouseId, index), 0);
+                            if (line.qty > line.warehouseStock) {
+                                line.qty = line.warehouseStock;
+                            }
+                        }
+
                         const priceOptions = line.prices
                             .map((p) => ({ id: p.price_type_id, name: p.price_type_name }))
                             .map((option) => `
@@ -886,11 +933,27 @@
                                 </button>
                             `).join('');
 
-                        const warehouseOptions = line.availableWarehouses.map((w) => `
-                            <button type="button" data-warehouse-id="${w.warehouse_id}" data-stock="${w.stock}" class="pos-line-warehouse-option w-full text-start px-3 py-1.5 text-sm rounded-lg ${line.warehouseId === w.warehouse_id ? 'bg-accent/10 text-accent' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10'} focus:outline-hidden">
-                                ${escapeHtml(w.warehouse_name)} (${w.stock})
-                            </button>
-                        `).join('');
+                        /**
+                         * Igual que arriba, pero para CADA bodega candidata
+                         * del dropdown (no solo la ya elegida): lo que
+                         * muestra y deja tomar el selector es lo que de
+                         * verdad queda libre en esa bodega, descontando lo
+                         * que ya reservan otras líneas de este mismo
+                         * producto -- si no queda nada, la opción se
+                         * deshabilita para que no se pueda repetir la misma
+                         * bodega que ya está al tope en otra línea (eso era
+                         * lo que dejaba una bodega en negativo al facturar).
+                         */
+                        const warehouseOptions = line.availableWarehouses.map((w) => {
+                            const remaining = Math.max(w.stock - stockClaimedByOtherLines(cart, line.code, w.warehouse_id, index), 0);
+                            const disabled = remaining <= 0;
+
+                            return `
+                                <button type="button" data-warehouse-id="${w.warehouse_id}" data-stock="${remaining}" ${disabled ? 'disabled' : ''} class="pos-line-warehouse-option w-full text-start px-3 py-1.5 text-sm rounded-lg ${disabled ? 'opacity-50 pointer-events-none cursor-not-allowed text-zinc-400 dark:text-neutral-600' : (line.warehouseId === w.warehouse_id ? 'bg-accent/10 text-accent' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10')} focus:outline-hidden">
+                                    ${escapeHtml(w.warehouse_name)} (${remaining})
+                                </button>
+                            `;
+                        }).join('');
 
                         row.innerHTML = `
                             <div class="grid flex-1 min-w-0" style="grid-template-columns: 1fr 76px ${line.availableWarehouses.length > 0 ? '40px' : ''} 112px 108px 40px;">
@@ -974,12 +1037,50 @@
                         const lineWarehouseDropdown = row.querySelector('[data-warehouse-dropdown]');
                         row.querySelectorAll('.pos-line-warehouse-option').forEach((option) => {
                             option.addEventListener('click', () => {
-                                line.warehouseId = option.dataset.warehouseId;
-                                line.warehouseName = line.availableWarehouses.find((w) => w.warehouse_id === line.warehouseId)?.warehouse_name ?? null;
-                                line.warehouseStock = parseFloat(option.dataset.stock) || 0;
-                                if (line.qty > line.warehouseStock) {
-                                    line.qty = line.warehouseStock;
+                                const targetWarehouseId = option.dataset.warehouseId;
+                                const targetRemaining = parseFloat(option.dataset.stock) || 0;
+                                const originalWarehouseId = line.warehouseId;
+                                const originalWarehouseName = line.warehouseName;
+                                const requestedQty = line.qty;
+                                const movedQty = Math.min(requestedQty, targetRemaining);
+                                const leftoverQty = requestedQty - movedQty;
+
+                                line.warehouseId = targetWarehouseId;
+                                line.warehouseName = line.availableWarehouses.find((w) => w.warehouse_id === targetWarehouseId)?.warehouse_name ?? null;
+                                line.warehouseStock = targetRemaining;
+                                line.qty = movedQty;
+
+                                /**
+                                 * Si la bodega elegida ya la está usando OTRA
+                                 * línea de este mismo producto, se fusionan
+                                 * en una sola (mismo criterio que
+                                 * addToCartUnsafe() al agregar desde el
+                                 * buscador) -- así no quedan dos filas
+                                 * separadas repitiendo producto y bodega.
+                                 */
+                                const existingIndex = cart.findIndex((other, i) => i !== index && other.code === line.code && other.warehouseId === targetWarehouseId);
+                                if (existingIndex !== -1) {
+                                    cart[existingIndex].qty += line.qty;
+                                    cart.splice(index, 1);
                                 }
+
+                                /**
+                                 * Si la bodega destino no tenía espacio para
+                                 * toda la cantidad, el sobrante NO se pierde
+                                 * -- se deja como una línea nueva en la
+                                 * bodega original, para no reducir en
+                                 * silencio lo que el cajero ya había puesto
+                                 * en el carrito.
+                                 */
+                                if (leftoverQty > 0 && originalWarehouseId) {
+                                    cart.push({
+                                        ...line,
+                                        warehouseId: originalWarehouseId,
+                                        warehouseName: originalWarehouseName,
+                                        qty: leftoverQty,
+                                    });
+                                }
+
                                 if (window.HSDropdown && lineWarehouseDropdown) {
                                     HSDropdown.close(lineWarehouseDropdown);
                                 }
