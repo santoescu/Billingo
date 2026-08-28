@@ -634,6 +634,124 @@ class DocumentoEmitidoController extends Controller
     }
 
     /**
+     * Edita una venta POS que aún no se facturó electrónicamente -- una vez la DIAN acepta la
+     * factura, corregirla requiere una Nota Crédito, no una edición silenciosa. Como es un
+     * talonario (no hay XML/UBL de por medio todavía), acá sí se puede tocar TODO: cliente,
+     * vendedor, forma de pago y líneas, igual que si fuera una venta nueva -- mismos campos y
+     * misma validación que issuePosSale(), solo que sin volver a numerar ni a abrir turno.
+     *
+     * @param  Request  $request  Mismo shape que issuePosSale() (cliente_*, seller_id, payment_method_id/amount, items[]).
+     * @param  Company  $company  Empresa dueña de la venta.
+     * @param  DocumentoPos  $documento  Venta a editar.
+     * @param  IssueDocumentService  $service  Servicio que reversa/aplica el inventario, resuelve el cliente y guarda.
+     * @return DocumentoPos Venta ya actualizada.
+     *
+     * @throws InvalidArgumentException|RuntimeException Si ya se facturó electrónicamente, o error de validación de negocio.
+     */
+    public function updatePosSaleItems(Request $request, Company $company, DocumentoPos $documento, IssueDocumentService $service): DocumentoPos
+    {
+        if ($documento->is_electronic) {
+            throw new InvalidArgumentException(__('This sale was already issued as an electronic invoice; use a credit note instead of editing it.'));
+        }
+
+        $data = $request->validate([
+            'cliente_tipo_identificacion' => ['required', 'string', 'max:2'],
+            'cliente_identificacion' => ['required', 'string', 'max:20'],
+            'cliente_nombre' => ['required', 'string', 'max:255'],
+            'cliente_tipo_persona' => ['nullable', 'string', 'in:1,2'],
+            'cliente_responsabilidades' => ['nullable', 'array'],
+            'cliente_direccion' => ['nullable', 'string', 'max:255'],
+            'cliente_departamento_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_ciudad_codigo' => ['nullable', 'string', 'max:10'],
+            'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'cliente_email' => ['nullable', 'email', 'max:255'],
+
+            'seller_id' => ['nullable', 'string'],
+
+            'payment_method_id' => ['nullable', 'array'],
+            'payment_method_id.*' => ['nullable', 'string'],
+            'payment_method_amount' => ['nullable', 'array'],
+            'payment_method_amount.*' => ['nullable', 'numeric', 'min:0'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.codigo' => ['required', 'string', 'max:50'],
+            'items.*.codigo_barras' => ['nullable', 'string', 'max:50'],
+            'items.*.descripcion' => ['required', 'string', 'max:500'],
+            'items.*.unidad_medida' => ['nullable', 'string', 'max:10'],
+            'items.*.cantidad' => ['required', 'numeric', 'min:0.01'],
+            'items.*.precio_unitario' => ['required', 'numeric', 'min:0'],
+            'items.*.bodega_id' => ['nullable', 'string'],
+            'items.*.descuento_valor_tipo' => ['nullable', 'string', 'in:porcentaje,fijo'],
+            'items.*.descuento_valor' => ['nullable', 'numeric', 'min:0'],
+            'items.*.descuento_motivo' => ['nullable', 'string', 'max:255'],
+            'items.*.impuestos' => ['nullable', 'array'],
+            'items.*.impuestos.*.tipo' => ['required_with:items.*.impuestos', 'string', 'max:5'],
+            'items.*.impuestos.*.porcentaje' => ['required_with:items.*.impuestos', 'numeric', 'min:0'],
+            'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $paymentMethodIds = array_filter($data['payment_method_id'] ?? []);
+        $paymentMethods = $company->paymentMethods()->whereIn('_id', $paymentMethodIds)->get()->keyBy(fn (PaymentMethod $m) => (string) $m->_id);
+
+        $saleTotal = round(collect($data['items'])->sum(fn (array $item) => $item['cantidad'] * $item['precio_unitario']), 2);
+        $paymentAmounts = array_map(fn ($amount) => round((float) ($amount ?? 0), 2), $data['payment_method_amount'] ?? []);
+        $assignedTotal = round(array_sum($paymentAmounts), 2);
+
+        if (! empty($paymentMethodIds) && abs($assignedTotal - $saleTotal) > 0.01) {
+            throw new InvalidArgumentException(__('The amounts assigned to the payment methods (:assigned) do not match the sale total (:total).', [
+                'assigned' => number_format($assignedTotal, 2),
+                'total' => number_format($saleTotal, 2),
+            ]));
+        }
+
+        $accountingCustomerParty = [
+            'AdditionalAccountID' => ($data['cliente_tipo_persona'] ?? '2') === '1' ? '1' : '2',
+            'PartyName' => $data['cliente_nombre'],
+            'CompanyID' => $data['cliente_identificacion'],
+            'TypeCompanyID' => $data['cliente_tipo_identificacion'],
+            'TaxLevelCode' => implode(';', $data['cliente_responsabilidades'] ?? []),
+            'direccion' => $data['cliente_direccion'] ?? null,
+            'cityCode' => $data['cliente_ciudad_codigo'] ?? null,
+            'CountrySubentityCode' => $data['cliente_departamento_codigo'] ?? null,
+            'telefono' => $data['cliente_telefono'] ?? null,
+            'email' => $data['cliente_email'] ?? null,
+        ];
+
+        $documento = $service->updatePosSaleLines($company, $documento, $data['items'], $accountingCustomerParty, (string) $request->user()->_id);
+
+        $payments = collect($data['payment_method_id'] ?? [])
+            ->map(function (?string $id, int $index) use ($paymentMethods, $paymentAmounts) {
+                if (! $id) {
+                    return null;
+                }
+                $method = $paymentMethods->get($id);
+
+                return [
+                    'payment_method_id' => $id,
+                    'payment_method_name' => $method?->name,
+                    'dian_code' => $method?->dian_payment_means_code,
+                    'amount' => $paymentAmounts[$index] ?? 0,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $firstPayment = $payments[0] ?? null;
+        $seller = ! empty($data['seller_id']) ? $company->sellers()->find($data['seller_id']) : null;
+
+        $documento->update([
+            'payment_method_id' => $firstPayment['payment_method_id'] ?? null,
+            'payment_method_name' => $firstPayment['payment_method_name'] ?? null,
+            'payments' => $payments,
+            'seller_id' => $seller ? (string) $seller->_id : null,
+            'seller_name' => $seller?->name,
+        ]);
+
+        return $documento->fresh();
+    }
+
+    /**
      * Valida el request y arma + guarda una cotización: no hay pago ni
      * turno de caja de por medio (a diferencia de issuePosSale()), y el
      * inventario NO se descuenta -- una cotización no es una venta todavía.

@@ -1172,5 +1172,13 @@
     "Shared across modules": "Compartido entre módulos",
     "Per module": "Por módulo",
     "Renews monthly": "Se renueva mensual",
-    "Fixed package": "Paquete fijo"
+    "Fixed package": "Paquete fijo",
+    "Back to sale": "Volver a la venta",
+    "Save changes": "Guardar cambios",
+    "Sale not found.": "Venta no encontrada.",
+    "Could not update the sale.": "No se pudo actualizar la venta.",
+    "This sale was already issued as an electronic invoice; use a credit note instead of editing it.": "Esta venta ya se facturó electrónicamente; usa una nota crédito en vez de editarla.",
+    "This sale was already issued as an electronic invoice; it cannot be edited.": "Esta venta ya se facturó electrónicamente; no se puede editar.",
+    "Only the products/quantities can be corrected here -- the client and payment stay the same.": "Aquí solo se pueden corregir los productos/cantidades -- el cliente y la forma de pago se quedan igual.",
+    "Only an administrator can type a custom price -- pick from the price list instead.": "Solo un administrador puede escribir un precio manual -- elige uno de la lista de precios."
 }

@@ -125,7 +125,7 @@ class DocumentJsonMapper
      * @param  array  $accountingCustomerParty  Bloque "AccountingCustomerParty" de la petición.
      * @return array{data: array, id: string} Datos del receptor en el shape interno de UblDocumentBuilder, y el id del tercero.
      */
-    private function resolveCustomerParty(Company $company, array $accountingCustomerParty): array
+    public function resolveCustomerParty(Company $company, array $accountingCustomerParty): array
     {
         $identificacion = $accountingCustomerParty['CompanyID'] ?? throw new InvalidArgumentException('AccountingCustomerParty.CompanyID es obligatorio.');
         $tipoIdentificacion = $accountingCustomerParty['TypeCompanyID'] ?? null;

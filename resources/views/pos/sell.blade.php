@@ -159,37 +159,39 @@
             </div>
 
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 flex flex-col gap-3">
-                <div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Payment method') }}</label>
-                        @if ($paymentMethods->isNotEmpty())
-                            <button type="button" id="pos-payment-add-btn" class="text-xs font-medium text-accent hover:underline focus:outline-hidden">
-                                + {{ __('Add payment method') }}
-                            </button>
+                <div id="pos-payment-fields" class="flex flex-col gap-3">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Payment method') }}</label>
+                            @if ($paymentMethods->isNotEmpty())
+                                <button type="button" id="pos-payment-add-btn" class="text-xs font-medium text-accent hover:underline focus:outline-hidden">
+                                    + {{ __('Add payment method') }}
+                                </button>
+                            @endif
+                        </div>
+                        <div id="pos-payment-lines" class="flex flex-col gap-2"></div>
+                        @if ($paymentMethods->isEmpty())
+                            <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">{{ __('You have no payment methods configured yet.') }}</p>
+                        @else
+                            <p id="pos-payment-remaining" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
                         @endif
                     </div>
-                    <div id="pos-payment-lines" class="flex flex-col gap-2"></div>
-                    @if ($paymentMethods->isEmpty())
-                        <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">{{ __('You have no payment methods configured yet.') }}</p>
-                    @else
-                        <p id="pos-payment-remaining" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
-                    @endif
-                </div>
 
-                <div id="pos-cash-section" class="hidden grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-efectivo-display">{{ __('Cash received') }}</label>
-                        <div class="relative">
-                            <input type="text" inputmode="decimal" id="pos-efectivo-display"
-                                class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
-                            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
-                                <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                    <div id="pos-cash-section" class="hidden grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-efectivo-display">{{ __('Cash received') }}</label>
+                            <div class="relative">
+                                <input type="text" inputmode="decimal" id="pos-efectivo-display"
+                                    class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
+                                <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Change') }}</span>
-                        <span id="pos-change-display" class="block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
+                        <div>
+                            <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Change') }}</span>
+                            <span id="pos-change-display" class="block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
+                        </div>
                     </div>
                 </div>
 
@@ -263,6 +265,12 @@
 
                 const quotationId = @json($quotationId ?? null);
                 const quotationPrefill = @json($quotationPrefill ?? null);
+
+                const editSaleId = @json($editSaleId ?? null);
+                const editSalePrefill = @json($editSalePrefill ?? null);
+                const editSaleUpdateUrl = @json(($editSaleId ?? null) ? route('pos.sales.update', $editSaleId) : null);
+
+                const canEditPrice = @json($canEditPrice ?? false);
 
                 // Pre-cuentas: cada una es un cliente + carrito + medio de
                 // pago independientes, para poder atender a un cliente sin
@@ -1310,8 +1318,105 @@
                  * y deja lista otra para la siguiente venta.
                  * @returns {void}
                  */
+                /**
+                 * Envía la edición de una venta ya guardada (modo
+                 * editSaleId): manda cliente, vendedor, formas de pago y
+                 * líneas por PUT -- mismo body y misma validación de saldo
+                 * asignado que el cobro normal (ver bindCheckout() más
+                 * abajo), solo que apunta a pos.sales.update en vez de
+                 * pos.checkout. Al terminar va directo al detalle de la
+                 * venta en vez de abrir el modal de "venta cobrada" (no hay
+                 * recibo nuevo que mostrar, la venta ya estaba cobrada).
+                 * @returns {Promise<void>}
+                 */
+                async function submitEditSale() {
+                    const btn = document.getElementById('pos-checkout-btn');
+                    document.getElementById('pos-checkout-error').classList.add('hidden');
+
+                    const ticket = activeTicket();
+                    const cart = ticket.cart;
+
+                    if (cart.length === 0) {
+                        showError('{{ __('Add at least one product to the cart.') }}');
+                        return;
+                    }
+
+                    const remaining = Math.round((cartTotal() - assignedPaymentsTotal(ticket)) * 100) / 100;
+                    if (remaining !== 0) {
+                        showError(remaining > 0
+                            ? '{{ __('Missing to assign') }}: ' + formatMoney(remaining)
+                            : '{{ __('Assigned amount exceeds the total by') }} ' + formatMoney(Math.abs(remaining)));
+                        return;
+                    }
+
+                    btn.disabled = true;
+                    btn.textContent = '{{ __('Processing...') }}';
+
+                    const client = ticket.client;
+
+                    const body = new URLSearchParams();
+                    body.append('cliente_tipo_identificacion', client.identification_type || '13');
+                    body.append('cliente_identificacion', client.identificacion || '');
+                    body.append('cliente_nombre', client.name || '');
+                    body.append('cliente_tipo_persona', client.person_type || '2');
+                    body.append('cliente_direccion', client.address || '');
+                    body.append('cliente_departamento_codigo', client.department_code || '');
+                    body.append('cliente_ciudad_codigo', client.city_code || '');
+                    body.append('cliente_telefono', client.phone || '');
+                    body.append('cliente_email', client.email || '');
+                    if (ticket.sellerId) {
+                        body.append('seller_id', ticket.sellerId);
+                    }
+                    ticket.payments.forEach((payment, index) => {
+                        if (! payment.paymentMethodId) {
+                            return;
+                        }
+                        body.append(`payment_method_id[${index}]`, payment.paymentMethodId);
+                        body.append(`payment_method_amount[${index}]`, payment.amount || 0);
+                    });
+                    cart.forEach((line, index) => {
+                        body.append(`items[${index}][codigo]`, line.code);
+                        body.append(`items[${index}][codigo_barras]`, line.barcode || '');
+                        body.append(`items[${index}][descripcion]`, line.description);
+                        body.append(`items[${index}][unidad_medida]`, line.unit_code || 'EA');
+                        body.append(`items[${index}][cantidad]`, line.qty);
+                        body.append(`items[${index}][precio_unitario]`, line.unit_price);
+                        if (line.warehouseId) {
+                            body.append(`items[${index}][bodega_id]`, line.warehouseId);
+                        }
+                    });
+
+                    try {
+                        const response = await fetch(editSaleUpdateUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: body.toString(),
+                        });
+                        const data = await response.json();
+
+                        if (! response.ok) {
+                            throw new Error(data.message || '{{ __('Could not update the sale.') }}');
+                        }
+
+                        window.location.href = data.show_url;
+                    } catch (error) {
+                        showError(error.message || '{{ __('Could not update the sale.') }}');
+                        btn.disabled = false;
+                        btn.textContent = '{{ __('Save changes') }}';
+                    }
+                }
+
                 function bindCheckout() {
                 document.getElementById('pos-checkout-btn').addEventListener('click', async () => {
+                    if (editSaleId) {
+                        await submitEditSale();
+                        return;
+                    }
+
                     const btn = document.getElementById('pos-checkout-btn');
                     document.getElementById('pos-checkout-error').classList.add('hidden');
 
@@ -1547,6 +1652,28 @@
                                 priceTypeId: null,
                             };
                         });
+                    }
+                    if (editSalePrefill) {
+                        ticket.client = { ...editSalePrefill.client };
+                        ticket.sellerId = editSalePrefill.seller_id || '';
+                        ticket.cart = editSalePrefill.lines.map((line) => {
+                            const warehouse = line.warehouse_id
+                                ? (line.product.warehouses || []).find((w) => w.warehouse_id === line.warehouse_id)
+                                : null;
+                            return {
+                                ...makeCartLine(line.product, warehouse?.warehouse_id ?? null, warehouse?.warehouse_name ?? null, warehouse?.stock ?? null),
+                                qty: line.qty,
+                                unit_price: line.unit_price,
+                                priceTypeId: null,
+                            };
+                        });
+                    }
+                    if (editSaleId) {
+                        document.getElementById('pos-ticket-add-btn')?.classList.add('hidden');
+                        const checkoutBtn = document.getElementById('pos-checkout-btn');
+                        if (checkoutBtn) {
+                            checkoutBtn.textContent = '{{ __('Save changes') }}';
+                        }
                     }
                     renderTickets();
                     renderActiveTicket();

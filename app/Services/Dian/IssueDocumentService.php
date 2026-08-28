@@ -137,6 +137,155 @@ class IssueDocumentService
     }
 
     /**
+     * Edita las líneas (productos/cantidades) de una venta POS que AÚN no se facturó
+     * electrónicamente -- una vez la DIAN acepta la factura, corregirla requiere una Nota
+     * Crédito, no una edición silenciosa del documento ya aceptado. Devuelve al inventario lo
+     * que estaba descontado por las líneas viejas y descuenta lo de las líneas nuevas (mismo
+     * mecanismo que discountInventory(), en el mismo orden que evita que un producto quede con
+     * stock negativo de más tiempo del necesario), y recalcula subtotal/impuestos/total.
+     *
+     * @param  Company  $company  Empresa dueña de la venta.
+     * @param  DocumentoPos  $documento  Venta a editar.
+     * @param  array  $items  Líneas nuevas, mismo shape que valida DocumentoEmitidoController::issuePosSale() ("items.*").
+     * @param  array|null  $accountingCustomerParty  Bloque "AccountingCustomerParty" (mismo shape que buildDocumentJson()) si el cliente también se está editando; null para dejar el cliente actual tal cual.
+     * @param  string|null  $userId  Quién hizo la corrección, para el kardex.
+     * @return DocumentoPos Venta ya actualizada.
+     *
+     * @throws RuntimeException Si la venta ya se facturó electrónicamente.
+     */
+    public function updatePosSaleLines(Company $company, DocumentoPos $documento, array $items, ?array $accountingCustomerParty = null, ?string $userId = null): DocumentoPos
+    {
+        if ($documento->is_electronic) {
+            throw new RuntimeException(__('This sale was already issued as an electronic invoice; use a credit note instead of editing it.'));
+        }
+
+        $newLineas = $this->mapItemsToLineas($items);
+        $oldLineas = $documento->payload['lineas'] ?? [];
+
+        $calculo = $this->totals->calcularTotalesDocumento($newLineas, $documento->payload['cargos_descuentos'] ?? []);
+
+        $this->syncProducts($company, $newLineas);
+        $this->returnInventory($company, $oldLineas, $documento->numeral, $userId);
+        $this->discountInventory($company, $newLineas, $documento->numeral, $userId);
+
+        $payload = $documento->payload;
+        $payload['lineas'] = $newLineas;
+
+        $updates = [
+            'payload' => $payload,
+            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            'total' => $calculo['totales']['payable_amount'],
+        ];
+
+        if ($accountingCustomerParty !== null) {
+            $cliente = $this->mapper->resolveCustomerParty($company, $accountingCustomerParty);
+            $payload['accounting_customer_party'] = $cliente['data'];
+            $updates['payload'] = $payload;
+            $updates['cliente_id'] = $cliente['id'];
+        }
+
+        $documento->update($updates);
+
+        return $documento->fresh();
+    }
+
+    /**
+     * Traduce las líneas ya validadas de un formulario ("items.*", mismo shape que
+     * DocumentoEmitidoController::issuePosSale()) directamente al shape interno "lineas" que
+     * usan discountInventory()/DocumentTotalsCalculator -- sin pasar por
+     * DocumentJsonMapper::map() (que además resuelve/crea el cliente), porque al editar una
+     * venta el cliente no cambia.
+     *
+     * @param  array  $items  Líneas validadas del formulario de edición.
+     * @return array Líneas en el shape interno "lineas".
+     */
+    private function mapItemsToLineas(array $items): array
+    {
+        return collect($items)->map(fn (array $item) => [
+            'codigo' => $item['codigo'],
+            'codigo_barras' => $item['codigo_barras'] ?? null,
+            'descripcion' => $item['descripcion'],
+            'cantidad' => (float) $item['cantidad'],
+            'unidad_medida' => $item['unidad_medida'] ?? 'EA',
+            'precio_unitario' => (float) $item['precio_unitario'],
+            'bodega_id' => $item['bodega_id'] ?? null,
+            'descuento' => ! empty($item['descuento_valor']) ? [
+                'valor_tipo' => $item['descuento_valor_tipo'] ?? 'porcentaje',
+                'valor' => (float) $item['descuento_valor'],
+                'motivo' => $item['descuento_motivo'] ?? null,
+            ] : null,
+            'impuestos' => collect($item['impuestos'] ?? [])->map(fn (array $impuesto) => [
+                'tipo' => $impuesto['tipo'],
+                'porcentaje' => (float) $impuesto['porcentaje'],
+                'base_gravable' => $impuesto['base_gravable'] ?? null,
+            ])->values()->all(),
+        ])->values()->all();
+    }
+
+    /**
+     * Reversa de discountInventory(): devuelve al inventario lo que se había descontado por
+     * unas líneas -- usado al editar una venta, para las líneas que van a cambiar/quitarse
+     * antes de descontar las nuevas.
+     *
+     * @param  Company  $company  Empresa dueña del inventario.
+     * @param  array  $lineas  Líneas a devolver (shape interno "lineas").
+     * @param  string  $numeral  Número del documento, para el motivo del movimiento.
+     * @param  string|null  $userId  Quién hizo la corrección, para el kardex.
+     */
+    private function returnInventory(Company $company, array $lineas, string $numeral, ?string $userId = null): void
+    {
+        foreach ($lineas as $linea) {
+            $codigo = $linea['codigo'] ?? null;
+
+            if (! $codigo) {
+                continue;
+            }
+
+            $product = Product::where('company_id', (string) $company->_id)->where('code', $codigo)->first();
+
+            if (! $product || ! $product->tracks_inventory) {
+                continue;
+            }
+
+            $cantidad = (float) ($linea['cantidad'] ?? 0);
+            $stocks = $product->warehouse_stocks ?? [];
+            $warehouseId = $linea['bodega_id'] ?? null;
+            $balanceAfter = null;
+            $unitCost = (float) ($product->average_cost ?? 0);
+
+            if ($warehouseId) {
+                foreach ($stocks as &$entry) {
+                    if (($entry['warehouse_id'] ?? null) === $warehouseId) {
+                        $entry['stock'] = (float) ($entry['stock'] ?? 0) + $cantidad;
+                        $balanceAfter = $entry['stock'];
+
+                        break;
+                    }
+                }
+                unset($entry);
+                $product->warehouse_stocks = $stocks;
+            }
+
+            $product->stock = (float) $product->stock + $cantidad;
+            $product->save();
+
+            StockMovement::create([
+                'company_id' => (string) $company->_id,
+                'product_id' => (string) $product->_id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'in',
+                'quantity' => $cantidad,
+                'unit_cost' => $unitCost,
+                'total_cost' => round($cantidad * $unitCost, 2),
+                'balance_after' => $warehouseId ? $balanceAfter : $product->unassigned_stock,
+                'reason' => 'document:' . $numeral . ':edit',
+                'user_id' => $userId,
+            ]);
+        }
+    }
+
+    /**
      * Crea una cotización: colección "quotations", totalmente separada de
      * "documentos_pos"/"documentos_emitidos", numerada con la Resolution
      * manual tipo 'COT'. Igual que issuePosSale() calcula los totales con

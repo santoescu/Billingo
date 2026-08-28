@@ -10,6 +10,7 @@ use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
 use App\Models\FiscalResponsibility;
 use App\Models\PaymentMeansCode;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\Dian\IssueDocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -37,6 +38,12 @@ class PosController extends Controller
      * la vista para que el checkout enlace la cotización con la venta que
      * resulte (ver checkout() más abajo).
      *
+     * Si viene "edit_sale" en la URL (botón "Editar" de pos/sales/show.blade.php),
+     * precarga esta misma pantalla con el cliente y las líneas de esa venta
+     * ya guardada, para corregirlas como si fuera una venta nueva -- solo un
+     * administrador puede entrar en este modo, y solo si la venta todavía no
+     * se facturó electrónicamente (ver DocumentoPos::is_electronic).
+     *
      * @param  Request  $request  Petición actual (empresa activa en sesión).
      * @param  DocumentoEmitidoController  $documentController  Provee mapProductsForJs() para reusar el mismo mapeo que el AJAX de búsqueda.
      * @param  QuotationController  $quotationController  Resuelve y traduce la cotización a precargar, si aplica.
@@ -60,6 +67,21 @@ class PosController extends Controller
         $quotation = $quotationController->resolveFromQuotation($company, $request->query('from_quotation'));
         $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $documentController) : null;
 
+        $editSale = null;
+        $editSalePrefill = null;
+
+        if ($request->query('edit_sale')) {
+            abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
+            $editSale = $company->documentosPos()->where('_id', $request->query('edit_sale'))->first();
+            abort_unless($editSale, 404);
+            abort_if($editSale->is_electronic, 403, __('This sale was already issued as an electronic invoice; it cannot be edited.'));
+
+            $editSalePrefill = $this->mapPosSaleLinesForJs($company, $editSale, $documentController);
+        }
+
+        $canEditPrice = User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []);
+
         return view('pos.sell', [
             'shift' => $shift,
             'company' => $company,
@@ -73,7 +95,97 @@ class PosController extends Controller
             'fiscalResponsibilities' => FiscalResponsibility::orderBy('codigo')->get(),
             'quotationId' => $quotation ? (string) $quotation->_id : null,
             'quotationPrefill' => $quotationPrefill,
+            'editSaleId' => $editSale ? (string) $editSale->_id : null,
+            'editSalePrefill' => $editSalePrefill,
+            'canEditPrice' => $canEditPrice,
+            'isAdmin' => $canEditPrice,
         ]);
+    }
+
+    /**
+     * Traduce una venta POS ya guardada al mismo shape que
+     * QuotationController::mapQuotationLinesForJs() usa para precargar el
+     * POS desde una cotización -- incluido aquí (y no ahí) porque lee de
+     * DocumentoPos, no de Quotation, aunque el payload de líneas/cliente
+     * tiene la misma forma en los dos modelos.
+     *
+     * @param  Company  $company  Empresa activa, para resolver los productos actuales por código.
+     * @param  DocumentoPos  $documento  Venta cuyas líneas/cliente se van a precargar.
+     * @param  DocumentoEmitidoController  $documentController  Provee mapProductsForJs() para reusar el mismo mapeo que el AJAX de búsqueda.
+     * @return array{client: array, lines: array} Cliente y líneas listos para inyectar en la pre-cuenta del POS.
+     */
+    private function mapPosSaleLinesForJs(Company $company, DocumentoPos $documento, DocumentoEmitidoController $documentController): array
+    {
+        $customerParty = $documento->payload['accounting_customer_party'] ?? [];
+
+        $client = [
+            'id' => $documento->cliente_id,
+            'identification_type' => $customerParty['tipo_identificacion'] ?? '13',
+            'identificacion' => $customerParty['identificacion'] ?? '',
+            'name' => $customerParty['razon_social'] ?? '',
+            'person_type' => $customerParty['tipo_persona'] ?? '2',
+            'fiscal_responsibilities' => $customerParty['responsabilidades_fiscales'] ?? null,
+            'address' => $customerParty['direccion'] ?? null,
+            'department_code' => $customerParty['departamento_codigo'] ?? null,
+            'city_code' => $customerParty['ciudad_codigo'] ?? null,
+            'phone' => $customerParty['telefono'] ?? null,
+            'email' => $customerParty['email'] ?? null,
+        ];
+
+        $lineas = $documento->payload['lineas'] ?? [];
+        $codes = collect($lineas)->pluck('codigo')->filter()->values()->all();
+        $productsByCode = Product::where('company_id', (string) $company->_id)->whereIn('code', $codes)->get()->keyBy('code');
+
+        $lines = collect($lineas)->map(function (array $linea) use ($productsByCode, $documentController) {
+            $product = $productsByCode->get($linea['codigo'] ?? null);
+
+            $productJs = $product
+                ? $documentController->mapProductsForJs(collect([$product]))->first()
+                : [
+                    'id' => null,
+                    'code' => $linea['codigo'] ?? '',
+                    'barcode' => null,
+                    'description' => $linea['descripcion'] ?? '',
+                    'unit_code' => 'EA',
+                    'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
+                    'tracks_inventory' => false,
+                    'stock' => 0,
+                    'prices' => [],
+                    'warehouses' => [],
+                    'image_url' => null,
+                ];
+
+            /**
+             * La cantidad de esta línea todavía está "reservada" por la
+             * propia venta (su inventario recién se devuelve/vuelve a
+             * descontar cuando se guarda la edición, ver
+             * IssueDocumentService::updatePosSaleLines()) -- si no se le
+             * suma de vuelta acá, el stock actual de esa bodega puede
+             * aparecer en 0 (ya descontado por esta misma venta) y el
+             * stepper de cantidad del POS se rompe con un tope inválido
+             * (máximo 0, mínimo 1).
+             */
+            if ($product && $product->tracks_inventory && ! empty($linea['bodega_id'])) {
+                $cantidad = (float) ($linea['cantidad'] ?? 0);
+                $productJs['stock'] += $cantidad;
+                $productJs['warehouses'] = collect($productJs['warehouses'])->map(function (array $warehouse) use ($linea, $cantidad) {
+                    if ($warehouse['warehouse_id'] === $linea['bodega_id']) {
+                        $warehouse['stock'] += $cantidad;
+                    }
+
+                    return $warehouse;
+                })->values()->all();
+            }
+
+            return [
+                'product' => $productJs,
+                'qty' => (float) ($linea['cantidad'] ?? 1),
+                'warehouse_id' => $linea['bodega_id'] ?? null,
+                'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
+            ];
+        })->values()->all();
+
+        return ['client' => $client, 'lines' => $lines, 'seller_id' => $documento->seller_id];
     }
 
     /**
@@ -253,6 +365,52 @@ class PosController extends Controller
     }
 
     /**
+     * Pantalla para editar los productos/cantidades de una venta ya guardada -- solo mientras
+     * siga siendo talonario interno (! documento_emitido_id). Una vez facturada
+     * electrónicamente, la DIAN ya la aceptó y corregirla requiere una Nota Crédito, no una
+     * edición; por eso ni se muestra el botón ni existe esta pantalla para esos casos.
+     */
+    /**
+     * Guarda la edición de líneas de una venta -- mismo patrón de manejo de errores que
+     * checkout(). Si el total cambió, el CashMovement de esa venta se actualiza también, para
+     * que el arqueo de caja siga cuadrando con lo que de verdad quedó vendido. Solo un
+     * administrador puede editar (mismo control que create() al entrar en modo edición).
+     */
+    public function updateSale(Request $request, string $sale, DocumentoEmitidoController $documentController, IssueDocumentService $service)
+    {
+        $company = $this->currentCompany($request);
+
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
+        $documento = $company->documentosPos()->where('_id', $sale)->first();
+
+        if (! $documento) {
+            return response()->json(['message' => __('Sale not found.')], 404);
+        }
+
+        try {
+            $documento = $documentController->updatePosSaleItems($request, $company, $documento, $service);
+        } catch (InvalidArgumentException|RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => __('Could not update the sale.')], 500);
+        }
+
+        CashMovement::where('document_id', (string) $documento->_id)
+            ->where('type', CashMovement::TYPE_VENTA)
+            ->update(['amount' => $documento->total]);
+
+        return response()->json([
+            'sale_id' => (string) $documento->_id,
+            'numeral' => $documento->numeral,
+            'total_formatted' => $documento->total_formatted,
+            'show_url' => route('pos.sales.show', $documento->_id),
+        ]);
+    }
+
+    /**
      * Lista las ventas del POS (talonario o electrónicas) de la empresa
      * activa -- colección separada de "documentos_emitidos" (esa es solo
      * documentos electrónicos reales), para poder ver de un vistazo cuánto
@@ -293,7 +451,11 @@ class PosController extends Controller
             && $documento->shift?->invoicingResolution
             && ! empty($documento->payment_means_code);
 
-        return view('pos.sales.show', compact('company', 'documento', 'paymentMeansCode', 'canIssueElectronic'));
+        $isAdmin = User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []);
+
+        $warehouseNames = $company->warehouses()->get()->mapWithKeys(fn ($warehouse) => [(string) $warehouse->_id => $warehouse->name]);
+
+        return view('pos.sales.show', compact('company', 'documento', 'paymentMeansCode', 'canIssueElectronic', 'isAdmin', 'warehouseNames'));
     }
 
     /**
