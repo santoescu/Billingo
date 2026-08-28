@@ -121,11 +121,14 @@ class QuotationController extends Controller
 
         abort_unless($documento, 404);
 
+        $warehouseNames = $company->warehouses()->get()->mapWithKeys(fn ($warehouse) => [(string) $warehouse->_id => $warehouse->name]);
+
         return view('quotations.show', [
             'company' => $company,
             'documento' => $documento,
             'canConvertToPos' => $company->hasModule('pos'),
             'canConvertToInvoicing' => $company->hasModule('invoicing'),
+            'warehouseNames' => $warehouseNames,
         ]);
     }
 

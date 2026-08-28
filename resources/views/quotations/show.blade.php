@@ -39,21 +39,27 @@
                     <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
                         <thead class="bg-gray-50 dark:bg-neutral-700">
                             <tr>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Code') }}</th>
                                 <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
                                 <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Quantity') }}</th>
                                 <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Unit price') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Subtotal') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Warehouse') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
                             @forelse ($lineas as $linea)
                                 <tr>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $linea['codigo'] ?? '—' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200">{{ $linea['descripcion'] ?? '—' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $linea['cantidad'] ?? '—' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ number_format((float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ number_format((float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $warehouseNames[$linea['bodega_id'] ?? ''] ?? '—' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Lines')]) }}</td>
+                                    <td colspan="6" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Lines')]) }}</td>
                                 </tr>
                             @endforelse
                         </tbody>

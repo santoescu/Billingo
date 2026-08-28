@@ -1009,12 +1009,15 @@ class DocumentoEmitidoController extends Controller
             data_get($documento->payload, 'accounting_customer_party.ciudad_codigo'),
         );
 
+        $warehouseNames = $company->warehouses()->get()->mapWithKeys(fn ($warehouse) => [(string) $warehouse->_id => $warehouse->name]);
+
         return view('documents.show', compact(
             'company',
             'documento',
             'paymentMeansCode',
             'customerDepartmentName',
             'customerCityName',
+            'warehouseNames',
         ));
     }
 
