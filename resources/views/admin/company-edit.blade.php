@@ -6,6 +6,7 @@
     $basicSelectConfig = \App\Support\SelectConfig::basic(__('No access'));
     $quotaModeSelectConfig = \App\Support\SelectConfig::basic();
     $renewalSelectConfig = \App\Support\SelectConfig::basic();
+    $contractCompaniesSelectConfig = \App\Support\SelectConfig::searchable(__('Select companies...'), __('Search...'));
 @endphp
 
 <x-layouts.app :title="__('Edit :name', ['name' => $company->name])">
@@ -167,8 +168,20 @@
             @else
                 <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($contracts as $contract)
-                        <div class="relative space-y-3 rounded-lg border border-gray-200 bg-white p-4 transition hover:border-gray-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600">
-                            <div class="absolute right-3 top-3 flex gap-1">
+                        @php
+                            $isExpired = ! $contract->isWithinDateRange() && $contract->ends_at && now()->startOfDay()->gt($contract->ends_at->copy()->startOfDay());
+                            $contractCompanies = $contract->companies();
+                        @endphp
+                        <div class="relative space-y-3 overflow-hidden rounded-lg border border-gray-200 bg-white p-4 pt-5 shadow-xs transition hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800">
+                            <div class="absolute right-3 top-4 flex gap-1">
+                                @if ($contractCompanies->count() > 1)
+                                    <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                                        title="{{ __('View breakdown by company') }}"
+                                        data-hs-overlay="#contract-usage-modal-{{ $contract->_id }}"
+                                    >
+                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                @endif
                                 <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
                                     title="{{ __('Edit') }}"
                                     onclick="window.openContractPanel({{ Illuminate\Support\Js::from([
@@ -184,6 +197,7 @@
                                         'invoicing_limit' => $contract->invoicing_limit,
                                         'pos_limit' => $contract->pos_limit,
                                         'cotizaciones_limit' => $contract->cotizaciones_limit,
+                                        'company_ids' => collect($contract->company_ids ?? [])->reject(fn ($id) => (string) $id === (string) $company->_id)->values(),
                                     ]) }})"
                                 >
                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
@@ -197,11 +211,13 @@
                                 </form>
                             </div>
 
-                            <div class="w-full space-y-3 pr-14">
+                            <div class="w-full space-y-3 pr-9">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($contract->isWithinDateRange())
-                                        <span class="rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">{{ __('Active') }}</span>
-                                    @elseif ($contract->ends_at && now()->startOfDay()->gt($contract->ends_at->copy()->startOfDay()))
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                            <span class="size-1.5 rounded-full bg-green-500"></span>{{ __('Active') }}
+                                        </span>
+                                    @elseif ($isExpired)
                                         <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-300">{{ __('Expired') }}</span>
                                     @else
                                         <span class="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">{{ __('Upcoming') }}</span>
@@ -209,44 +225,104 @@
                                     <span class="text-xs text-neutral-400">{{ $contract->starts_at?->format('Y-m-d') }} &rarr; {{ $contract->ends_at?->format('Y-m-d') ?? __('No end date') }}</span>
                                 </div>
 
-                                <div class="flex flex-wrap gap-3">
+                                <div class="divide-y divide-gray-100 dark:divide-neutral-700">
                                     @forelse ($contract->modules ?? [] as $moduleKey)
-                                        <div class="space-y-1">
-                                            @include('panel.partials.module-badge', ['module' => $moduleKey])
-                                            <div class="text-xs text-gray-600 dark:text-neutral-400">
+                                        @php
+                                            $limit = $contract->quota_mode === 'shared' ? $contract->shared_limit : ($contract->{"{$moduleKey}_limit"} ?? null);
+                                            $used = $contract->quota_mode === 'shared' ? $contract->shared_used : ($contract->{"{$moduleKey}_used"} ?? 0);
+                                            $percent = ($limit && ! $contract->unlimited) ? min(100, round(($used / max($limit, 1)) * 100)) : 0;
+                                            $barColor = $percent >= 100 ? 'bg-red-500' : ($percent >= 90 ? 'bg-amber-500' : 'bg-green-500');
+                                        @endphp
+                                        <div class="py-2.5 first:pt-0 last:pb-0">
+                                            <div class="mb-1.5 flex items-center justify-between gap-2">
+                                                @include('panel.partials.module-badge', ['module' => $moduleKey])
+
                                                 @if ($contract->unlimited)
-                                                    {{ __('Unlimited') }}
+                                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-accent">
+                                                        <svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"></path></svg>
+                                                        {{ __('Unlimited') }}
+                                                    </span>
+                                                @elseif ($limit === null)
+                                                    <span class="text-xs font-semibold text-gray-700 dark:text-neutral-300">{{ $used }} &middot; ∞</span>
                                                 @else
-                                                    @php
-                                                        $limit = $contract->quota_mode === 'shared' ? $contract->shared_limit : ($contract->{"{$moduleKey}_limit"} ?? null);
-                                                        $used = $contract->quota_mode === 'shared' ? $contract->shared_used : ($contract->{"{$moduleKey}_used"} ?? 0);
-                                                    @endphp
-                                                    {{ $used }} / {{ $limit ?? '∞' }}
-                                                    @if ($limit !== null)
-                                                        <span class="block text-neutral-400">{{ __(':count remaining', ['count' => $contract->remaining($moduleKey)]) }}</span>
-                                                    @endif
+                                                    <span class="text-xs font-semibold text-gray-800 dark:text-neutral-100">{{ $percent }}%</span>
                                                 @endif
                                             </div>
+
+                                            @if (! $contract->unlimited && $limit !== null)
+                                                <div class="flex h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-neutral-700" role="progressbar" aria-valuenow="{{ $percent }}" aria-valuemin="0" aria-valuemax="100">
+                                                    <div class="flex flex-col justify-center overflow-hidden rounded-full {{ $barColor }} text-center text-xs whitespace-nowrap text-white transition duration-500" style="width: {{ $percent }}%"></div>
+                                                </div>
+                                                <div class="mt-1 text-[11px] text-neutral-400">{{ $used }} / {{ $limit }} &middot; {{ __(':count remaining', ['count' => $contract->remaining($moduleKey)]) }}</div>
+                                            @endif
                                         </div>
                                     @empty
                                         <span class="text-xs text-neutral-400">—</span>
                                     @endforelse
                                 </div>
 
-                                <div class="text-sm text-gray-600 dark:text-neutral-400">
-                                    {{ $contract->price !== null ? '$' . number_format($contract->price, 2, '.', ',') : '—' }}
+                                <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 text-sm text-gray-600 dark:border-neutral-700 dark:text-neutral-400">
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-gray-800 dark:text-neutral-200">
+                                        <svg class="size-4 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                        {{ $contract->price !== null ? number_format($contract->price, 2, '.', ',') : '—' }}
+                                    </span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs">
+                                        <svg class="size-3.5 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>
+                                        {{ $contract->renewal_type === 'monthly' ? __('Renews monthly') : __('Fixed package') }}
+                                    </span>
                                 </div>
 
-                                <div class="text-sm text-gray-600 dark:text-neutral-400">
-                                    @if ($contract->unlimited)
-                                        {{ __('Unlimited') }}
-                                    @else
-                                        {{ $contract->quota_mode === 'shared' ? __('Shared across modules') : __('Per module') }}
-                                    @endif
-                                    <span class="text-xs text-neutral-400">&middot; {{ $contract->renewal_type === 'monthly' ? __('Renews monthly') : __('Fixed package') }}</span>
-                                </div>
                             </div>
                         </div>
+
+                        @if ($contractCompanies->count() > 1)
+                            <div id="contract-usage-modal-{{ $contract->_id }}" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="contract-usage-modal-{{ $contract->_id }}-label">
+                                <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all w-fit min-w-[32rem] max-w-[95vw] m-3 sm:mx-auto">
+                                    <div class="w-fit max-w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                                        <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-5 py-4 dark:border-neutral-700">
+                                            <h3 id="contract-usage-modal-{{ $contract->_id }}-label" class="text-lg font-bold text-gray-800 dark:text-white">{{ __('View breakdown by company') }}</h3>
+                                            <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#contract-usage-modal-{{ $contract->_id }}">
+                                                <span class="sr-only">Close</span>
+                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                                            </button>
+                                        </div>
+                                        <div class="p-5">
+                                            <table class="w-full text-sm">
+                                                <thead>
+                                                    <tr class="bg-gray-50 dark:bg-white/5">
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-neutral-400">{{ __('Company') }}</th>
+                                                        @foreach ($contract->modules ?? [] as $moduleKey)
+                                                            <th class="whitespace-nowrap px-3 py-2 text-right">@include('panel.partials.module-badge', ['module' => $moduleKey])</th>
+                                                        @endforeach
+                                                        <th class="whitespace-nowrap px-3 py-2 text-right font-semibold text-gray-600 dark:text-neutral-300">{{ __('Total') }}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($contractCompanies as $usageCompany)
+                                                        <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-white/5' : '' }}">
+                                                            <td class="truncate px-3 py-2 text-gray-600 dark:text-neutral-400">{{ $usageCompany->name }}</td>
+                                                            @foreach ($contract->modules ?? [] as $moduleKey)
+                                                                <td class="px-3 py-2 text-right text-gray-800 dark:text-neutral-100">{{ $contract->usageForCompany((string) $usageCompany->_id, $moduleKey) }}</td>
+                                                            @endforeach
+                                                            <td class="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">{{ collect($contract->modules ?? [])->sum(fn ($moduleKey) => $contract->usageForCompany((string) $usageCompany->_id, $moduleKey)) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="border-t border-gray-100 font-semibold text-gray-700 dark:border-neutral-700 dark:text-neutral-200">
+                                                        <td class="px-3 py-2">{{ __('Total') }}</td>
+                                                        @foreach ($contract->modules ?? [] as $moduleKey)
+                                                            <td class="px-3 py-2 text-right">{{ $contractCompanies->sum(fn ($usageCompany) => $contract->usageForCompany((string) $usageCompany->_id, $moduleKey)) }}</td>
+                                                        @endforeach
+                                                        <td class="px-3 py-2 text-right">{{ $contractCompanies->sum(fn ($usageCompany) => collect($contract->modules ?? [])->sum(fn ($moduleKey) => $contract->usageForCompany((string) $usageCompany->_id, $moduleKey))) }}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </section>
             @endif
@@ -286,6 +362,16 @@
                 <div>
                     <x-date-range-picker name-from="starts_at" name-to="ends_at" :label="__('Contract dates')" :value-from="now()->format('Y-m-d')" :allow-open-end="true" :floating="true" />
                     <p class="mt-1 text-xs text-neutral-400">{{ __('If you leave the end date empty, the contract will have no expiration.') }}</p>
+                </div>
+
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Also shared with these companies') }}</label>
+                    <select name="company_ids[]" id="contract-company-ids" multiple data-hs-select='{!! $contractCompaniesSelectConfig !!}' class="hidden">
+                        @foreach ($otherCompanies as $otherCompany)
+                            <option value="{{ $otherCompany->_id }}">{{ $otherCompany->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-neutral-400">{{ __('This company (:name) is always included -- pick others here if the same client has several companies sharing one quota.', ['name' => $company->name]) }}</p>
                 </div>
 
                 <div>
@@ -645,6 +731,16 @@
 
                 setSelectValue('contract-renewal-type', contract?.renewal_type ?? '{{ \App\Models\CompanyContract::RENEWAL_LIFETIME }}');
                 setSelectValue('contract-quota-mode', contract?.quota_mode ?? '{{ \App\Models\CompanyContract::QUOTA_MODE_PER_MODULE }}');
+
+                const companyIdsEl = document.getElementById('contract-company-ids');
+                const companyIdsInstance = window.HSSelect && HSSelect.getInstance(companyIdsEl);
+                if (companyIdsInstance) {
+                    companyIdsInstance.setValue(contract?.company_ids ?? []);
+                } else {
+                    Array.from(companyIdsEl.options).forEach((option) => {
+                        option.selected = (contract?.company_ids ?? []).includes(option.value);
+                    });
+                }
 
                 if (contract?.id) {
                     form.action = @json(route('admin.companies.contracts.update', ['companyId' => $company->_id, 'contractId' => '__ID__'])).replace('__ID__', contract.id);

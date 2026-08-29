@@ -3,7 +3,7 @@
 return [
 
     'invoicing' => [
-        'name' => 'Emisión de facturas',
+        'name' => 'Emisión de documentos',
         'roles' => ['administrador', 'vendedor', 'auditor'],
     ],
 
