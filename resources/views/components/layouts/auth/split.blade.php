@@ -38,22 +38,22 @@
     $plans = [
         [
             'name' => __('Basic'),
-            'price' => __('From $990,000/year'),
+            'price' => __('From $420,000/year'),
             'tagline' => __('To start invoicing'),
-            'features' => [__('1 module of your choice'), __('1 user'), __('Email support')],
+            'features' => [__('Unlimited users'), __('1 module of your choice'), __('Up to 400 documents/year'), __('Email support')],
         ],
         [
             'name' => __('Pro'),
-            'price' => __('From $2,490,000/year'),
+            'price' => __('From $780,000/year'),
             'tagline' => __('Most popular'),
-            'features' => [__('All modules'), __('Unlimited users'), __('Priority support')],
+            'features' => [__('Unlimited users'), __('2 modules of your choice'), __('Up to 2,000 documents/year'), __('Priority support')],
             'highlighted' => true,
         ],
         [
             'name' => __('Enterprise'),
             'price' => __('Custom quote'),
-            'tagline' => __('Several companies, one shared quota'),
-            'features' => [__('Contract shared across companies'), __('Custom-fit quotas'), __('Dedicated support')],
+            'tagline' => __('High volume and advanced needs'),
+            'features' => [__('Unlimited users'), __('More than 3 modules of your choice'), __('Unlimited documents/year'), __('Dedicated support')],
         ],
     ];
 @endphp
