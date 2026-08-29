@@ -1153,6 +1153,6 @@ class IssueDocumentService
             throw new RuntimeException(__('This company has no active contract covering this module.'));
         }
 
-        $contract->claimUsage($module);
+        $contract->claimUsage($module, (string) $company->_id);
     }
 }

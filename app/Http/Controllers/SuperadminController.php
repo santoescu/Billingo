@@ -68,13 +68,17 @@ class SuperadminController extends Controller
 
         // Los vigentes primero (para no tener que buscarlos entre muchos histórios), y dentro
         // de cada grupo (vigentes / no vigentes) el más reciente primero.
-        $contracts = CompanyContract::where('company_id', $companyId)
+        $contracts = CompanyContract::where('company_ids', $companyId)
             ->orderByDesc('starts_at')
             ->get()
             ->sortByDesc(fn (CompanyContract $contract) => $contract->isWithinDateRange())
             ->values();
 
-        return view('admin.company-edit', compact('company', 'members', 'contracts'));
+        // Para el selector de "empresas asociadas" al crear/editar un contrato (un mismo
+        // contrato puede cubrir varias empresas del mismo cliente, ver CompanyContract).
+        $otherCompanies = Company::where('_id', '!=', $companyId)->orderBy('name')->get();
+
+        return view('admin.company-edit', compact('company', 'members', 'contracts', 'otherCompanies'));
     }
 
     /**
@@ -110,7 +114,7 @@ class SuperadminController extends Controller
         $data = $this->validatedContractData($request, $company);
 
         CompanyContract::create([
-            'company_id' => $companyId,
+            'company_ids' => $this->resolveContractCompanyIds($companyId, $data),
             'price' => $data['price'] ?? null,
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'] ?? null,
@@ -144,12 +148,13 @@ class SuperadminController extends Controller
      */
     public function updateContract(Request $request, string $companyId, string $contractId)
     {
-        $contract = CompanyContract::where('company_id', $companyId)->where('_id', $contractId)->firstOrFail();
+        $contract = CompanyContract::where('company_ids', $companyId)->where('_id', $contractId)->firstOrFail();
         $company = Company::findOrFail($companyId);
 
         $data = $this->validatedContractData($request, $company);
 
         $contract->update([
+            'company_ids' => $this->resolveContractCompanyIds($companyId, $data),
             'price' => $data['price'] ?? null,
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'] ?? null,
@@ -203,7 +208,33 @@ class SuperadminController extends Controller
             'invoicing_limit' => ['nullable', 'integer', 'min:1'],
             'pos_limit' => ['nullable', 'integer', 'min:1'],
             'cotizaciones_limit' => ['nullable', 'integer', 'min:1'],
+            'company_ids' => ['nullable', 'array'],
+            'company_ids.*' => ['string'],
         ]);
+    }
+
+    /**
+     * @param  string  $companyId  Empresa desde cuya pantalla se creó/editó el contrato -- siempre queda incluida, sin importar el checkbox.
+     * @param  array  $data  Datos ya validados de validatedContractData(), incluye "company_ids" si el superadmin marcó otras empresas para compartir el contrato.
+     * @return array<int, string> IDs únicos y reales de todas las empresas que van a compartir este contrato -- cualquier id que no exista de verdad (manipulado a mano en el request) se descarta en silencio.
+     */
+    private function resolveContractCompanyIds(string $companyId, array $data): array
+    {
+        $candidateIds = collect($data['company_ids'] ?? [])
+            ->push($companyId)
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+
+        // "->pluck('_id')" directo en el query builder de Mongo devuelve null (no resuelve el
+        // campo "_id" sin pasar por el modelo) -- por eso se trae primero la colección de
+        // modelos con get() y se le hace pluck() encima, no al query builder.
+        return Company::whereIn('_id', $candidateIds->all())
+            ->get()
+            ->pluck('_id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
     }
 
     /**
@@ -211,7 +242,7 @@ class SuperadminController extends Controller
      */
     public function destroyContract(string $companyId, string $contractId)
     {
-        CompanyContract::where('company_id', $companyId)->where('_id', $contractId)->firstOrFail()->delete();
+        CompanyContract::where('company_ids', $companyId)->where('_id', $contractId)->firstOrFail()->delete();
 
         session()->flash('toast', [
             'type' => 'success',

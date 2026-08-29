@@ -255,9 +255,14 @@ class Company extends Model
         return $this->hasMany(Seller::class);
     }
 
+    /**
+     * Contratos que cubren esta empresa -- un mismo contrato (con sus contadores de uso) puede
+     * cubrir varias empresas a la vez (ver CompanyContract::$company_ids), así que esto no es
+     * un hasMany por FK simple: se busca por contención en el arreglo "company_ids".
+     */
     public function contracts()
     {
-        return $this->hasMany(CompanyContract::class);
+        return CompanyContract::where('company_ids', (string) $this->_id);
     }
 
     /**
