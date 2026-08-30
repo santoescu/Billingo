@@ -111,12 +111,14 @@ class PublicCatalogController extends Controller
                 });
             })
             ->when($link->warehouse_id, function ($builder) use ($link) {
-                $builder->where('warehouse_stocks', 'elemMatch', [
-                    'warehouse_id' => $link->warehouse_id,
-                    'stock' => ['$gt' => 1],
-                ]);
+                $builder->where(function ($builder) use ($link) {
+                    $builder->where('warehouse_stocks', 'elemMatch', [
+                        'warehouse_id' => $link->warehouse_id,
+                        'stock' => ['$gt' => 1],
+                    ])->orWhere('tracks_inventory', '!=', true);
+                });
             }, function ($builder) {
-                $builder->where('stock', '>', 1);
+                $builder->where(fn ($builder) => $builder->where('stock', '>', 1)->orWhere('tracks_inventory', '!=', true));
             });
     }
 

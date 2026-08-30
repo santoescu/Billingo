@@ -256,13 +256,15 @@ class DocumentoEmitidoController extends Controller
                 });
             })
             ->when($warehouseId === 'all', function ($builder) {
-                $builder->where('stock', '>', 1);
+                $builder->where(fn ($builder) => $builder->where('stock', '>', 1)->orWhere('tracks_inventory', '!=', true));
             })
             ->when($warehouseId !== '' && $warehouseId !== 'all', function ($builder) use ($warehouseId) {
-                $builder->where('warehouse_stocks', 'elemMatch', [
-                    'warehouse_id' => $warehouseId,
-                    'stock' => ['$gt' => 1],
-                ]);
+                $builder->where(function ($builder) use ($warehouseId) {
+                    $builder->where('warehouse_stocks', 'elemMatch', [
+                        'warehouse_id' => $warehouseId,
+                        'stock' => ['$gt' => 1],
+                    ])->orWhere('tracks_inventory', '!=', true);
+                });
             })
             ->orderBy('description')
             ->limit(50)

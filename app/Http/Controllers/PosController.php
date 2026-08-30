@@ -62,7 +62,9 @@ class PosController extends Controller
         $paymentMethods = $company->paymentMethods()->orderBy('name')->get();
         $sellers = $company->sellers()->orderBy('name')->get();
 
-        $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
+        $products = $company->products()->active()
+            ->where(fn ($builder) => $builder->where('stock', '>', 1)->orWhere('tracks_inventory', '!=', true))
+            ->orderBy('description')->limit(60)->get();
 
         $quotation = $quotationController->resolveFromQuotation($company, $request->query('from_quotation'));
         $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $documentController) : null;

@@ -36,7 +36,9 @@ class QuotationController extends Controller
 
         $resolutions = $documentController->resolutionsFor($company, 'COT');
 
-        $products = $company->products()->active()->where('stock', '>', 1)->orderBy('description')->limit(60)->get();
+        $products = $company->products()->active()
+            ->where(fn ($builder) => $builder->where('stock', '>', 1)->orWhere('tracks_inventory', '!=', true))
+            ->orderBy('description')->limit(60)->get();
 
         return view('quotations.create', [
             'company' => $company,
