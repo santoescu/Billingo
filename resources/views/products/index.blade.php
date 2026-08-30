@@ -97,7 +97,7 @@
                             <flux:button variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
                                 {{ __('Import from Excel') }}
                             </flux:button>
-                            <flux:button variant="primary" icon="plus" onclick="openProductPanel()">
+                            <flux:button id="new-product-btn" variant="primary" icon="plus" onclick="openProductPanel()">
                                 {{ __('New product') }}
                             </flux:button>
                         </div>
@@ -161,7 +161,7 @@
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                                                 </a>
 
-                                                <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product->makeHidden('image_data')) !!})">
+                                                <button type="button" class="product-edit-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product->makeHidden('image_data')) !!})">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
                                                         <path d="m15 5 4 4"></path>
@@ -169,22 +169,22 @@
                                                 </button>
 
                                                 <div class="hs-dropdown [--auto-close:true] relative inline-flex">
-                                                    <button type="button" class="hs-dropdown-toggle flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('More actions') }}">
+                                                    <button type="button" class="product-more-actions-btn hs-dropdown-toggle flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('More actions') }}">
                                                         <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                                                     </button>
                                                     <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 flex items-center gap-1 dark:bg-neutral-800 dark:border-neutral-700">
                                                         @if ($product->tracks_inventory)
-                                                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Register entry') }}" title="{{ __('Register entry') }}" onclick="openStockEntryPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
+                                                            <button type="button" class="product-register-entry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Register entry') }}" title="{{ __('Register entry') }}" onclick="openStockEntryPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
                                                                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                                                             </button>
-                                                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Fix cost') }}" title="{{ __('Fix cost') }}" onclick="openAverageCostPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }}, {{ (float) ($product->average_cost ?? 0) }})">
+                                                            <button type="button" class="product-fix-cost-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Fix cost') }}" title="{{ __('Fix cost') }}" onclick="openAverageCostPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }}, {{ (float) ($product->average_cost ?? 0) }})">
                                                                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
                                                             </button>
                                                         @endif
                                                         <form action="{{ route('products.destroy', $product->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
+                                                            <button type="submit" class="product-delete-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
                                                                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                                                             </button>
                                                         </form>
@@ -206,7 +206,7 @@
         
         <div class="flex flex-col gap-6">
             <div class="flex justify-end">
-                <flux:button variant="primary" icon="plus" onclick="openWarehousePanel()">
+                <flux:button id="new-warehouse-btn" variant="primary" icon="plus" onclick="openWarehousePanel()">
                     {{ __('New warehouse') }}
                 </flux:button>
             </div>
@@ -255,7 +255,7 @@
             <div class="p-1.5 min-w-full inline-block align-middle">
                 <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
                     <div class="py-3 px-4 flex justify-end items-center gap-4">
-                        <flux:button variant="primary" icon="plus" onclick="openPriceTypePanel()">
+                        <flux:button id="new-price-type-btn" variant="primary" icon="plus" onclick="openPriceTypePanel()">
                             {{ __('New price type') }}
                         </flux:button>
                     </div>
@@ -732,7 +732,7 @@
 
                 <div class="flex items-stretch gap-3">
                     <div class="shrink-0 relative w-32 aspect-square">
-                        <button type="button" onclick="document.getElementById('pr-image').click()" class="relative block size-full rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Image') }}">
+                        <button id="pr-image-btn" type="button" onclick="document.getElementById('pr-image').click()" class="relative block size-full rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Image') }}">
                             <img id="pr-image-preview" src="" alt="" class="hidden size-full object-cover object-center">
                             <span id="pr-image-placeholder" class="flex items-center justify-center size-full bg-accent/10 text-accent">
                                 <svg class="shrink-0 size-11" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
@@ -752,7 +752,7 @@
 
                 <flux:input id="pr-description" name="description" :label="__('Description')" value="{{ old('description') }}" required />
 
-                <flux:field>
+                <flux:field id="pr-unit_code-field">
                     <flux:label>{{ __('Unit') }}</flux:label>
                     <select id="pr-unit_code" name="unit_code" data-hs-select='{!! $searchableSelectConfig !!}' class="hidden">
                         <option value="">{{ __('Select...') }}</option>
@@ -765,7 +765,7 @@
                 <div class="space-y-3">
                     <div class="flex justify-between items-center">
                         <label class="text-sm font-medium text-zinc-800 dark:text-white">{{ __('Prices') }}</label>
-                        <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addExtraPriceLine()">{{ __('Add price') }}</flux:button>
+                        <flux:button id="pr-add-price-btn" type="button" size="sm" variant="filled" icon="plus" onclick="addExtraPriceLine()">{{ __('Add price') }}</flux:button>
                     </div>
                     <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('The first price is the one used by default.') }}</p>
                     <div id="pr-extra_prices_body" class="space-y-3"></div>
@@ -812,7 +812,7 @@
 
                     <div class="flex justify-between items-center">
                         <label class="text-sm font-medium text-zinc-800 dark:text-white">{{ __('Stock by warehouse') }}</label>
-                        <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addProductWarehouseLine()">{{ __('Add warehouse') }}</flux:button>
+                        <flux:button id="pr-add-warehouse-btn" type="button" size="sm" variant="filled" icon="plus" onclick="addProductWarehouseLine()">{{ __('Add warehouse') }}</flux:button>
                     </div>
                     <div id="pr-warehouse_stocks_body" class="space-y-3"></div>
 

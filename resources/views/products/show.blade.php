@@ -35,7 +35,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="product-show-general" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('General') }}</h3>
                 </div>
@@ -55,7 +55,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="product-show-prices" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Prices') }}</h3>
                 </div>
@@ -77,7 +77,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="product-show-kardex" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Kardex') }}</h3>
                 </div>
@@ -88,7 +88,7 @@
         </div>
 
         <div class="flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 flex justify-center">
+            <div id="product-show-image" class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 flex justify-center">
                 <button type="button" onclick="document.getElementById('pd-image-input').click()" class="relative block w-full aspect-square max-w-72 rounded-lg overflow-hidden focus:outline-hidden focus:ring-2 focus:ring-accent" title="{{ __('Image') }}">
                     <img id="pd-image-preview" src="{{ $product->image_url }}" alt="" class="size-full object-cover {{ $product->image_url ? '' : 'hidden' }}">
                     <span id="pd-image-placeholder" class="flex items-center justify-center size-full bg-accent/10 text-accent {{ $product->image_url ? 'hidden' : '' }}">
@@ -99,7 +99,7 @@
             </div>
 
             @if ($product->tracks_inventory)
-                <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div id="product-show-stock" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                         <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Stock') }}</h3>
                     </div>
@@ -134,7 +134,7 @@
                     </div>
                 </div>
             @else
-                <div class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+                <div id="product-show-stock" class="border border-gray-200 rounded-lg dark:border-neutral-700 p-4 text-sm text-neutral-500 dark:text-neutral-400">
                     {{ __('This product does not track inventory.') }}
                 </div>
             @endif

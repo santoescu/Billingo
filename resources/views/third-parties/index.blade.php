@@ -38,7 +38,7 @@
                             <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                         </div>
 
-                        <flux:button variant="primary" icon="plus" onclick="openThirdPartyPanel()">
+                        <flux:button id="new-third-party-btn" variant="primary" icon="plus" onclick="openThirdPartyPanel()">
                             {{ $isClient ? __('New client') : __('New provider') }}
                         </flux:button>
                     </div>

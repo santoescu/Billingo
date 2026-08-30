@@ -17,7 +17,7 @@
 
         @isset($button)
             <a href="{{ $button['route'] }}">
-                <flux:button variant="primary">
+                <flux:button :id="$button['id'] ?? null" variant="primary">
                     {{ $button['label'] }}
                 </flux:button>
             </a>

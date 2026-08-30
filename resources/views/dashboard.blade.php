@@ -2,7 +2,7 @@
     @include('partials.tittle', [
         'title' => __('Companies'),
         'subheading' => __('Select the company you want to work with'),
-        'button' => ['route' => route('companies.create'), 'label' => __('New company')],
+        'button' => ['route' => route('companies.create'), 'label' => __('New company'), 'id' => 'new-company-btn'],
     ])
 
     @if ($companies->isEmpty())

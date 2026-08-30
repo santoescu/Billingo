@@ -27,7 +27,7 @@
                         </div>
 
                         @if ($canManage)
-                            <flux:button variant="primary" icon="plus" data-hs-overlay="#add-member">{{ __('Add member') }}</flux:button>
+                            <flux:button id="add-member-btn" variant="primary" icon="plus" data-hs-overlay="#add-member">{{ __('Add member') }}</flux:button>
                         @endif
                     </div>
 
@@ -125,17 +125,19 @@
                     @if (empty($activeModules))
                         <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('This company has no active modules yet, so the member will be added without access to anything until a module is assigned.') }}</p>
                     @else
-                        @foreach ($activeModules as $moduleKey)
-                            <div>
-                                <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
-                                <select name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                                    <option value="">{{ __('No access') }}</option>
-                                    @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
-                                        <option value="{{ $role }}">{{ ucfirst($role) }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endforeach
+                        <div id="member-modules-fields" class="space-y-6">
+                            @foreach ($activeModules as $moduleKey)
+                                <div>
+                                    <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
+                                    <select name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                                        <option value="">{{ __('No access') }}</option>
+                                        @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
+                                            <option value="{{ $role }}">{{ ucfirst($role) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
 
                     @error('email')
