@@ -19,7 +19,7 @@ class ProductController extends Controller
     {
         $company = $this->currentCompany($request);
 
-        $products = $company->products()->orderBy('description')->get();
+        $products = $company->products()->get();
         $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
         $warehouses = $company->warehouses()->orderBy('name')->get();
         $priceTypes = $this->priceTypesOrDefault($company);

@@ -19,7 +19,7 @@ class ThirdPartyController extends Controller
         $company = $this->currentCompany($request);
         $role = $request->route('role');
 
-        $thirdParties = $company->thirdParties()->withRole($role)->orderBy('name')->get();
+        $thirdParties = $company->thirdParties()->withRole($role)->get();
 
         return view('third-parties.index', [
             'thirdParties' => $thirdParties,

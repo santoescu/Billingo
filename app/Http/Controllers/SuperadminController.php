@@ -17,7 +17,7 @@ class SuperadminController extends Controller
      */
     public function companies()
     {
-        $companies = Company::orderBy('name')->get();
+        $companies = Company::all();
 
         $owners = CompanyMember::whereIn('company_id', $companies->pluck('_id')->map(fn ($id) => (string) $id)->all())
             ->where('role', 'owner')
@@ -375,7 +375,7 @@ class SuperadminController extends Controller
      */
     public function users()
     {
-        $users = User::orderBy('name')->get();
+        $users = User::all();
 
         $memberships = CompanyMember::whereIn('user_id', $users->pluck('_id')->map(fn ($id) => (string) $id)->all())->get();
         $companyNames = Company::whereIn('_id', $memberships->pluck('company_id')->unique()->all())
