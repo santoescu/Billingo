@@ -1,3 +1,5 @@
+import './tours';
+
 import ClipboardJS from 'clipboard';
 window.ClipboardJS = ClipboardJS;
 import clipboardHelper from 'preline/helpers/clipboard';

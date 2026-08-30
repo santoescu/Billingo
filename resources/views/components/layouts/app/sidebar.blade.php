@@ -179,6 +179,7 @@
 </script>
 @include('components.toast')
 @include('components.confirm-dialog')
+@include('partials.tours-content')
 
 <div class="fixed z-[100] bottom-4 start-2 lg:start-[272px] hs-overlay-minified:lg:start-[68px] transition-[inset-inline-start] duration-300 ease-in-out">
     @include('partials.notifications-bell')
@@ -340,6 +341,14 @@
                     bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
                      role="menu" aria-orientation="vertical" aria-labelledby="hs-sidebar-account">
                     <div class="p-1">
+                        <a class="flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100
+                      focus:outline-hidden focus:bg-gray-100
+                      dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
+                           href="{{ route('help.index') }}">
+                            <x-dynamic-component component="heroicon-o-question-mark-circle" class="size-4 shrink-0" />
+                            {{ __('Help') }}
+                        </a>
+
                         <a class="flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100
                       focus:outline-hidden focus:bg-gray-100
                       dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"

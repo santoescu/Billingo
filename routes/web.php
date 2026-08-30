@@ -55,6 +55,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/appearance', Appearance::class)->name('settings.appearance');
     Route::get('settings/language', Language::class)->name('settings.language');
 
+    Route::view('help', 'help.index')->name('help.index');
+
     Route::post('dashboard/select-company', [CompanyController::class, 'select'])->name('dashboard.select-company');
 
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
