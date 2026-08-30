@@ -15,10 +15,15 @@ import 'driver.js/dist/driver.css';
  * @param {() => Object} getDriver
  * @returns {Array<Object>}
  */
-function buildSteps(tourSteps, getDriver) {
+function buildSteps(tourSteps, getDriver, tourKey) {
     return tourSteps.map((step, index) => {
         const config = {
             element: step.selector,
+            // Si el selector de un paso no existe en la página (ej. la
+            // guía apunta a una fila de la tabla pero la empresa no tiene
+            // productos todavía), que se lo salte en vez de romper el tour
+            // entero a la mitad.
+            skipMissingElement: true,
             popover: {
                 title: step.title,
                 description: step.description,
@@ -28,9 +33,10 @@ function buildSteps(tourSteps, getDriver) {
         // Solo en el último paso: terminar el tour con "Terminar" te devuelve
         // a Ayuda -- cerrarlo a medias (con la X) te deja donde estabas, ahí
         // seguro quieres seguir viendo la pantalla, no que te saque de golpe.
-        if (index === tourSteps.length - 1 && window.appHelpUrl) {
+        if (index === tourSteps.length - 1) {
             config.popover.onDoneClick = () => {
-                window.location.href = window.appHelpUrl;
+                markTourCompleted(tourKey);
+                if (window.appHelpUrl) window.location.href = window.appHelpUrl;
             };
         }
 
@@ -74,6 +80,61 @@ function buildSteps(tourSteps, getDriver) {
     });
 }
 
+const COMPLETED_TOURS_STORAGE_KEY = 'completedTours';
+
+/**
+ * @returns {Array<string>} Claves de los tours que el usuario ya terminó (persistido en localStorage).
+ */
+function getCompletedTours() {
+    try {
+        return JSON.parse(localStorage.getItem(COMPLETED_TOURS_STORAGE_KEY) || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+/**
+ * @param {string} key
+ * @returns {void}
+ */
+function markTourCompleted(key) {
+    if (!key) return;
+    const completed = new Set(getCompletedTours());
+    completed.add(key);
+    localStorage.setItem(COMPLETED_TOURS_STORAGE_KEY, JSON.stringify([...completed]));
+}
+
+/**
+ * En la página de Ayuda, le pone un check a cada tarjeta de guía que el
+ * usuario ya completó antes -- así sabe cuáles le faltan sin tener que
+ * recordarlo, y sigue pudiendo repetir cualquiera con solo hacer clic.
+ * @returns {void}
+ */
+function decorateCompletedGuides() {
+    const completed = new Set(getCompletedTours());
+    if (!completed.size) return;
+
+    document.querySelectorAll('a[href*="tour="]').forEach((link) => {
+        let tourKey;
+        try {
+            tourKey = new URL(link.href, window.location.origin).searchParams.get('tour');
+        } catch (error) {
+            return;
+        }
+
+        if (!tourKey || !completed.has(tourKey) || link.querySelector('.tour-completed-badge')) return;
+
+        const badge = document.createElement('span');
+        badge.className = 'tour-completed-badge absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+        badge.title = window.appTourLabels?.completed ?? '';
+        badge.innerHTML = '<svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>';
+        link.appendChild(badge);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', decorateCompletedGuides);
+document.addEventListener('livewire:navigated', decorateCompletedGuides);
+
 /**
  * Si el usuario cierra a mano un panel que el tour necesitaba abierto (antes
  * de terminar el recorrido), los pasos siguientes apuntarían a elementos ya
@@ -107,7 +168,7 @@ window.startTour = function (key) {
         prevBtnText: window.appTourLabels?.prev,
         doneBtnText: window.appTourLabels?.done,
         progressText: window.appTourLabels?.progress,
-        steps: buildSteps(tour.steps, () => driverInstance),
+        steps: buildSteps(tour.steps, () => driverInstance, key),
         onDestroyed: () => stopWatching(),
     });
 

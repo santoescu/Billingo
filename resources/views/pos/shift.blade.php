@@ -48,7 +48,7 @@
                                 </div>
                             </div>
 
-                            <div>
+                            <div id="shift-fv-resolution-field">
                                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Sales invoice resolution') }}</label>
                                 <select name="fv_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" required>
                                     <option value=""></option>
@@ -59,7 +59,7 @@
                             </div>
 
                             @if ($invoicingResolutions->isNotEmpty())
-                                <div>
+                                <div id="shift-invoicing-resolution-field">
                                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Electronic invoice resolution') }}</label>
                                     <select name="invoicing_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" required>
                                         <option value=""></option>
@@ -74,7 +74,7 @@
                                 <flux:input name="notes" :label="__('Notes')" />
                             </div>
 
-                            <flux:button type="submit" variant="primary" class="w-full" :disabled="$fvResolutions->isEmpty()">{{ __('Open shift') }}</flux:button>
+                            <flux:button id="shift-open-btn" type="submit" variant="primary" class="w-full" :disabled="$fvResolutions->isEmpty()">{{ __('Open shift') }}</flux:button>
                         </form>
                     </div>
                 </section>
@@ -112,7 +112,7 @@
                                 </div>
                             </div>
 
-                            <flux:button type="button" size="sm" variant="filled" class="w-full"
+                            <flux:button type="button" size="sm" variant="filled" class="shift-close-btn w-full"
                                 onclick="window.openAdminCloseShiftModal({{ Illuminate\Support\Js::from([
                                     'closeUrl' => route('pos.shifts.close', $s->_id),
                                     'showUrl' => route('pos.shifts.show', $s->_id),

@@ -114,7 +114,7 @@
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Operation type') }}</label>
                     <select id="doc-tipo_operacion" name="tipo_operacion" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>
-                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                <div id="doc-resolution-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Resolution') }}</label>
                     <select id="doc-resolution" name="resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>

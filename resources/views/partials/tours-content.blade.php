@@ -25,6 +25,165 @@
                 ],
             ],
         ],
+        'issue-document' => [
+            'steps' => [
+                [
+                    'selector' => '#doc-resolution-field',
+                    'title' => __('Resolution'),
+                    'description' => __('The DIAN-authorized numbering range you\'re issuing under -- the prefix and consecutive fill in on their own once you pick it.'),
+                ],
+                [
+                    'selector' => '#doc-cliente-search',
+                    'title' => __('Search existing client'),
+                    'description' => __("Search by name or ID -- picking one fills in their data. If they're not registered yet, fill in the fields below by hand."),
+                ],
+                [
+                    'selector' => '.line-product-search',
+                    'title' => __('Add a line'),
+                    'description' => __('Search a product by code, barcode or description to add it as a line -- a new empty line appears automatically for the next one.'),
+                ],
+                [
+                    'selector' => '#documentLinesTotal',
+                    'title' => __('Total'),
+                    'description' => __('Updates live as you add lines, discounts and taxes.'),
+                ],
+                [
+                    'selector' => '#documentSubmitBtn',
+                    'title' => __('Issue document'),
+                    'description' => __('Validates and sends it to the DIAN right away -- once issued, it can\'t be edited, only corrected with a credit or debit note.'),
+                ],
+            ],
+        ],
+        'pos-open-shift' => [
+            'steps' => [
+                [
+                    'selector' => '#opening-balance-display',
+                    'title' => __('Opening balance'),
+                    'description' => __('How much cash you\'re starting the shift with -- used later to compare against what you actually count when you close it.'),
+                ],
+                [
+                    'selector' => '#shift-fv-resolution-field',
+                    'title' => __('Sales invoice resolution'),
+                    'description' => __('The numbering range used for every sale in this shift, whether or not you also issue it as an electronic invoice.'),
+                ],
+                [
+                    'selector' => '#shift-invoicing-resolution-field',
+                    'title' => __('Electronic invoice resolution'),
+                    'description' => __('Only needed if you plan to issue electronic invoices from the POS during this shift, not just the sales receipt.'),
+                ],
+                [
+                    'selector' => '#shift-open-btn',
+                    'title' => __('Open shift'),
+                    'description' => __('Once it\'s open you can start selling -- you won\'t be able to sell without an open shift.'),
+                ],
+            ],
+        ],
+        'pos-close-shift' => [
+            'steps' => [
+                [
+                    'selector' => '.shift-close-btn',
+                    'title' => __('Close shift'),
+                    'description' => __('Click here to count your cash and close the shift.'),
+                    'panel' => '#admin-close-shift-modal',
+                ],
+                [
+                    'selector' => '#admin-close-counted-display',
+                    'title' => __('Counted cash'),
+                    'description' => __('What you actually count in the drawer -- compare it against "Expected cash" above to spot any difference.'),
+                ],
+                [
+                    'selector' => '#admin-close-shift-form button[type="submit"]',
+                    'title' => __('Close shift'),
+                    'description' => __('That\'s it -- the shift closes with whatever you counted, and you\'ll need to open a new one to keep selling.'),
+                ],
+            ],
+        ],
+        'pos-sell' => [
+            'steps' => [
+                [
+                    'selector' => '#pos-ticket-add-btn',
+                    'title' => __('Pre-bills'),
+                    'description' => __('Open a new tab to attend a different client without losing the cart you already had going -- each tab keeps its own cart and client.'),
+                ],
+                [
+                    'selector' => '#pos-product-search',
+                    'title' => __('Search a product'),
+                    'description' => __('Search by code, barcode or description -- click a card in the grid below to add it to the cart.'),
+                ],
+                [
+                    'selector' => '#pos-cart-body',
+                    'title' => __('Cart'),
+                    'description' => __('Every product you\'ve added -- change the quantity or remove a line right here.'),
+                ],
+                [
+                    'selector' => '#pos-client-search',
+                    'title' => __('Client'),
+                    'description' => __('Search an existing client, or leave it as the default "final consumer" if you don\'t need to identify who\'s buying.'),
+                ],
+                [
+                    'selector' => '#pos-total-display',
+                    'title' => __('Total'),
+                    'description' => __('Updates live as you add or remove products from the cart.'),
+                ],
+                [
+                    'selector' => '#pos-checkout-btn',
+                    'title' => __('Charge sale'),
+                    'description' => __('Opens the payment screen -- once charged you can print the receipt or, if the module is active, also issue it as an electronic invoice.'),
+                ],
+            ],
+        ],
+        'create-quotation' => [
+            'steps' => [
+                [
+                    'selector' => '#quote-ticket-add-btn',
+                    'title' => __('Pre-quotations'),
+                    'description' => __('Open a new tab to start a different quotation without losing the cart you already had going -- each tab keeps its own cart and client.'),
+                ],
+                [
+                    'selector' => '#quote-product-search',
+                    'title' => __('Search a product'),
+                    'description' => __('Search by code, barcode or description -- click a card in the grid below to add it to the cart.'),
+                ],
+                [
+                    'selector' => '#quote-cart-body',
+                    'title' => __('Cart'),
+                    'description' => __('Every product you\'ve added -- change the quantity or remove a line right here.'),
+                ],
+                [
+                    'selector' => '#quote-client-search',
+                    'title' => __('Client'),
+                    'description' => __('Search an existing client, or leave it as the default one if you don\'t have their details yet.'),
+                ],
+                [
+                    'selector' => '#quote-total-display',
+                    'title' => __('Total'),
+                    'description' => __('Updates live as you add or remove products from the cart.'),
+                ],
+                [
+                    'selector' => '#quote-submit-btn',
+                    'title' => __('Issue quotation'),
+                    'description' => __('Generates the quotation PDF -- your client can later turn it into a sale or an invoice without typing everything again.'),
+                ],
+            ],
+        ],
+        'quotations-search' => [
+            'steps' => [
+                [
+                    'selector' => '#hs-table-with-pagination-search',
+                    'title' => __('Search'),
+                    'description' => __('Filter by client or number to find a quotation you already issued -- open it to view or download its PDF.'),
+                ],
+            ],
+        ],
+        'documents-search' => [
+            'steps' => [
+                [
+                    'selector' => '#hs-table-with-pagination-search',
+                    'title' => __('Search'),
+                    'description' => __('Filter by client, number or prefix to quickly find a document you already issued -- click the eye icon on any row to open it.'),
+                ],
+            ],
+        ],
         'inventory' => [
             'steps' => [
                 [
@@ -270,6 +429,7 @@
         'prev' => __('Back'),
         'done' => __('Done'),
         'progress' => __('{{current}} of {{total}}'),
+        'completed' => __('You already completed this guide'),
     ];
 @endphp
 <script>

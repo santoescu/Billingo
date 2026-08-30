@@ -80,6 +80,56 @@
                 ] : null,
             ])) : [],
         ],
+        [
+            'label' => config('modules.invoicing.name'),
+            'guides' => $hasInvoicing ? [
+                [
+                    'label' => __('Issue document'),
+                    'description' => __('Pick a resolution, search a client, add lines and issue an electronic document.'),
+                    'url' => route('documents.create', ['tour' => 'issue-document']),
+                ],
+                [
+                    'label' => __('Search'),
+                    'description' => __('Find a document you already issued.'),
+                    'url' => route('documents.index', ['tour' => 'documents-search']),
+                ],
+            ] : [],
+        ],
+        [
+            'label' => config('modules.pos.name'),
+            'guides' => $hasPos ? [
+                [
+                    'label' => __('Open shift'),
+                    'description' => __('Set your opening cash balance and the resolutions you\'ll sell under.'),
+                    'url' => route('pos.shift', ['tour' => 'pos-open-shift']),
+                ],
+                [
+                    'label' => __('Sell'),
+                    'description' => __('Add products to the cart, pick a client and charge the sale.'),
+                    'url' => route('pos.create', ['tour' => 'pos-sell']),
+                ],
+                [
+                    'label' => __('Close shift'),
+                    'description' => __('Count your cash and close the shift at the end of the day.'),
+                    'url' => route('pos.shift', ['tour' => 'pos-close-shift']),
+                ],
+            ] : [],
+        ],
+        [
+            'label' => config('modules.cotizaciones.name'),
+            'guides' => $hasCotizaciones ? [
+                [
+                    'label' => __('Create a quotation'),
+                    'description' => __('Add products to the cart, pick a client and issue the quotation PDF.'),
+                    'url' => route('quotations.create', ['tour' => 'create-quotation']),
+                ],
+                [
+                    'label' => __('Search'),
+                    'description' => __('Find a quotation you already issued.'),
+                    'url' => route('quotations.index', ['tour' => 'quotations-search']),
+                ],
+            ] : [],
+        ],
     ];
 
     $sections = array_values(array_filter($sections, fn ($section) => ! empty($section['guides'])));
@@ -97,7 +147,7 @@
                 <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500">{{ $section['label'] }}</h2>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($section['guides'] as $guide)
-                        <a href="{{ $guide['url'] }}" class="block space-y-1.5 rounded-lg border border-gray-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800">
+                        <a href="{{ $guide['url'] }}" class="relative block space-y-1.5 rounded-lg border border-gray-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-accent hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800">
                             <p class="font-semibold text-gray-800 dark:text-white">{{ $guide['label'] }}</p>
                             <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ $guide['description'] }}</p>
                         </a>
