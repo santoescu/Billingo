@@ -356,7 +356,7 @@ class SuperadminController extends Controller
 
         return collect($input)
             ->only($activeModules)
-            ->filter(fn ($role) => filled($role))
+            ->filter(fn ($role) => filled($role) && $role !== 'none')
             ->map(function ($role, $moduleKey) use ($catalog) {
                 if (! in_array($role, $catalog[$moduleKey]['roles'] ?? [], true)) {
                     throw ValidationException::withMessages([

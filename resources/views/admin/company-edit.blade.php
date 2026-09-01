@@ -491,7 +491,7 @@
                         <div>
                             <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
                             <select name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                                <option value="">{{ __('No access') }}</option>
+                                <option value="none" selected>{{ __('No access') }}</option>
                                 @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
                                     <option value="{{ $role }}">{{ ucfirst($role) }}</option>
                                 @endforeach
@@ -539,7 +539,7 @@
                         <div>
                             <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
                             <select id="edit-member-module-{{ $moduleKey }}" name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                                <option value="">{{ __('No access') }}</option>
+                                <option value="none" selected>{{ __('No access') }}</option>
                                 @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
                                     <option value="{{ $role }}">{{ ucfirst($role) }}</option>
                                 @endforeach
@@ -584,7 +584,7 @@
                 });
 
                 @foreach ($activeModules as $moduleKey)
-                    setSelectValue('edit-member-module-{{ $moduleKey }}', assignments['{{ $moduleKey }}'] || '');
+                    setSelectValue('edit-member-module-{{ $moduleKey }}', assignments['{{ $moduleKey }}'] || 'none');
                 @endforeach
             };
 

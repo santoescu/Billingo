@@ -66,20 +66,24 @@
                                             @endif
                                         </td>
                                         @if ($canManage)
-                                            <td class="px-6 py-4 flex justify-center gap-2">
+                                            <td class="px-6 py-4">
                                                 @if ($member->membership->role !== 'owner')
-                                                    <flux:button
-                                                        size="sm"
-                                                        variant="primary"
-                                                        icon="pencil-square"
-                                                        onclick="openEditMemberModal({!! Illuminate\Support\Js::from($member) !!})"
-                                                    ></flux:button>
+                                                    <div class="flex justify-center gap-1">
+                                                        <button type="button" class="member-edit-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" title="{{ __('Edit') }}" onclick="openEditMemberModal({!! Illuminate\Support\Js::from($member) !!})">
+                                                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                                                <path d="m15 5 4 4"></path>
+                                                            </svg>
+                                                        </button>
 
-                                                    <form action="{{ route('companies.members.destroy', $member->_id) }}" method="POST">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <flux:button size="sm" variant="danger" icon="trash" type="submit"></flux:button>
-                                                    </form>
+                                                        <form action="{{ route('companies.members.destroy', $member->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="member-delete-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
+                                                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                                            </button>
+                                                        </form>
+                                                    </div>
                                                 @endif
                                             </td>
                                         @endif
@@ -130,7 +134,7 @@
                                 <div>
                                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
                                     <select name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                                        <option value="">{{ __('No access') }}</option>
+                                        <option value="none" selected>{{ __('No access') }}</option>
                                         @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
                                             <option value="{{ $role }}">{{ ucfirst($role) }}</option>
                                         @endforeach
@@ -175,17 +179,19 @@
                     @if (empty($activeModules))
                         <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('This company has no active modules yet, so the member will be added without access to anything until a module is assigned.') }}</p>
                     @else
-                        @foreach ($activeModules as $moduleKey)
-                            <div>
-                                <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
-                                <select id="edit-member-module-{{ $moduleKey }}" name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
-                                    <option value="">{{ __('No access') }}</option>
-                                    @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
-                                        <option value="{{ $role }}">{{ ucfirst($role) }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endforeach
+                        <div id="edit-member-modules-fields" class="space-y-6">
+                            @foreach ($activeModules as $moduleKey)
+                                <div>
+                                    <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}</label>
+                                    <select id="edit-member-module-{{ $moduleKey }}" name="modules[{{ $moduleKey }}]" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                                        <option value="none" selected>{{ __('No access') }}</option>
+                                        @foreach ($moduleCatalog[$moduleKey]['roles'] ?? [] as $role)
+                                            <option value="{{ $role }}">{{ ucfirst($role) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
 
                     <div class="flex gap-3">
@@ -222,7 +228,7 @@
                     });
 
                     @foreach ($activeModules as $moduleKey)
-                        setSelectValue('edit-member-module-{{ $moduleKey }}', assignments['{{ $moduleKey }}'] || '');
+                        setSelectValue('edit-member-module-{{ $moduleKey }}', assignments['{{ $moduleKey }}'] || 'none');
                     @endforeach
                 };
 
