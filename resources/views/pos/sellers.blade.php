@@ -8,7 +8,7 @@
 
     <div class="flex flex-col gap-6">
         <div class="flex justify-end">
-            <flux:button type="button" variant="primary" icon="plus" onclick="window.openSellerPanel()">
+            <flux:button id="new-seller-btn" type="button" variant="primary" icon="plus" onclick="window.openSellerPanel()">
                 {{ __('New seller') }}
             </flux:button>
         </div>
@@ -67,7 +67,7 @@
                 <flux:input name="name" id="seller-name" :label="__('Name')" maxlength="255" required />
                 <div class="flex justify-end gap-3 pt-2">
                     <flux:button type="button" variant="filled" data-hs-overlay="#seller-panel">{{ __('Cancel') }}</flux:button>
-                    <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                    <flux:button type="submit" id="seller-submit-btn" variant="primary">{{ __('Save') }}</flux:button>
                 </div>
             </form>
         </div>

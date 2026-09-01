@@ -102,7 +102,7 @@
                 <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Document') }}</h3>
             </div>
             <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                <div id="doc-tipo_documento-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select id="doc-tipo_documento" name="tipo_documento" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         @foreach ($documentTypeLabels as $code => $label)

@@ -15,7 +15,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="quote-show-customer" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Customer') }}</h3>
                 </div>
@@ -31,7 +31,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="quote-show-lines" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Lines') }}</h3>
                 </div>
@@ -69,7 +69,7 @@
         </div>
 
         <div class="flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="quote-show-summary" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Summary') }}</h3>
                 </div>
@@ -97,7 +97,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="quote-show-convert" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Convert quotation') }}</h3>
                 </div>
@@ -118,12 +118,12 @@
                     @elseif ($canConvertToPos || $canConvertToInvoicing)
                         <p class="text-gray-600 dark:text-neutral-400">{{ __('Convert this quotation into a sale, reusing the client and lines.') }}</p>
                         @if ($canConvertToPos)
-                            <a href="{{ route('pos.create', ['from_quotation' => $documento->_id]) }}">
+                            <a id="quote-convert-pos-btn" href="{{ route('pos.create', ['from_quotation' => $documento->_id]) }}">
                                 <flux:button type="button" variant="primary" icon="shopping-cart" class="w-full">{{ __('Convert to POS sale') }}</flux:button>
                             </a>
                         @endif
                         @if ($canConvertToInvoicing)
-                            <a href="{{ route('documents.create', ['from_quotation' => $documento->_id]) }}">
+                            <a id="quote-convert-invoice-btn" href="{{ route('documents.create', ['from_quotation' => $documento->_id]) }}">
                                 <flux:button type="button" variant="filled" icon="bolt" class="w-full">{{ __('Issue electronic invoice') }}</flux:button>
                             </a>
                         @endif
@@ -133,7 +133,7 @@
                 </div>
             </div>
 
-            <a href="{{ route('quotations.pdf', $documento->_id) }}">
+            <a id="quote-show-download-btn" href="{{ route('quotations.pdf', $documento->_id) }}">
                 <flux:button type="button" variant="filled" icon="arrow-down-tray" class="w-full">{{ __('Download PDF') }}</flux:button>
             </a>
         </div>

@@ -11,12 +11,14 @@
             'label' => null,
             'items' => array_values(array_filter([
                 [
+                    'id' => 'sidebar-companies',
                     'name' => __('Companies'),
                     'icon' => 'home',
                     'url' => route('dashboard'),
                     'current' => request()->routeIs('dashboard'),
                 ],
                 session('selected_company') ? [
+                    'id' => 'sidebar-panel',
                     'name' => __('Panel'),
                     'icon' => 'chart-bar',
                     'url' => route('panel'),
@@ -29,6 +31,7 @@
             'label' => __('Document issuance'),
             'items' => $hasInvoicing ? [
                 [
+                    'id' => 'sidebar-documents',
                     'name' => __('Issued documents'),
                     'icon' => 'document-text',
                     'url' => route('documents.index'),
@@ -41,18 +44,21 @@
             'label' => __('Point of sale'),
             'items' => array_key_exists('pos', $myModules) ? [
                 [
+                    'id' => 'sidebar-pos-sell',
                     'name' => __('Sell'),
                     'icon' => 'shopping-cart',
                     'url' => route('pos.create'),
                     'current' => request()->routeIs('pos.create') || request()->routeIs('pos.checkout'),
                 ],
                 [
+                    'id' => 'sidebar-pos-sales',
                     'name' => __('Sales'),
                     'icon' => 'receipt-percent',
                     'url' => route('pos.sales.index'),
                     'current' => request()->routeIs('pos.sales.*'),
                 ],
                 [
+                    'id' => 'sidebar-pos-payment-methods',
                     'name' => __('Payment methods'),
                     'icon' => 'credit-card',
                     'url' => route('pos.payment-methods.index'),
@@ -65,12 +71,14 @@
             'label' => __('Quotations'),
             'items' => array_key_exists('cotizaciones', $myModules) ? [
                 [
+                    'id' => 'sidebar-quotations-create',
                     'name' => __('New quotation'),
                     'icon' => 'document-plus',
                     'url' => route('quotations.create'),
                     'current' => request()->routeIs('quotations.create') || request()->routeIs('quotations.store'),
                 ],
                 [
+                    'id' => 'sidebar-quotations-index',
                     'name' => __('Quotations'),
                     'icon' => 'document-text',
                     'url' => route('quotations.index'),
@@ -90,6 +98,7 @@
             'label' => __('Document receiving'),
             'items' => array_key_exists('receiving', $myModules) ? [
                 [
+                    'id' => 'sidebar-providers',
                     'name' => __('Providers'),
                     'icon' => 'truck',
                     'url' => route('providers.index'),
@@ -102,24 +111,28 @@
             'label' => __('Company'),
             'items' => session('selected_company') ? array_values(array_filter([
                 ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
+                    'id' => 'sidebar-clients',
                     'name' => __('Clients'),
                     'icon' => 'user-group',
                     'url' => route('clients.index'),
                     'current' => request()->routeIs('clients.*'),
                 ] : null,
                 ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
+                    'id' => 'sidebar-inventory',
                     'name' => __('Inventory'),
                     'icon' => 'cube',
                     'url' => route('products.index'),
                     'current' => request()->routeIs('products.*') || request()->routeIs('warehouses.*'),
                 ] : null,
                 ($hasInvoicing || $hasPos || $hasCotizaciones) ? [
+                    'id' => 'sidebar-resolutions',
                     'name' => __('Resolutions'),
                     'icon' => 'document-check',
                     'url' => route('dian.resolutions.index'),
                     'current' => request()->routeIs('dian.resolutions.*'),
                 ] : null,
                 [
+                    'id' => 'sidebar-members',
                     'name' => __('Members'),
                     'icon' => 'users',
                     'url' => route('companies.members.index'),
@@ -286,6 +299,7 @@
                                 <a
                                     href="{{ $link['url'] }}"
                                     wire:navigate
+                                    @if(!empty($link['id'])) id="{{ $link['id'] }}" @endif
                                     @class([
                                         'min-h-[36px] w-full flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden',
                                         'bg-gray-100 text-accent font-semibold hover:bg-gray-100 focus:bg-gray-100 dark:bg-neutral-700 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700' => $link['current'],

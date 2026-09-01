@@ -9,7 +9,7 @@
     ])
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap gap-1.5">
+        <div id="panel-period-filters" class="flex flex-wrap gap-1.5">
             @foreach ($periods as $key => $label)
                 <a href="{{ route('panel', ['period' => $key]) }}"
                     class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border {{ $period === $key ? 'bg-accent border-accent text-white' : 'border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}">
@@ -18,7 +18,7 @@
             @endforeach
         </div>
 
-        <a href="{{ route('panel.pdf', ['period' => $period]) }}" target="_blank">
+        <a id="panel-export-btn" href="{{ route('panel.pdf', ['period' => $period]) }}" target="_blank">
             <flux:button variant="filled" size="sm" icon="arrow-down-tray">{{ __('Export PDF') }}</flux:button>
         </a>
     </div>
@@ -28,7 +28,7 @@
             <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __("You don't administer any active module in this company yet.") }}</p>
         </section>
     @else
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-6">
+        <div id="panel-metrics-grid" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-6">
             @if (isset($metrics['invoicing']))
                 @php $m = $metrics['invoicing']; @endphp
                 <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
@@ -108,7 +108,7 @@
             @endif
 
             @if ($utility)
-                <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                <div id="panel-utility" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
                     <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">{{ __('Gross profit') }} ({{ $periods[$period] }})</h3>
                     <dl class="space-y-2">
                         <div class="flex justify-between items-baseline">
@@ -131,7 +131,7 @@
             @endif
 
             @if (! empty($lowStockProducts))
-                <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                <div id="panel-low-stock" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
                     <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">{{ __('Low stock') }}</h3>
                     <ul class="space-y-2">
                         @foreach ($lowStockProducts as $product)
@@ -145,7 +145,7 @@
             @endif
 
             @if ($receivables)
-                <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                <div id="panel-receivables" class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
                     <h3 class="flex items-center justify-between gap-2 mb-3">
                         <span class="text-sm font-semibold text-gray-800 dark:text-white">{{ __('Accounts receivable') }}</span>
                         @include('panel.partials.module-badge', ['module' => 'invoicing'])

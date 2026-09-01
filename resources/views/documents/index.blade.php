@@ -28,7 +28,7 @@
                             <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                         </div>
 
-                        <a href="{{ route('documents.create') }}">
+                        <a href="{{ route('documents.create') }}" id="new-document-btn">
                             <flux:button type="button" variant="primary" icon="plus">{{ __('New document') }}</flux:button>
                         </a>
                     </div>
@@ -73,7 +73,7 @@
                                         </td>
                                         <td class="px-4 py-4 text-end text-sm">
                                             <div class="flex justify-end items-center gap-3">
-                                                <a href="{{ route('documents.show', $documento->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
+                                                <a href="{{ route('documents.show', $documento->_id) }}" class="document-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                                                 </a>
                                             </div>

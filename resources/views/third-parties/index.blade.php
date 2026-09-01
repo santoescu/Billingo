@@ -63,7 +63,7 @@
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $thirdParty->phone ?? '—' }}</td>
                                         <td class="px-4 py-4 text-right">
                                             <div class="flex justify-end gap-1">
-                                                <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openThirdPartyPanel({!! Illuminate\Support\Js::from($thirdParty) !!})">
+                                                <button type="button" class="third-party-edit-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openThirdPartyPanel({!! Illuminate\Support\Js::from($thirdParty) !!})">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
                                                         <path d="m15 5 4 4"></path>

@@ -83,8 +83,8 @@
                                     {{ $errors->first() }}
                                 </div>
                             @endif
-                            <flux:input name="label" :label="__('Label')" placeholder="{{ __('e.g. Main store') }}" value="{{ old('label') }}" />
-                            <div>
+                            <flux:input id="catalog-link-label" name="label" :label="__('Label')" placeholder="{{ __('e.g. Main store') }}" value="{{ old('label') }}" />
+                            <div id="catalog-link-warehouse-field">
                                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Warehouse') }}</label>
                                 {{-- "none" es un valor real seleccionable (no la
                                      cadena vacía): con "" como valor, Preline lo
@@ -101,7 +101,7 @@
                             </div>
 
                             @if ($priceTypes->isNotEmpty())
-                                <div>
+                                <div id="catalog-link-primary-price-field">
                                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Main price type') }}</label>
                                     <select name="primary_price_type_id" data-hs-select='{!! \App\Support\SelectConfig::basic() !!}' class="hidden">
                                         @foreach ($priceTypes as $priceType)
@@ -111,7 +111,7 @@
                                     <p class="mt-1 text-xs text-zinc-500 dark:text-neutral-400">{{ __('This is the price shown on each product card.') }}</p>
                                 </div>
 
-                                <div>
+                                <div id="catalog-link-visible-prices-field">
                                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Other visible price types') }}</label>
                                     <div class="flex flex-col gap-1.5">
                                         @foreach ($priceTypes as $priceType)
@@ -124,7 +124,7 @@
                         </div>
                         <div class="p-4 pt-0 flex justify-end gap-2">
                             <flux:button type="button" variant="filled" onclick="window.HSOverlay && HSOverlay.close('#catalog-link-modal')">{{ __('Cancel') }}</flux:button>
-                            <flux:button type="submit" variant="primary">{{ __('Create link') }}</flux:button>
+                            <flux:button type="submit" id="catalog-link-submit-btn" variant="primary">{{ __('Create link') }}</flux:button>
                         </div>
                     </form>
                 </div>
@@ -181,7 +181,7 @@
                                                 <a href="{{ route('quotations.preview', $quotation->_id) }}" target="_blank" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View PDF') }}" title="{{ __('View PDF') }}">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
                                                 </a>
-                                                <a href="{{ route('quotations.show', $quotation->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}" title="{{ __('View') }}">
+                                                <a href="{{ route('quotations.show', $quotation->_id) }}" class="quotation-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}" title="{{ __('View') }}">
                                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                                                 </a>
                                             </div>

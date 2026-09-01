@@ -13,7 +13,7 @@
             <div class="p-1.5 min-w-full inline-block align-middle">
                 <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
                     <div class="py-3 px-4 flex justify-end items-center gap-3">
-                        <flux:button type="button" variant="primary" icon="plus" onclick="window.openPaymentMethodPanel()">
+                        <flux:button id="new-payment-method-btn" type="button" variant="primary" icon="plus" onclick="window.openPaymentMethodPanel()">
                             {{ __('New payment method') }}
                         </flux:button>
                     </div>
@@ -89,7 +89,7 @@
                 @csrf
                 <input type="hidden" name="_method" id="payment-method-method" value="POST">
                 <flux:input name="name" id="payment-method-name" :label="__('Name')" maxlength="255" required />
-                <div>
+                <div id="payment-method-dian-code-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('DIAN equivalent') }}</label>
                     <select name="dian_payment_means_code" id="payment-method-dian-code" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value=""></option>
@@ -100,7 +100,7 @@
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
                     <flux:button type="button" variant="filled" data-hs-overlay="#payment-method-panel">{{ __('Cancel') }}</flux:button>
-                    <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                    <flux:button type="submit" id="payment-method-submit-btn" variant="primary">{{ __('Save') }}</flux:button>
                 </div>
             </form>
         </div>

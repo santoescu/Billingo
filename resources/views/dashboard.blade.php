@@ -21,7 +21,7 @@
                     @if (\App\Models\User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []))
                         <button
                             type="button"
-                            class="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                            class="company-edit-btn absolute right-3 top-3 flex size-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
                             aria-label="{{ __('Edit') }}"
                             onclick='openEditCompanyModal(@json($company))'
                         >
@@ -137,7 +137,7 @@
 
                 <flux:input id="edit-company-name" label="{{ __('Company name') }}" name="name" />
 
-                <div>
+                <div id="edit-company-person_type-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Person type') }}</label>
                     <select id="edit-company-person_type" name="person_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="">{{ __('Select...') }}</option>
@@ -146,7 +146,7 @@
                     </select>
                 </div>
 
-                <div>
+                <div id="edit-company-fiscal_responsibilities-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Fiscal responsibilities') }}</label>
                     <select
                         id="edit-company-fiscal_responsibilities"
@@ -163,7 +163,7 @@
 
                 <flux:input id="edit-company-address" label="{{ __('Address') }}" name="address" />
 
-                <div class="grid grid-cols-2 gap-3">
+                <div id="edit-company-department_code-field" class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Department') }}</label>
                         <select id="edit-company-department_code" name="department_code" data-hs-select='{!! $searchableSelectConfig !!}' class="hidden">
@@ -181,7 +181,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div id="edit-company-phone-field" class="grid grid-cols-2 gap-3">
                     <div>
                         <label for="edit-company-phone" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Phone') }}</label>
                         <div class="relative">
@@ -202,7 +202,7 @@
                     </div>
                 </div>
 
-                <div>
+                <div id="edit-company-status-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Status') }}</label>
                     <select id="edit-company-status" name="status" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="active">{{ __('Active') }}</option>
@@ -212,7 +212,7 @@
 
                 <flux:separator :text="__('DIAN configuration')" />
 
-                <div>
+                <div id="edit-company-dian_environment-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('DIAN environment') }}</label>
                     <select id="edit-company-dian_environment" name="dian_environment" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="1">1 - {{ __('Production') }}</option>
@@ -308,14 +308,14 @@
                         <p class="text-sm font-medium text-gray-800 dark:text-white">{{ __('DIAN enablement') }}</p>
                         <p id="edit-company-habilitacion-status" class="text-xs text-neutral-500 dark:text-neutral-400"></p>
                     </div>
-                    <flux:button type="button" variant="filled" icon="shield-check" onclick="openHabilitacionModal()">{{ __('Enablement') }}</flux:button>
+                    <flux:button type="button" id="edit-company-habilitacion-btn" variant="filled" icon="shield-check" onclick="openHabilitacionModal()">{{ __('Enablement') }}</flux:button>
                 </div>
 
                 <div id="formErrors" class="text-red-500 text-sm"></div>
 
                 <div class="flex gap-3">
                     <flux:spacer />
-                    <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                    <flux:button type="submit" id="edit-company-submit-btn" variant="primary">{{ __('Save') }}</flux:button>
                 </div>
                     </form>
                 </div>

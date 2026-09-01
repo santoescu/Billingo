@@ -41,7 +41,7 @@
                 </div>
             @endif
 
-            <div class="flex gap-3" data-dian-lookup>
+            <div id="tp-identification_type-field" class="flex gap-3" data-dian-lookup>
                 <flux:field class="w-44 shrink-0 [&>.hs-select]:max-w-[11rem]">
                     <flux:label>{{ __('Identification type') }}</flux:label>
                     <select id="tp-identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' data-dian-lookup-type class="hidden">
@@ -72,7 +72,7 @@
 
             <flux:input id="tp-name" name="name" :label="__('Name')" value="{{ old('name') }}" data-dian-lookup-name required />
 
-            <div>
+            <div id="tp-person_type-field">
                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Person type') }}</label>
                 <select id="tp-person_type" name="person_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                     <option value="">{{ __('Select...') }}</option>
@@ -81,7 +81,7 @@
                 </select>
             </div>
 
-            <div>
+            <div id="tp-fiscal_responsibilities-field">
                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Fiscal responsibilities') }}</label>
                 @php $oldFiscalResponsibilities = old('fiscal_responsibilities', []); @endphp
                 <select id="tp-fiscal_responsibilities" name="fiscal_responsibilities[]" multiple data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
@@ -95,7 +95,7 @@
 
             <flux:input id="tp-address" name="address" :label="__('Address')" value="{{ old('address') }}" />
 
-            <div class="grid grid-cols-2 gap-3">
+            <div id="tp-department_code-field" class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Department') }}</label>
                     <select id="tp-department_code" name="department_code" data-hs-select='{!! $searchableSelectConfig !!}' class="hidden">
@@ -113,7 +113,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div id="tp-phone-field" class="grid grid-cols-2 gap-3">
                 <div>
                     <label for="tp-phone" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Phone') }}</label>
                     <div class="relative">

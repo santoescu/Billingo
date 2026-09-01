@@ -34,13 +34,13 @@
             <div class="p-1.5 min-w-full inline-block align-middle">
                 <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
                     <div class="py-3 px-4 flex justify-end items-center gap-3">
-                        <flux:button type="button" variant="filled" icon="plus" data-hs-overlay="#note-numbering-modal">
+                        <flux:button id="dian-add-prefix-btn" type="button" variant="filled" icon="plus" data-hs-overlay="#note-numbering-modal">
                             {{ __('Add prefixes') }}
                         </flux:button>
                         @if ($hasInvoicing)
                             <form method="POST" action="{{ route('dian.resolutions.sync') }}">
                                 @csrf
-                                <flux:button type="submit" variant="primary" icon="arrow-path" :disabled="! $dianConfigured">
+                                <flux:button id="dian-sync-btn" type="submit" variant="primary" icon="arrow-path" :disabled="! $dianConfigured">
                                     {{ __('Sync from DIAN') }}
                                 </flux:button>
                             </form>
@@ -133,7 +133,7 @@
             <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('The DIAN does not authorize numbering ranges for credit/debit notes, non-electronic sales invoices, or quotations: define your own prefix and starting number.') }}</p>
             <form method="POST" action="{{ route('dian.resolutions.manual') }}" class="space-y-4">
                 @csrf
-                <div>
+                <div id="dian-manual-doctype-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select name="document_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="FV">{{ __('Sales invoice') }}</option>
@@ -142,11 +142,11 @@
                         <option value="92">92 - {{ __('Debit note') }}</option>
                     </select>
                 </div>
-                <flux:input name="prefix" :label="__('Prefix')" maxlength="10" required />
-                <flux:input name="range_from" type="number" min="1" :label="__('Starting number')" required />
+                <flux:input id="dian-manual-prefix" name="prefix" :label="__('Prefix')" maxlength="10" required />
+                <flux:input id="dian-manual-range_from" name="range_from" type="number" min="1" :label="__('Starting number')" required />
                 <div class="flex justify-end gap-3 pt-2">
                     <flux:button type="button" variant="filled" data-hs-overlay="#note-numbering-modal">{{ __('Cancel') }}</flux:button>
-                    <flux:button type="submit" variant="primary">{{ __('Create') }}</flux:button>
+                    <flux:button type="submit" id="dian-manual-submit-btn" variant="primary">{{ __('Create') }}</flux:button>
                 </div>
             </form>
         </div>

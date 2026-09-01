@@ -41,7 +41,7 @@
             </div>
 
             <div class="flex-1 flex flex-col gap-3">
-                <flux:field class="[&>.hs-select]:max-w-full">
+                <flux:field id="identification-type-field" class="[&>.hs-select]:max-w-full">
                     <flux:label>{{ __('Identification type') }}</flux:label>
                     <select id="identification_type" name="identification_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="">{{ __('Select...') }}</option>
@@ -62,10 +62,10 @@
         </div>
 
         <div>
-            <flux:input name="name" :label="__('Company name')" value="{{ old('name') }}" required />
+            <flux:input id="company-create-name" name="name" :label="__('Company name')" value="{{ old('name') }}" required />
         </div>
 
-        <div>
+        <div id="company-create-person_type-field">
             <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Person type') }}</label>
             <select name="person_type" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                 <option value="">{{ __('Select...') }}</option>
@@ -74,7 +74,7 @@
             </select>
         </div>
 
-        <div>
+        <div id="company-create-fiscal_responsibilities-field">
             <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Fiscal responsibilities') }}</label>
             @php $oldFiscalResponsibilities = old('fiscal_responsibilities', []); @endphp
             <select
@@ -91,13 +91,13 @@
             </select>
         </div>
 
-        <flux:input name="address" :label="__('Address')" value="{{ old('address') }}" />
+        <flux:input id="company-create-address" name="address" :label="__('Address')" value="{{ old('address') }}" />
 
         @php
             $searchableSelectConfig = \App\Support\SelectConfig::searchable();
         @endphp
 
-        <div class="grid grid-cols-2 gap-3">
+        <div id="company-create-department_code-field" class="grid grid-cols-2 gap-3">
             <div>
                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Department') }}</label>
                 <select id="department_code" name="department_code" data-hs-select='{!! $searchableSelectConfig !!}' class="hidden">
@@ -115,7 +115,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div id="company-create-phone-field" class="grid grid-cols-2 gap-3">
             <div>
                 <label for="company-create-phone" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Phone') }}</label>
                 <div class="relative">
@@ -138,7 +138,7 @@
 
         <flux:separator :text="__('DIAN configuration')" />
 
-        <div>
+        <div id="company-create-dian_environment-field">
             <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('DIAN environment') }}</label>
             <select name="dian_environment" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                 <option value="1" {{ old('dian_environment') === '1' ? 'selected' : '' }}>1 - {{ __('Production') }}</option>
@@ -149,7 +149,7 @@
 
         <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('These codes are provided when the invoicing software is registered, and are used to sync resolutions automatically. The account code is already your NIT, no need to enter it again.') }}</p>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div id="company-create-dian_pin-field" class="grid grid-cols-2 gap-3">
             <flux:input name="dian_pin" :label="__('Pin')" value="{{ old('dian_pin') }}" />
             <flux:input name="dian_software_id" :label="__('Software ID')" value="{{ old('dian_software_id') }}" />
         </div>
@@ -219,7 +219,7 @@
             <a href="{{ route('dashboard') }}">
                 <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
             </a>
-            <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+            <flux:button type="submit" id="company-create-submit-btn" variant="primary">{{ __('Save') }}</flux:button>
         </div>
     </form>
 

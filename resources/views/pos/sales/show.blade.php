@@ -20,7 +20,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="sale-show-customer" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Customer') }}</h3>
                 </div>
@@ -36,7 +36,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="sale-show-lines" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex items-center justify-between">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Lines') }}</h3>
                     @if (! $documento->is_electronic && $isAdmin)
@@ -82,7 +82,7 @@
         </div>
 
         <div class="flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="sale-show-summary" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Summary') }}</h3>
                 </div>
@@ -131,7 +131,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="sale-show-electronic" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Electronic invoice') }}</h3>
                 </div>
@@ -153,7 +153,7 @@
                 </div>
             </div>
 
-            <a href="{{ route('pos.sales.receipt-pdf', $documento->_id) }}">
+            <a id="sale-show-download-btn" href="{{ route('pos.sales.receipt-pdf', $documento->_id) }}">
                 <flux:button type="button" variant="filled" icon="arrow-down-tray" class="w-full">{{ __('Download receipt') }}</flux:button>
             </a>
         </div>

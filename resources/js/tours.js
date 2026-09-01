@@ -38,6 +38,15 @@ function buildSteps(tourSteps, getDriver, tourKey) {
                 markTourCompleted(tourKey);
                 if (window.appHelpUrl) window.location.href = window.appHelpUrl;
             };
+        } else {
+            // driver.js decide si mostrar "Siguiente" o "Terminar" mirando
+            // si el selector del PRÓXIMO paso existe ya en el DOM -- en una
+            // guía "realNav" los pasos que siguen viven en otra página
+            // todavía no cargada, así que ese chequeo siempre falla y el
+            // botón se ve como "Terminar" aunque falten pasos de verdad.
+            // Se fuerza el texto acá para que siempre diga "Siguiente"
+            // salvo en el último paso real del arreglo completo.
+            config.popover.nextBtnText = window.appTourLabels?.next;
         }
 
         if (step.panel) {
@@ -71,8 +80,96 @@ function buildSteps(tourSteps, getDriver, tourKey) {
         // avanzar, no apenas se resalta el paso) y se avanza ya mismo.
         if (step.clickAndAdvance) {
             config.popover.onNextClick = () => {
-                document.querySelector(step.clickAndAdvance)?.click();
+                const target = document.querySelector(step.clickAndAdvance);
+                // Si es un checkbox que ya está en el estado que el clic
+                // pondría (ej. editando un producto que ya tiene activado el
+                // control de inventario), no hacerle clic -- lo apagaría en
+                // vez de dejarlo como está, rompiendo lo que sigue del tour.
+                if (!target || target.type !== 'checkbox' || !target.checked) {
+                    target?.click();
+                }
                 getDriver().moveNext();
+            };
+        }
+
+        // Pasos "realNav" resaltan un link/botón que de verdad te lleva a
+        // otra página (ej. "Compañías" en el menú lateral, o "+ Nueva
+        // empresa" en el dashboard) -- a diferencia de "panel", acá SÍ debe
+        // navegar de una vez, tanto si el usuario le da clic directo al
+        // elemento como si usa "Siguiente". Antes de que la página cambie se
+        // guarda en sessionStorage en qué paso seguir, y al cargar la
+        // siguiente página (ver resumePendingTour) el tour se retoma justo
+        // ahí, para que la guía completa se sienta como un solo recorrido
+        // aunque cruce varias pantallas.
+        if (step.realNav) {
+            const remember = () => rememberTourResume(tourKey, index + 1);
+
+            config.popover.onNextClick = () => {
+                remember();
+                document.querySelector(step.selector)?.click();
+            };
+
+            // Un solo listener de "click" en el propio elemento llega
+            // TARDE cuando wire:navigate intercepta la navegación real
+            // desde "mousedown" (ver el comentario más abajo, en el bloque
+            // "solo mira esto") -- si el click directo del usuario dispara
+            // primero el mousedown de Livewire y recién después nuestro
+            // listener, seguía funcionando por las puras, pero cualquier
+            // variación en el orden (u otro listener con
+            // stopImmediatePropagation) podía comerse el evento antes de
+            // que "remember()" llegara a guardar en qué paso seguir. Se
+            // escucha en captura desde "document" sobre los tres eventos,
+            // igual que el bloqueo de navegación de abajo, para que quede
+            // guardado ANTES de que cualquier navegación (Livewire o una
+            // recarga completa de página) alcance a completarse.
+            let navListener;
+            const navEvents = ['pointerdown', 'mousedown', 'click'];
+
+            config.onHighlighted = (element) => {
+                if (!element) return;
+                navListener = (event) => {
+                    if (element !== event.target && !element.contains(event.target)) return;
+                    remember();
+                };
+                navEvents.forEach((type) => document.addEventListener(type, navListener, true));
+            };
+
+            config.onDeselected = () => {
+                if (navListener) navEvents.forEach((type) => document.removeEventListener(type, navListener, true));
+            };
+        } else if (!step.panel && !step.clickAndAdvance) {
+            // Pasos "solo mira esto" que resaltan un link real pero NO están
+            // marcados como "realNav" (la guía no sigue del otro lado) --
+            // bloquea la navegación directa sobre el elemento mientras el
+            // paso está resaltado, para que no rompa el tour a medias. El
+            // elemento resaltado sigue siendo el real; solo se frena la
+            // navegación hasta que el usuario avance con el popover.
+            //
+            // wire:navigate (Alpine "x-navigate" por debajo) dispara la
+            // navegación real desde "mousedown", directo sobre el <a>, NO
+            // desde "click" -- un listener de "click" puesto en el propio
+            // elemento llega tarde, la navegación ya arrancó. Por eso acá se
+            // escucha en fase de captura desde "document" (se ejecuta antes
+            // de que el evento baje hasta el elemento) y se cubren
+            // "pointerdown"/"mousedown" además de "click".
+            let blockNav;
+            const blockedEvents = ['pointerdown', 'mousedown', 'click'];
+
+            config.onHighlighted = (element) => {
+                if (!element) return;
+                blockNav = (event) => {
+                    if (element !== event.target && !element.contains(event.target)) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                };
+                blockedEvents.forEach((type) => document.addEventListener(type, blockNav, true));
+            };
+
+            config.onDeselected = () => {
+                if (blockNav) {
+                    blockedEvents.forEach((type) => document.removeEventListener(type, blockNav, true));
+                }
             };
         }
 
@@ -155,9 +252,34 @@ function watchPanelsForEarlyClose(tourSteps, getDriver) {
     return () => panels.forEach((panel) => panel.removeEventListener('close.hs.overlay', onClose));
 }
 
-window.startTour = function (key) {
+/**
+ * @param {string} key
+ * @param {number} [startIndex] Paso por el que arrancar -- 0 si es la
+ * primera vez, o el que quedó guardado si la guía sigue después de una
+ * navegación real de página (ver "realNav" en buildSteps()).
+ * @returns {void}
+ */
+window.startTour = function (key, startIndex = 0) {
     const tour = window.appTours && window.appTours[key];
     if (!tour || !tour.steps || !tour.steps.length) return;
+
+    // Al retomar una guía después de una navegación real (ver "realNav" en
+    // buildSteps()), la pantalla a la que en teoría se llega puede depender
+    // de un estado que no está garantizado (ej. "Vender" manda a la
+    // pantalla de venta en vez de a la de abrir turno si ya hay un turno
+    // abierto) -- si el paso al que se debería retomar no existe en esta
+    // página, antes el tour simplemente desaparecía sin explicación. Mejor
+    // avisar por qué no se puede seguir en vez de fallar en silencio.
+    if (startIndex > 0) {
+        const resumeStep = tour.steps[startIndex];
+        if (resumeStep && !document.querySelector(resumeStep.selector)) {
+            window.appConfirmDialog.notify(
+                resumeStep.resumeMissingMessage || window.appTourLabels?.resumeMissing,
+                window.appTourLabels?.noticeTitle
+            );
+            return;
+        }
+    }
 
     let driverInstance;
     let stopWatching = () => {};
@@ -173,8 +295,37 @@ window.startTour = function (key) {
     });
 
     stopWatching = watchPanelsForEarlyClose(tour.steps, () => driverInstance);
-    driverInstance.drive();
+    driverInstance.drive(startIndex);
 };
+
+const TOUR_RESUME_STORAGE_KEY = 'pendingTourResume';
+
+/**
+ * @param {string} tourKey
+ * @param {number} stepIndex
+ * @returns {void}
+ */
+function rememberTourResume(tourKey, stepIndex) {
+    sessionStorage.setItem(TOUR_RESUME_STORAGE_KEY, JSON.stringify({ tourKey, stepIndex }));
+}
+
+/**
+ * Se consume una sola vez (se borra al leerlo) -- así, si tanto
+ * "DOMContentLoaded" como "livewire:navigated" disparan en la misma carga,
+ * el segundo simplemente no encuentra nada pendiente, sin necesitar un
+ * guard aparte como el de autoStartFromQuery().
+ * @returns {{tourKey: string, stepIndex: number}|null}
+ */
+function consumePendingTourResume() {
+    try {
+        const raw = sessionStorage.getItem(TOUR_RESUME_STORAGE_KEY);
+        if (!raw) return null;
+        sessionStorage.removeItem(TOUR_RESUME_STORAGE_KEY);
+        return JSON.parse(raw);
+    } catch (error) {
+        return null;
+    }
+}
 
 let lastAutoStartedUrl = null;
 
@@ -184,9 +335,20 @@ let lastAutoStartedUrl = null;
  * guard "DOMContentLoaded" y "livewire:navigated" arrancaban DOS tours a la
  * vez en el mismo load -- cada uno avanzando por su cuenta sin saber del
  * otro (dos popovers superpuestos, cada uno en un paso distinto).
+ *
+ * Primero se revisa si hay un tour pendiente por retomar (ver "realNav" en
+ * buildSteps()) -- si lo hay, tiene prioridad y no se evalúa el "?tour="
+ * de la URL, porque esa página normalmente no lo trae (se navegó por un
+ * link real del menú, no por el link de una tarjeta de Ayuda).
  * @returns {void}
  */
 function autoStartFromQuery() {
+    const pending = consumePendingTourResume();
+    if (pending) {
+        setTimeout(() => window.startTour(pending.tourKey, pending.stepIndex), 300);
+        return;
+    }
+
     const tour = new URLSearchParams(window.location.search).get('tour');
     if (!tour || lastAutoStartedUrl === window.location.href) return;
 

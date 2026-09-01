@@ -107,7 +107,8 @@
             document.getElementById('app-confirm-dialog-cancel-btn').disabled = false;
         }
 
-        function show(message, isAlert) {
+        function show(message, isAlert, title) {
+            document.getElementById('app-confirm-dialog-title').textContent = title || '{{ __('Are you sure?') }}';
             document.getElementById('app-confirm-dialog-message').textContent = message || '';
             document.getElementById('app-confirm-dialog-cancel-wrapper').classList.toggle('hidden', isAlert);
             document.getElementById('app-confirm-dialog-accept-wrapper').classList.toggle('hidden', isAlert);
@@ -130,19 +131,19 @@
             return false;
         }
 
-        function ask(message) {
+        function ask(message, title) {
             return new Promise((resolve) => {
                 pendingForm = null;
                 pendingResolve = resolve;
-                show(message, false);
+                show(message, false, title);
             });
         }
 
-        function notify(message) {
+        function notify(message, title) {
             return new Promise((resolve) => {
                 pendingForm = null;
                 pendingResolve = resolve;
-                show(message, true);
+                show(message, true, title);
             });
         }
 

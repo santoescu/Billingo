@@ -29,7 +29,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="doc-show-customer" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Customer') }}</h3>
                 </div>
@@ -89,7 +89,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="doc-show-lines" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Lines') }}</h3>
                 </div>
@@ -126,7 +126,7 @@
             </div>
 
             @if ($documento->status_message)
-                <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div id="doc-show-dian-message" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                         <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('DIAN message') }}</h3>
                     </div>
@@ -148,7 +148,7 @@
         </div>
 
         <div class="flex flex-col gap-6">
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="doc-show-summary" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Summary') }}</h3>
                 </div>
@@ -197,7 +197,7 @@
                                 <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->payment_status_badge_classes }}">{{ $documento->payment_status_label }}</span>
                                 <form method="POST" action="{{ route('documents.toggle-paid', $documento->_id) }}">
                                     @csrf
-                                    <button type="submit" class="text-xs font-medium text-accent hover:underline">
+                                    <button type="submit" id="doc-toggle-paid-btn" class="text-xs font-medium text-accent hover:underline">
                                         {{ $documento->is_paid ? __('Mark as pending') : __('Mark as paid') }}
                                     </button>
                                 </form>
@@ -212,7 +212,7 @@
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+            <div id="doc-show-downloads" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Downloads') }}</h3>
                 </div>
