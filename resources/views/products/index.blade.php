@@ -91,10 +91,14 @@
                         </div>
 
                         <div class="flex gap-2">
-                            <flux:button variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
+                            <button type="button" id="products-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadProductsTable()">
+                                <svg id="products-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                            </button>
+
+                            <flux:button id="products-export-btn" variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
                                 {{ __('Export to Excel') }}
                             </flux:button>
-                            <flux:button variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
+                            <flux:button id="products-import-btn" variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
                                 {{ __('Import from Excel') }}
                             </flux:button>
                             <flux:button id="new-product-btn" variant="primary" icon="plus" onclick="openProductPanel()">
@@ -116,84 +120,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @foreach ($products as $product)
-                                    <tr>
-                                        <td class="px-4 py-4">
-                                            <div class="flex items-center gap-3">
-                                                @if ($product->image_url)
-                                                    <img src="{{ $product->image_url }}" alt="" class="shrink-0 size-9 rounded-lg object-cover zoomable-thumb cursor-zoom-in">
-                                                @else
-                                                    <span class="flex items-center justify-center shrink-0 size-9 rounded-lg bg-accent/10 text-accent">
-                                                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-                                                    </span>
-                                                @endif
-                                                <div class="min-w-0">
-                                                    <span class="block text-sm text-gray-600 dark:text-neutral-400 truncate">{{ $product->barcode ?? '—' }}</span>
-                                                    <span class="block text-xs text-neutral-400 dark:text-neutral-500 truncate">{{ $product->code ?? '—' }}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $product->description }}</td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400" data-order="{{ $product->unit_price }}">
-                                            {{ $product->unit_price_formatted }}
-                                            <button type="button" class="block text-xs text-accent hover:underline" onclick="showProductPrices('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
-                                                {{ __('View all prices') }}
-                                            </button>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400" data-order="{{ $product->tracks_inventory ? $product->stock : -1 }}">
-                                            @if ($product->tracks_inventory)
-                                                {{ rtrim(rtrim(number_format((float) $product->stock, 2, '.', ','), '0'), '.') }}
-                                            @else
-                                                <span class="text-xs text-neutral-400">{{ __('Not tracked') }}</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            {{ $warehouseNamesFor($product) ?: '—' }}
-                                            @if ($product->tracks_inventory)
-                                                <button type="button" class="block text-xs text-accent hover:underline" onclick="showProductWarehouses('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
-                                                    {{ __('View all warehouses') }}
-                                                </button>
-                                            @endif
-                                        </td>
-                                        <td class="px-4 py-4 text-right">
-                                            <div class="flex justify-end gap-1">
-                                                <a href="{{ route('products.show', $product->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
-                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
-                                                </a>
-
-                                                <button type="button" class="product-edit-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openProductPanel({!! Illuminate\Support\Js::from($product->makeHidden('image_data')) !!})">
-                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                                                        <path d="m15 5 4 4"></path>
-                                                    </svg>
-                                                </button>
-
-                                                <div class="hs-dropdown [--auto-close:true] relative inline-flex">
-                                                    <button type="button" class="product-more-actions-btn hs-dropdown-toggle flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('More actions') }}">
-                                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-                                                    </button>
-                                                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 flex items-center gap-1 dark:bg-neutral-800 dark:border-neutral-700">
-                                                        @if ($product->tracks_inventory)
-                                                            <button type="button" class="product-register-entry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Register entry') }}" title="{{ __('Register entry') }}" onclick="openStockEntryPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }})">
-                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                                                            </button>
-                                                            <button type="button" class="product-fix-cost-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Fix cost') }}" title="{{ __('Fix cost') }}" onclick="openAverageCostPanel('{{ (string) $product->_id }}', {{ Illuminate\Support\Js::from($product->description) }}, {{ (float) ($product->average_cost ?? 0) }})">
-                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
-                                                            </button>
-                                                        @endif
-                                                        <form action="{{ route('products.destroy', $product->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="product-delete-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
-                                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
+                                @include('products.partials.rows')
                             </tbody>
                         </table>
                     </div>
@@ -239,7 +166,7 @@
                             <button type="button" class="w-full space-y-2 pr-14 text-left" onclick="showWarehouseProducts('{{ (string) $warehouse->_id }}', {{ Illuminate\Support\Js::from($warehouse->name) }})">
                                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white">{{ $warehouse->name }}</h2>
                                 <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ $warehouse->address ?? __('No address') }}</p>
-                                <span class="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
+                                <span id="warehouse-count-{{ $warehouse->_id }}" class="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
                                     {{ trans_choice(':count product|:count products', $warehouseProductCount, ['count' => $warehouseProductCount]) }}
                                 </span>
                             </button>
@@ -389,7 +316,7 @@
                 @csrf
                 <p id="se-product-name" class="font-medium text-gray-800 dark:text-neutral-200"></p>
 
-                <div>
+                <div id="se-warehouse_id-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Warehouse') }}</label>
                     <select id="se-warehouse_id" name="warehouse_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         <option value="">{{ __('Unassigned') }}</option>
@@ -502,7 +429,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="p-4 flex flex-col gap-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <div id="product-export-fields" class="p-4 flex flex-col gap-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
                     <p class="text-sm text-zinc-500 dark:text-neutral-400">{{ __('Code, description and barcode are always included. Choose any other columns you want in the file.') }}</p>
 
                     <div>
@@ -556,7 +483,7 @@
                     @endif
                 </div>
                 <div class="flex justify-end p-4 border-t border-gray-200 dark:border-neutral-700">
-                    <flux:button type="button" variant="primary" icon="arrow-down-tray" onclick="submitExport()">{{ __('Export') }}</flux:button>
+                    <flux:button type="button" id="product-export-submit-btn" variant="primary" icon="arrow-down-tray" onclick="submitExport()">{{ __('Export') }}</flux:button>
                 </div>
             </div>
         </div>
@@ -922,12 +849,18 @@
         </div>
     </template>
 
+    <template id="warehouse-count-labels" data-singular="{{ trans_choice(':count product|:count products', 1) }}" data-plural="{{ trans_choice(':count product|:count products', 2) }}"></template>
+
     @include('partials.datatable-pagination')
 
     @push('scripts')
         <script>
             (function () {
-                const warehouseProductsMap = @json($warehouseProductsMap);
+                // Se llenan en cuanto llega la respuesta de loadProductsTable()
+                // (ver más abajo) -- arrancan vacíos porque $products ya no se
+                // consulta en el primer render de la página (ver
+                // ProductController::index()), solo en el endpoint de AJAX.
+                let warehouseProductsMap = {};
                 // Para insertarlo dentro de un template literal de JS hay que pasarlo
                 // por la directiva de Blade que lo escapa para JS (no el texto
                 // crudo): si no, el propio parser de JS desescapa las comillas
@@ -935,8 +868,8 @@
                 // data-hs-select con un JSON inválido.
                 const basicSelectConfigJson = @json($basicSelectConfig);
                 const searchableSelectConfigJson = @json($searchableSelectConfig);
-                const productPricesMap = @json($productPricesMap);
-                const productWarehousesMap = @json($productWarehousesMap);
+                let productPricesMap = {};
+                let productWarehousesMap = {};
                 const inventoryTabs = ['products', 'warehouses', 'price-types'];
 
                 window.showInventoryTab = function (tab) {
@@ -1945,10 +1878,6 @@
                         }
                     });
 
-                    initWorkflowDataTable('#productsTable', '#hs-table-with-pagination-search', {
-                        columnDefs: [{ targets: -1, orderable: false }],
-                    });
-
                     const importUploadEl = document.getElementById('import-file-upload');
                     const importFileInput = document.getElementById('import-file-input');
 
@@ -1989,8 +1918,69 @@
                     @endif
                 }
 
+                /**
+                 * "N producto(s)" en Español solo tiene dos formas (1 y todo
+                 * lo demás, incluido 0) -- se toman las dos ya traducidas del
+                 * <template> y se les cambia el número del frente en vez de
+                 * traducir en JS.
+                 * @param {number} count
+                 * @returns {string}
+                 */
+                function warehouseCountLabel(count) {
+                    const labels = document.getElementById('warehouse-count-labels');
+                    const template = count === 1 ? labels.dataset.singular : labels.dataset.plural;
+                    return template.replace(/^\d+/, String(count));
+                }
+
+                /**
+                 * La tabla de productos ya no viene lista en el HTML inicial
+                 * (ver ProductController::index()) -- se pide por AJAX apenas
+                 * carga la página para no bloquear el primer render con la
+                 * consulta completa del catálogo. Reemplaza tanto las filas
+                 * como los mapas de precios/bodegas que usan
+                 * showProductPrices()/showProductWarehouses()/showWarehouseProducts(),
+                 * y recién ahí inicializa la DataTable (no puede pasar antes,
+                 * las filas todavía no existen en el DOM).
+                 * @returns {void}
+                 */
+                function loadProductsTable() {
+                    const tbody = document.querySelector('#productsTable tbody');
+                    if (!tbody) return;
+
+                    const refreshBtn = document.getElementById('products-refresh-btn');
+                    const refreshIcon = document.getElementById('products-refresh-icon');
+                    if (refreshBtn) refreshBtn.disabled = true;
+                    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+                    fetch('{{ route('products.data') }}', { headers: { Accept: 'application/json' } })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            tbody.innerHTML = data.rows_html;
+                            productPricesMap = data.product_prices_map;
+                            productWarehousesMap = data.product_warehouses_map;
+                            warehouseProductsMap = data.warehouse_products_map;
+
+                            Object.keys(warehouseProductsMap).forEach((warehouseId) => {
+                                const badge = document.getElementById(`warehouse-count-${warehouseId}`);
+                                if (badge) badge.textContent = warehouseCountLabel(warehouseProductsMap[warehouseId].length);
+                            });
+
+                            initWorkflowDataTable('#productsTable', '#hs-table-with-pagination-search', {
+                                columnDefs: [{ targets: -1, orderable: false }],
+                            });
+                        })
+                        .finally(() => {
+                            if (refreshBtn) refreshBtn.disabled = false;
+                            if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                        });
+                }
+
+                window.loadProductsTable = loadProductsTable;
+
                 document.addEventListener('DOMContentLoaded', init);
                 document.addEventListener('livewire:navigated', init);
+                document.addEventListener('DOMContentLoaded', loadProductsTable);
+                document.addEventListener('livewire:navigated', loadProductsTable);
             })();
         </script>
     @endpush

@@ -15,16 +15,104 @@ use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
+    /**
+     * $products vacío a propósito: la tabla se llena por AJAX (ver data())
+     * apenas termina de cargar la página, en vez de bloquear el primer
+     * render con la consulta completa de productos de la empresa (el
+     * catálogo puede tener miles).
+     */
     public function index(Request $request)
     {
         $company = $this->currentCompany($request);
 
-        $products = $company->products()->get();
+        $products = collect();
         $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
         $warehouses = $company->warehouses()->orderBy('name')->get();
         $priceTypes = $this->priceTypesOrDefault($company);
 
         return view('products.index', compact('products', 'measurementUnits', 'warehouses', 'priceTypes'));
+    }
+
+    /**
+     * Todo lo que necesita la pantalla de Inventario para pintar la tabla de
+     * productos y las tarjetas de bodegas: el HTML de las filas (reusa el
+     * mismo partial que antes se pintaba en el primer render) más los mapas
+     * de precios/bodegas por producto que consumen showProductPrices(),
+     * showProductWarehouses() y showWarehouseProducts() del lado del cliente.
+     */
+    public function data(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $products = $company->products()->get();
+        $warehouses = $company->warehouses()->orderBy('name')->get();
+        $priceTypes = $this->priceTypesOrDefault($company);
+
+        $warehousesById = $warehouses->keyBy(fn ($warehouse) => (string) $warehouse->_id);
+        $priceTypesById = $priceTypes->keyBy(fn ($priceType) => (string) $priceType->_id);
+
+        $warehouseNamesFor = function ($product) use ($warehousesById) {
+            return collect($product->warehouse_stocks ?? [])
+                ->map(fn ($entry) => $warehousesById->get($entry['warehouse_id'] ?? null)?->name)
+                ->filter()
+                ->implode(', ');
+        };
+
+        $productPricesMap = $products->mapWithKeys(function ($product) use ($priceTypesById) {
+            $extraByType = collect($product->extra_prices ?? [])->keyBy('price_type_id');
+
+            $rows = $priceTypesById->map(function ($priceType) use ($extraByType) {
+                $entry = $extraByType->get((string) $priceType->_id);
+
+                return $entry ? ['name' => $priceType->name, 'price' => (float) $entry['price']] : null;
+            })->filter()->values();
+
+            return [(string) $product->_id => $rows];
+        });
+
+        $productWarehousesMap = $products->mapWithKeys(function ($product) use ($warehousesById) {
+            $rows = collect($product->warehouse_stocks ?? [])
+                ->map(function ($entry) use ($warehousesById) {
+                    $warehouse = $warehousesById->get($entry['warehouse_id'] ?? null);
+
+                    return $warehouse ? ['name' => $warehouse->name, 'stock' => (float) $entry['stock']] : null;
+                })
+                ->filter()
+                ->values();
+
+            return [(string) $product->_id => $rows];
+        });
+
+        $warehouseProductsMap = $warehouses->mapWithKeys(function ($warehouse) use ($products) {
+            $warehouseId = (string) $warehouse->_id;
+
+            $items = $products
+                ->map(function ($product) use ($warehouseId) {
+                    $entry = collect($product->warehouse_stocks ?? [])->firstWhere('warehouse_id', $warehouseId);
+
+                    return $entry ? [
+                        'barcode' => $product->barcode,
+                        'code' => $product->code,
+                        'description' => $product->description,
+                        'price' => $product->unit_price_formatted,
+                        'unit_price' => (float) $product->unit_price,
+                        'stock' => (float) $entry['stock'],
+                    ] : null;
+                })
+                ->filter()
+                ->values();
+
+            return [$warehouseId => $items];
+        });
+
+        $rowsHtml = view('products.partials.rows', compact('products', 'warehouseNamesFor'))->render();
+
+        return response()->json([
+            'rows_html' => $rowsHtml,
+            'product_prices_map' => $productPricesMap,
+            'product_warehouses_map' => $productWarehousesMap,
+            'warehouse_products_map' => $warehouseProductsMap,
+        ]);
     }
 
     /**

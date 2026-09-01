@@ -102,6 +102,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
+            Route::get('data', [ProductController::class, 'data'])->name('data');
             Route::post('/', [ProductController::class, 'store'])->name('store');
             Route::post('import/preview', [ProductImportController::class, 'preview'])->name('import.preview');
             Route::post('import', [ProductImportController::class, 'import'])->name('import');
