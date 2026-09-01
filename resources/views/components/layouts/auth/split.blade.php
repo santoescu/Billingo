@@ -35,6 +35,42 @@
             'color' => $moduleColors[$key],
         ]);
 
+    $comparisons = [
+        [
+            'without' => __('Invoicing, POS and quotations in separate tools that don\'t talk to each other.'),
+            'with' => __('Everything in one place, sharing the same clients, products and stock.'),
+        ],
+        [
+            'without' => __('Finding out a document was rejected by the DIAN only after sending it.'),
+            'with' => __('Validation before it ever reaches the DIAN, so you catch mistakes first.'),
+        ],
+        [
+            'without' => __('Retyping a quotation\'s lines by hand into an invoice or a sale.'),
+            'with' => __('Convert a quotation into a sale or an invoice with one click.'),
+        ],
+        [
+            'without' => __('No real visibility into what\'s in stock at each warehouse.'),
+            'with' => __('Stock and cash register updated live as you sell.'),
+        ],
+    ];
+
+    $aboutPoints = [
+        __('We built Billingo because we ran into the same problem ourselves: juggling separate tools to invoice, sell and keep up with the DIAN.'),
+        __('We\'re a small team, so every conversation with a client actually reaches the people who build the product.'),
+        __('We keep adding modules based on what businesses using Billingo actually ask for, not a fixed roadmap.'),
+    ];
+
+    // Solo tenemos una recomendación real por ahora (la nuestra) -- se deja
+    // como array para poder ir agregando reseñas de clientes reales más
+    // adelante sin tocar el carrusel.
+    $recommendations = [
+        [
+            'name' => __('The Billingo team'),
+            'role' => __('We use it every day'),
+            'quote' => __('We use Billingo ourselves to invoice, sell and quote every day -- if it didn\'t work for our own business, we wouldn\'t be asking you to trust it with yours.'),
+        ],
+    ];
+
     $plans = [
         [
             'name' => __('Basic'),
@@ -62,10 +98,25 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
-        <div class="relative grid h-dvh flex-col items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-5 lg:px-0">
-            <div class="bg-muted relative hidden h-full flex-col overflow-y-auto p-10 text-white lg:col-span-3 lg:flex dark:border-r dark:border-neutral-800">
-                <div class="absolute inset-0 bg-neutral-900"></div>
+    <body class="min-h-screen overflow-x-hidden bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
+        {{-- Una sola vista (nada duplicado) -- las dos columnas viven en el
+             mismo grid de siempre, pero en vez de anchos en porcentaje
+             (flex-basis/width, que terminaban desbordando la página por el
+             min-width:auto por defecto de los ítems) se anima
+             "grid-template-columns" con fracciones "fr": como siempre suman
+             el total disponible sin importar el contenido, no hay forma de
+             que se desborden. Arranca en "1fr 0fr" (panel oscuro ocupa
+             todo, formulario en 0) y el botón lo cambia a "3fr 2fr" (la
+             proporción original), animado. JS plano, sin Alpine, para no
+             depender de que ya esté hidratado al momento del clic. --}}
+        <div id="auth-shell" class="relative grid h-dvh items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:items-stretch lg:justify-normal lg:px-0 lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
+            <div class="bg-muted relative hidden h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-10 text-white lg:flex dark:border-r dark:border-neutral-800">
+                <button type="button" id="auth-login-toggle-btn" aria-label="{{ __('Log in') }}" title="{{ __('Log in') }}"
+                    onclick="window.toggleAuthLoginPanel()"
+                    class="absolute end-6 top-6 z-30 hidden size-10 items-center justify-center rounded-full text-neutral-300 hover:bg-white/10 hover:text-white focus:outline-hidden lg:flex">
+                    <svg id="auth-login-toggle-icon" class="size-5 shrink-0 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+
                 <div class="relative z-20">
                     <a href="{{ route('home') }}" class="flex items-center text-lg font-medium" wire:navigate>
                         <span class="flex h-10 w-10 items-center justify-center rounded-md">
@@ -77,26 +128,59 @@
                     <p class="mt-8 max-w-xl text-2xl font-semibold leading-snug">{{ __('Electronic invoicing, point of sale and payroll, all in one place.') }}</p>
                     <p class="mt-3 max-w-xl text-sm text-neutral-300">{{ __('A platform built for Colombian businesses: issue electronic documents valid before the DIAN, sell over the counter and quote, without switching systems.') }}</p>
 
-                    <div class="mt-10">
-                        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-400">{{ __('Modules') }}</h2>
-                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div class="mt-10 border-b border-white/10">
+                        <nav class="flex gap-4">
+                            <button type="button" id="auth-promo-tab-modules-btn" class="auth-promo-tab-btn border-b-2 border-white py-2 text-sm font-medium text-white" onclick="window.showAuthPromoTab('modules')">
+                                {{ __('Modules') }}
+                            </button>
+                            <button type="button" id="auth-promo-tab-comparison-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('comparison')">
+                                {{ __('Why Billingo') }}
+                            </button>
+                            <button type="button" id="auth-promo-tab-plans-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('plans')">
+                                {{ __('Plans and pricing') }}
+                            </button>
+                            <button type="button" id="auth-promo-tab-about-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('about')">
+                                {{ __('About us') }}
+                            </button>
+                            <button type="button" id="auth-promo-tab-recommendation-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('recommendation')">
+                                {{ __('We recommend it') }}
+                            </button>
+                        </nav>
+                    </div>
+
+                    <div id="auth-promo-tab-modules" class="auth-promo-tab mt-6">
+                        <div class="grid gap-4 sm:grid-cols-2">
                             @foreach ($modules as $module)
-                                <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
-                                    <span class="flex size-8 shrink-0 items-center justify-center rounded-md {{ $module['color'] }}">
-                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{!! $module['icon'] !!}</svg>
+                                <div class="flex items-start gap-4 rounded-lg border border-white/10 bg-white/5 p-5">
+                                    <span class="flex size-11 shrink-0 items-center justify-center rounded-md {{ $module['color'] }}">
+                                        <svg class="size-5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{!! $module['icon'] !!}</svg>
                                     </span>
                                     <div>
-                                        <p class="text-sm font-medium text-white">{{ $module['name'] }}</p>
-                                        <p class="mt-0.5 text-xs text-neutral-400">{{ $module['description'] }}</p>
+                                        <p class="text-base font-medium text-white">{{ $module['name'] }}</p>
+                                        <p class="mt-1 text-sm text-neutral-400">{{ $module['description'] }}</p>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
                     </div>
 
-                    <div class="mt-10 mb-2">
-                        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-400">{{ __('Plans and pricing') }}</h2>
-                        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div id="auth-promo-tab-comparison" class="auth-promo-tab mt-6 hidden">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            @foreach ($comparisons as $comparison)
+                                <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-5">
+                                    <svg class="mt-0.5 size-5 shrink-0 text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                                    <p class="text-sm text-neutral-400 line-through decoration-neutral-600">{{ $comparison['without'] }}</p>
+                                </div>
+                                <div class="flex items-start gap-3 rounded-lg border border-accent/30 bg-accent/10 p-5">
+                                    <svg class="mt-0.5 size-5 shrink-0 text-accent" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                                    <p class="text-sm text-neutral-200">{{ $comparison['with'] }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div id="auth-promo-tab-plans" class="auth-promo-tab mt-6 hidden">
+                        <div class="grid gap-3 sm:grid-cols-3">
                             @foreach ($plans as $plan)
                                 <div class="relative rounded-lg border p-4 {{ ($plan['highlighted'] ?? false) ? 'border-accent bg-accent/10' : 'border-white/10 bg-white/5' }}">
                                     @if ($plan['highlighted'] ?? false)
@@ -117,10 +201,62 @@
                             @endforeach
                         </div>
                     </div>
+
+                    <div id="auth-promo-tab-about" class="auth-promo-tab mt-6 hidden">
+                        <div class="space-y-3">
+                            @foreach ($aboutPoints as $point)
+                                <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-5">
+                                    <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">{{ $loop->iteration }}</span>
+                                    <p class="text-sm text-neutral-300">{{ $point }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Carrusel horizontal en loop (misma técnica que un
+                         marquee de Preline): el track se duplica una vez y
+                         se anima con "translateX(-50%)" -- como las dos
+                         mitades son idénticas, al llegar a -50% el corte es
+                         invisible y arranca de nuevo. Con una sola reseña
+                         real (el caso de ahora) no tiene sentido duplicarla
+                         ni animarla -- se ve fija, sin repetirse -- el
+                         carrusel se activa solo cuando $recommendations
+                         tenga 2 o más. La segunda copia lleva aria-hidden
+                         porque es puramente visual, el contenido real ya lo
+                         lee el lector de pantalla en la primera. --}}
+                    <div id="auth-promo-tab-recommendation" class="auth-promo-tab mt-6 hidden">
+                        @php $recommendationCopies = count($recommendations) > 1 ? 2 : 1; @endphp
+                        <div @class([
+                            'relative overflow-hidden' => $recommendationCopies > 1,
+                            'before:pointer-events-none before:absolute before:inset-y-0 before:start-0 before:z-10 before:w-10 before:bg-linear-to-r before:from-neutral-900 before:to-transparent after:pointer-events-none after:absolute after:inset-y-0 after:end-0 after:z-10 after:w-10 after:bg-linear-to-l after:from-neutral-900 after:to-transparent' => $recommendationCopies > 1,
+                        ])>
+                            <div @class([
+                                'flex w-max gap-4' => true,
+                                '[animation:auth-marquee-x_30s_linear_infinite] hover:[animation-play-state:paused]' => $recommendationCopies > 1,
+                            ])>
+                                @for ($copy = 0; $copy < $recommendationCopies; $copy++)
+                                    <div class="flex shrink-0 gap-4" @if ($copy === 1) aria-hidden="true" @endif>
+                                        @foreach ($recommendations as $recommendation)
+                                            <figure class="w-72 shrink-0 rounded-lg border border-white/10 bg-white/5 p-5">
+                                                <div class="flex items-center gap-3">
+                                                    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent">{{ Str::substr($recommendation['name'], 0, 1) }}</span>
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-sm font-semibold text-white">{{ $recommendation['name'] }}</p>
+                                                        <p class="truncate text-xs text-neutral-400">{{ $recommendation['role'] }}</p>
+                                                    </div>
+                                                </div>
+                                                <blockquote class="mt-3 text-sm text-neutral-300">{{ $recommendation['quote'] }}</blockquote>
+                                            </figure>
+                                        @endforeach
+                                    </div>
+                                @endfor
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="w-full lg:col-span-2 lg:p-8">
-                <div class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+            <div class="relative flex h-full w-full min-w-0 items-center overflow-hidden lg:p-8">
+                <div class="mx-auto flex w-full max-w-[350px] flex-col justify-center space-y-6">
                     <a href="{{ route('home') }}" class="z-20 flex flex-col items-center gap-2 font-medium lg:hidden" wire:navigate>
                         <span class="flex h-9 w-9 items-center justify-center rounded-md">
                             <x-app-logo-icon class="size-9 fill-current text-black dark:text-white" />
@@ -132,6 +268,72 @@
                 </div>
             </div>
         </div>
+
+        <script>
+        {{-- wire:navigate no recarga la página completa -- vuelve a
+             ejecutar este <script> cada vez que se navega aquí, y un
+             "const"/"let" de nivel superior explota la segunda vez
+             ("ya declarado"). Todo va dentro de un IIFE para que quede
+             aislado en su propio scope, igual que el resto de la app. --}}
+        (function () {
+            const AUTH_SHELL_CLOSED = 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)]';
+            const AUTH_SHELL_OPEN = 'lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]';
+            const AUTH_PROMO_TABS = ['modules', 'comparison', 'plans', 'about', 'recommendation'];
+
+            /**
+             * Pestañas del panel oscuro (Módulos / Por qué Billingo /
+             * Planes) para no tener que hacer scroll por todo de una vez.
+             * @param {string} tab
+             * @returns {void}
+             */
+            window.showAuthPromoTab = function (tab) {
+                AUTH_PROMO_TABS.forEach((name) => {
+                    const isActive = name === tab;
+                    document.getElementById(`auth-promo-tab-${name}`).classList.toggle('hidden', !isActive);
+
+                    const btn = document.getElementById(`auth-promo-tab-${name}-btn`);
+                    btn.classList.toggle('border-white', isActive);
+                    btn.classList.toggle('text-white', isActive);
+                    btn.classList.toggle('border-transparent', !isActive);
+                    btn.classList.toggle('text-neutral-400', !isActive);
+                });
+            };
+
+            /**
+             * Un solo botón (la flecha) abre y cierra el panel de login --
+             * la flecha gira 180° para indicar la dirección en la que
+             * deslizaría al volver a hacerle clic.
+             * @returns {void}
+             */
+            window.toggleAuthLoginPanel = function () {
+                const shell = document.getElementById('auth-shell');
+                const icon = document.getElementById('auth-login-toggle-icon');
+                const isOpen = shell.classList.contains(AUTH_SHELL_OPEN);
+
+                shell.classList.replace(isOpen ? AUTH_SHELL_OPEN : AUTH_SHELL_CLOSED, isOpen ? AUTH_SHELL_CLOSED : AUTH_SHELL_OPEN);
+                icon.style.transform = isOpen ? '' : 'rotate(180deg)';
+            };
+
+            /**
+             * En la primera pintura, algunos navegadores calculan mal el
+             * ancho de las columnas "fr" del grid (queda una franja blanca
+             * hasta que algo fuerza un recálculo -- hacer zoom y volver a
+             * 100% lo arregla a mano). Forzarlo una vez apenas carga evita
+             * que el usuario tenga que hacerlo.
+             * @returns {void}
+             */
+            function forceAuthShellReflow() {
+                const shell = document.getElementById('auth-shell');
+                if (!shell) return;
+
+                shell.style.display = 'none';
+                void shell.offsetHeight;
+                shell.style.display = '';
+            }
+
+            requestAnimationFrame(forceAuthShellReflow);
+        })();
+        </script>
         @fluxScripts
     </body>
 </html>
