@@ -147,6 +147,41 @@ class Company extends Model
             ->all();
     }
 
+    /**
+     * Igual que administratorUserIds(), pero limitado a quien administra UN
+     * módulo en particular (para avisos de soporte: si un ticket es sobre
+     * POS, que le llegue a quien administra POS, no a todos los admins de
+     * la empresa) -- el 'owner' siempre entra, sin importar el módulo. Si
+     * nadie califica (módulo sin admin asignado, o "general"/null), cae de
+     * vuelta a administratorUserIds() para no dejar el aviso sin nadie a
+     * quien llegarle.
+     *
+     * @param  string|null  $module
+     * @return array<int, string>
+     */
+    public function administratorUserIdsForModule(?string $module): array
+    {
+        if (! $module || $module === 'general') {
+            return $this->administratorUserIds();
+        }
+
+        $ids = $this->members()
+            ->get()
+            ->filter(function (CompanyMember $member) use ($module) {
+                if ($member->role === 'owner') {
+                    return true;
+                }
+
+                return collect($member->modules ?? [])->contains(fn ($assignment) => ($assignment['module'] ?? null) === $module && ($assignment['role'] ?? null) === 'administrador');
+            })
+            ->pluck('user_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return $ids ?: $this->administratorUserIds();
+    }
+
     public function hasModule(string $module): bool
     {
         return in_array($module, $this->modules ?? [], true);
@@ -253,6 +288,11 @@ class Company extends Model
     public function sellers()
     {
         return $this->hasMany(Seller::class);
+    }
+
+    public function supportTickets()
+    {
+        return $this->hasMany(SupportTicket::class);
     }
 
     /**

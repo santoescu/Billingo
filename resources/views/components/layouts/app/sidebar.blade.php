@@ -138,6 +138,13 @@
                     'url' => route('companies.members.index'),
                     'current' => request()->routeIs('companies.members.*'),
                 ],
+                [
+                    'id' => 'sidebar-support',
+                    'name' => __('Support'),
+                    'icon' => 'lifebuoy',
+                    'url' => route('support.index'),
+                    'current' => request()->routeIs('support.*'),
+                ],
             ])) : [],
         ],
 
@@ -161,6 +168,18 @@
                     'icon' => 'bell',
                     'url' => route('admin.notifications.create'),
                     'current' => request()->routeIs('admin.notifications.create'),
+                ],
+                [
+                    'name' => __('Support tickets'),
+                    'icon' => 'lifebuoy',
+                    'url' => route('admin.tickets.index'),
+                    'current' => request()->routeIs('admin.tickets.*'),
+                ],
+                [
+                    'name' => __('Quick reply templates'),
+                    'icon' => 'document-duplicate',
+                    'url' => route('admin.canned-responses.index'),
+                    'current' => request()->routeIs('admin.canned-responses.*'),
                 ],
             ] : [],
         ],

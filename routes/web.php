@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CannedResponseController;
 use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CatalogLinkController;
 use App\Http\Controllers\CompanyController;
@@ -16,7 +17,9 @@ use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\AdminSupportTicketController;
 use App\Http\Controllers\SellerController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\SuperadminController;
 use App\Http\Controllers\ThirdPartyController;
@@ -195,6 +198,20 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('{catalogLink}', [CatalogLinkController::class, 'destroy'])->name('destroy');
         });
 
+    // Sin restricción de rol por módulo: cualquier miembro de la empresa
+    // (sin importar qué módulos de negocio tenga asignados) puede pedir
+    // ayuda o poner una PQR -- no es un módulo de facturación más, es el
+    // canal de soporte con Billingo.
+    Route::middleware(['company.selected'])
+        ->prefix('soporte')->name('support.')->group(function () {
+            Route::get('/', [SupportTicketController::class, 'index'])->name('index');
+            Route::post('/', [SupportTicketController::class, 'store'])->name('store');
+            Route::get('{supportTicket}', [SupportTicketController::class, 'show'])->name('show');
+            Route::post('{supportTicket}/mensajes', [SupportTicketController::class, 'reply'])->name('reply');
+            Route::post('{supportTicket}/cerrar', [SupportTicketController::class, 'close'])->name('close');
+            Route::post('{supportTicket}/reabrir', [SupportTicketController::class, 'reopen'])->name('reopen');
+        });
+
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
         ->prefix('dian')->name('dian.')->group(function () {
             Route::get('resolutions', [DianController::class, 'resolutions'])->name('resolutions.index');
@@ -220,6 +237,19 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('notifications', [SuperadminController::class, 'notificationsCreate'])->name('notifications.create');
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');
+
+        Route::get('tickets', [AdminSupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/create', [AdminSupportTicketController::class, 'create'])->name('tickets.create');
+        Route::post('tickets', [AdminSupportTicketController::class, 'store'])->name('tickets.store');
+        Route::get('tickets/{supportTicket}', [AdminSupportTicketController::class, 'show'])->name('tickets.show');
+        Route::post('tickets/{supportTicket}/mensajes', [AdminSupportTicketController::class, 'reply'])->name('tickets.reply');
+        Route::post('tickets/{supportTicket}/estado', [AdminSupportTicketController::class, 'updateStatus'])->name('tickets.status');
+        Route::post('tickets/{supportTicket}/asignar', [AdminSupportTicketController::class, 'assign'])->name('tickets.assign');
+        Route::post('tickets/{supportTicket}/prioridad', [AdminSupportTicketController::class, 'updatePriority'])->name('tickets.priority');
+
+        Route::get('canned-responses', [CannedResponseController::class, 'index'])->name('canned-responses.index');
+        Route::post('canned-responses', [CannedResponseController::class, 'store'])->name('canned-responses.store');
+        Route::delete('canned-responses/{cannedResponse}', [CannedResponseController::class, 'destroy'])->name('canned-responses.destroy');
     });
 });
 

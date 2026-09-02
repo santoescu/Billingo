@@ -12,6 +12,7 @@ import '@preline/dropdown';
 import '@preline/accordion';
 import '@preline/tabs';
 import '@preline/input-number';
+import '@preline/textarea-auto-height';
 
 import _ from 'lodash';
 window._ = _;
