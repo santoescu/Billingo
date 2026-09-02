@@ -25,7 +25,7 @@
                  real. --}}
             <li class="mx-auto w-full max-w-lg rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/10">
                 <p class="mb-1 text-xs font-semibold text-amber-700 dark:text-amber-400">{{ __('Internal note') }} — {{ $authorName }}</p>
-                <p class="text-sm whitespace-pre-line text-amber-800 dark:text-amber-200">{{ $message->body }}</p>
+                <p class="text-sm whitespace-pre-line break-words text-amber-800 dark:text-amber-200">{{ $message->body }}</p>
                 <p class="mt-1 text-xs text-amber-500 dark:text-amber-500/70">{{ $timestamp }}</p>
             </li>
         @elseif ($isOwn)
@@ -33,7 +33,7 @@
                 <div class="grow text-end space-y-1">
                     <div class="inline-flex flex-col items-end justify-end">
                         <div class="inline-block bg-accent rounded-2xl px-4 py-3 shadow-2xs">
-                            <p class="text-start text-sm whitespace-pre-line text-white">{{ $message->body }}</p>
+                            <p class="text-start text-sm whitespace-pre-line break-words text-white">{{ $message->body }}</p>
                         </div>
                     </div>
                     <div class="pe-1 text-xs text-zinc-400 dark:text-neutral-500">{{ $timestamp }}</div>
@@ -44,7 +44,7 @@
                 <div class="w-full space-y-1">
                     <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800">
                         <p class="mb-1 text-xs font-semibold text-zinc-500 dark:text-neutral-400">{{ $authorName }}</p>
-                        <p class="text-sm whitespace-pre-line text-zinc-700 dark:text-zinc-300">{{ $message->body }}</p>
+                        <p class="text-sm whitespace-pre-line break-words text-zinc-700 dark:text-zinc-300">{{ $message->body }}</p>
                     </div>
                     <div class="ps-1 text-xs text-zinc-400 dark:text-neutral-500">{{ $timestamp }}</div>
                 </div>
