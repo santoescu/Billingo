@@ -78,6 +78,25 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent;
 }
 
+/*
+ * iOS Safari hace zoom automático de toda la página al enfocar un campo
+ * de texto con letra menor a 16px -- se siente como un salto/descuadre
+ * cada vez que el usuario se pone a escribir. Por debajo de "sm" (el
+ * breakpoint de Tailwind, 640px), fuerza 16px en todos los campos de
+ * formulario para toda la app, sin importar qué utilidad de tamaño de
+ * texto (text-xs, text-sm, etc.) traigan encima -- esta regla, al no
+ * estar en ningún @layer, gana por encima de esas utilidades sin
+ * necesidad de !important (las capas sin nombre de Tailwind v4 siempre
+ * pesan más que "utilities").
+ */
+@media (max-width: 39.99rem) {
+    input,
+    textarea,
+    select {
+        font-size: 16px;
+    }
+}
+
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
