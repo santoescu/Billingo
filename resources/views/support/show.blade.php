@@ -20,12 +20,12 @@
              admin), así que puede ocupar más ancho sin tapar la campana de
              notificaciones (fixed, abajo a la izquierda). --}}
         <div class="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-4">
-            <div class="flex shrink-0 items-center justify-between">
+            <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <a href="{{ route('support.index') }}" wire:navigate class="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-accent dark:text-neutral-400">
                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                     {{ __('Back to requests') }}
                 </a>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
                     @if ($ticket->assignedTo)
                         <span class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Handled by :name', ['name' => $ticket->assignedTo->name]) }}</span>
                     @endif

@@ -14,10 +14,15 @@
 @endphp
 
 <x-layouts.app :title="$ticket->subject">
-    {{-- Mismo criterio que support/show.blade.php: todo dentro de un
-         contenedor con altura fija (viewport menos el padding de
-         <flux:main>) para que el chat sea lo único que scrollee. --}}
-    <div class="flex h-[calc(100dvh-3rem)] flex-col lg:h-[calc(100dvh-4rem)]">
+    {{-- El truco de "altura fija (viewport menos el padding) + flex-1 en
+         el chat" solo tiene sentido de lg para arriba, donde opciones y
+         chat están en columnas lado a lado (mismo presupuesto de alto para
+         ambas). En mobile las dos columnas se apilan en una sola: si se
+         mantuviera la altura fija, el bloque de opciones+historial se
+         comía la mayoría del alto disponible y dejaba el chat aplastado.
+         Por eso en mobile la página fluye normal (sin altura fija) y el
+         chat usa un alto propio en vh en vez de flex-1. --}}
+    <div class="flex flex-col lg:h-[calc(100dvh-4rem)]">
         @include('partials.tittle', [
             'title' => $ticket->subject,
             'subheading' => $company->name . ' — ' . $ticket->module_label,
@@ -30,11 +35,13 @@
             </a>
 
             <div class="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row">
-                {{-- Opciones + historial: a la izquierda -- el chat queda a
-                     la derecha (ver más abajo) para que el textarea, que
-                     crece con el mensaje, no le tape la campana de
-                     notificaciones (fixed, abajo a la izquierda). --}}
-                <div class="w-full shrink-0 space-y-6 lg:w-64">
+                {{-- Opciones + historial: a la izquierda en desktop (el chat
+                     queda a la derecha para que el textarea, que crece con
+                     el mensaje, no le tape la campana de notificaciones,
+                     fixed abajo a la izquierda) -- pero abajo del chat en
+                     mobile (order-2), para que lo primero que se vea sea la
+                     conversación, no los selects de estado/prioridad. --}}
+                <div class="order-2 w-full shrink-0 space-y-6 lg:order-none lg:w-64">
                     <div>
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-neutral-500">{{ __('Status') }}</label>
                         <form action="{{ route('admin.tickets.status', $ticket->_id) }}" method="POST">
@@ -117,8 +124,8 @@
                     </div>
                 </div>
 
-                <div class="flex min-h-0 max-w-3xl flex-1 flex-col gap-4">
-                    <div id="ticket-messages" class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 p-4 dark:border-neutral-700 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <div class="order-1 flex min-h-0 max-w-3xl flex-1 flex-col gap-4 lg:order-none">
+                    <div id="ticket-messages" class="h-[60vh] shrink-0 overflow-y-auto rounded-lg border border-gray-200 p-4 dark:border-neutral-700 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
                         @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'staff', 'otherLabel' => $company->name])
                     </div>
 
@@ -155,7 +162,13 @@
                         textarea.value = textarea.value ? textarea.value + '\n' + cannedSelect.value : cannedSelect.value;
                         textarea.dispatchEvent(new Event('input', { bubbles: true }));
                         textarea.focus();
-                        cannedSelect.value = '';
+
+                        const instance = window.HSSelect && HSSelect.getInstance(cannedSelect);
+                        if (instance) {
+                            instance.setValue('');
+                        } else {
+                            cannedSelect.value = '';
+                        }
                     });
                 }
             }

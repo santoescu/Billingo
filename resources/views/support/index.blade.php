@@ -17,7 +17,7 @@
             <div class="p-1.5 min-w-full inline-block align-middle">
                 <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
                     <div class="overflow-hidden">
-                        <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                        <table class="w-full min-w-[640px] table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
                             <thead class="bg-gray-50 dark:bg-neutral-700">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Date') }}</th>
