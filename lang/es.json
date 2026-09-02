@@ -1,4 +1,13 @@
 {
+    "Thanks! We got your message and will contact you soon.": "¡Gracias! Ya recibimos tu mensaje y te vamos a contactar pronto.",
+    "Contact us": "Contáctanos",
+    "Tell us a bit about your business and we'll get back to you.": "Contanos un poco de tu negocio y te contactamos.",
+    "Phone (optional)": "Teléfono (opcional)",
+    "Send message": "Enviar mensaje",
+    "Contact request from :name": "Solicitud de contacto de :name",
+    "New contact request": "Nueva solicitud de contacto",
+    "Lead": "Prospecto",
+    "Contact details": "Datos de contacto",
     ":actor changed the priority:": ":actor cambió la prioridad:",
     "Priority": "Prioridad",
     "Low": "Baja",

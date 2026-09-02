@@ -31,6 +31,9 @@ class SupportTicket extends Model
         'assigned_to',
         'priority',
         'staff_last_viewed_at',
+        'contact_name',
+        'contact_phone',
+        'contact_email',
     ];
 
     protected function casts(): array
@@ -43,6 +46,17 @@ class SupportTicket extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * true cuando el ticket viene del formulario público "Contáctanos" del
+     * login (un prospecto sin cuenta todavía) -- no tiene company_id ni
+     * user_id, en cambio trae los datos de contacto sueltos
+     * (contact_name/contact_phone/contact_email).
+     */
+    public function getIsLeadAttribute(): bool
+    {
+        return ! $this->company_id;
     }
 
     public function user()

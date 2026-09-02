@@ -91,7 +91,12 @@
                                                 {{ $ticket->created_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $ticket->company_name ?? '—' }}</td>
+                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                                            {{ $ticket->company_name ?? '—' }}
+                                            @if ($ticket->is_lead)
+                                                <span class="ms-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">{{ __('Lead') }}</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-4 text-sm">
                                             @if ($ticket->module && $ticket->module !== 'general')
                                                 @include('panel.partials.module-badge', ['module' => $ticket->module])

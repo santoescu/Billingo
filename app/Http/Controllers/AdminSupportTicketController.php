@@ -112,7 +112,7 @@ class AdminSupportTicketController extends Controller
 
         $tickets = $tickets
             ->map(function (SupportTicket $ticket) use ($companyNames, $assigneeNames) {
-                $ticket->company_name = $companyNames->get((string) $ticket->company_id)?->name;
+                $ticket->company_name = $companyNames->get((string) $ticket->company_id)?->name ?? $ticket->contact_name;
                 $ticket->assignee_name = $ticket->assigned_to ? $assigneeNames->get((string) $ticket->assigned_to)?->name : null;
 
                 return $ticket;
@@ -132,7 +132,7 @@ class AdminSupportTicketController extends Controller
     public function show(string $supportTicket)
     {
         $ticket = SupportTicket::findOrFail($supportTicket);
-        $company = Company::findOrFail($ticket->company_id);
+        $company = $ticket->company_id ? Company::find($ticket->company_id) : null;
 
         // "timestamps = false" antes de guardar para NO tocar "updated_at"
         // -- abrir un ticket para leerlo no debe hacerlo "saltar" al tope
@@ -176,7 +176,7 @@ class AdminSupportTicketController extends Controller
     public function reply(Request $request, string $supportTicket)
     {
         $ticket = SupportTicket::findOrFail($supportTicket);
-        $company = Company::findOrFail($ticket->company_id);
+        $company = $ticket->company_id ? Company::find($ticket->company_id) : null;
 
         $data = $request->validate([
             'body' => 'required|string|max:5000',
@@ -194,7 +194,10 @@ class AdminSupportTicketController extends Controller
 
         $ticket->update(['staff_last_viewed_at' => now()]);
 
-        if (! $isInternal) {
+        // Un lead del formulario "Contáctanos" no tiene empresa ni cuenta
+        // -- no hay a quién avisarle in-app (solo por correo, que todavía
+        // no existe para este flujo, ver memoria del backlog pendiente).
+        if (! $isInternal && $company) {
             Notification::notifyUsers(
                 $company->administratorUserIdsForModule($ticket->module),
                 __('Your support request was answered'),

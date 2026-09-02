@@ -25,7 +25,7 @@
     <div class="flex flex-col lg:h-[calc(100dvh-4rem)]">
         @include('partials.tittle', [
             'title' => $ticket->subject,
-            'subheading' => $company->name . ' — ' . $ticket->module_label,
+            'subheading' => ($company?->name ?? $ticket->contact_name) . ' — ' . $ticket->module_label,
         ])
 
         <div class="flex min-h-0 flex-1 flex-col gap-4">
@@ -42,6 +42,21 @@
                      mobile (order-2), para que lo primero que se vea sea la
                      conversación, no los selects de estado/prioridad. --}}
                 <div class="order-2 w-full shrink-0 space-y-6 lg:order-none lg:w-64">
+                    @if ($ticket->is_lead)
+                        {{-- Un prospecto del formulario "Contáctanos" no
+                             tiene cuenta -- estos son los únicos datos que
+                             hay para contactarlo de vuelta (todavía no hay
+                             aviso por correo, ver memoria del backlog). --}}
+                        <div class="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/40 dark:bg-purple-900/10">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">{{ __('Contact details') }}</p>
+                            <p class="text-sm font-medium text-purple-900 dark:text-purple-200">{{ $ticket->contact_name }}</p>
+                            <p class="text-sm text-purple-800 dark:text-purple-300">{{ $ticket->contact_email }}</p>
+                            @if ($ticket->contact_phone)
+                                <p class="text-sm text-purple-800 dark:text-purple-300">{{ $ticket->contact_phone }}</p>
+                            @endif
+                        </div>
+                    @endif
+
                     <div>
                         <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-neutral-500">{{ __('Status') }}</label>
                         <form action="{{ route('admin.tickets.status', $ticket->_id) }}" method="POST">
@@ -126,7 +141,7 @@
 
                 <div class="order-1 flex min-h-0 max-w-3xl flex-1 flex-col gap-4 lg:order-none">
                     <div id="ticket-messages" class="h-[60vh] shrink-0 overflow-y-auto rounded-lg border border-gray-200 p-4 dark:border-neutral-700 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-                        @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'staff', 'otherLabel' => $company->name])
+                        @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'staff', 'otherLabel' => $company?->name ?? $ticket->contact_name])
                     </div>
 
                     <form action="{{ route('admin.tickets.reply', $ticket->_id) }}" method="POST" class="shrink-0">

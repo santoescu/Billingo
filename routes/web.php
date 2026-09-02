@@ -16,6 +16,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
+use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\AdminSupportTicketController;
 use App\Http\Controllers\SellerController;
@@ -45,6 +46,11 @@ Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
     Route::post('quotations', [PublicCatalogController::class, 'store'])->name('quotations.store');
     Route::get('quotations/{quotation}/pdf', [PublicCatalogController::class, 'pdf'])->name('quotations.pdf');
 });
+
+// Formulario "Contáctanos" del panel de login: sin auth (todavía no tiene
+// cuenta), llega al mismo panel de soporte del admin como un ticket sin
+// empresa.
+Route::post('contacto', [PublicContactController::class, 'store'])->name('public.contact.store');
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('panel', [DashboardController::class, 'panel'])->middleware(['auth', 'verified'])->name('panel');

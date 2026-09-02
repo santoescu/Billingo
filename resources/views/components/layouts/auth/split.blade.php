@@ -168,6 +168,9 @@
                             <button type="button" id="auth-promo-tab-recommendation-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('recommendation')">
                                 {{ __('We recommend it') }}
                             </button>
+                            <button type="button" id="auth-promo-tab-contact-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('contact')">
+                                {{ __('Contact us') }}
+                            </button>
                         </nav>
                     </div>
 
@@ -291,6 +294,48 @@
                             </div>
                         </div>
                     </div>
+
+                    <div id="auth-promo-tab-contact" class="auth-promo-tab mt-6 hidden">
+                        <p class="max-w-md text-sm text-neutral-300">{{ __('Tell us a bit about your business and we\'ll get back to you.') }}</p>
+
+                        <form action="{{ route('public.contact.store') }}" method="POST" class="mt-4 max-w-md space-y-4">
+                            @csrf
+
+                            @if ($errors->any())
+                                <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                                    {{ $errors->first() }}
+                                </div>
+                            @endif
+
+                            <div>
+                                <label for="contact_name" class="mb-1.5 block text-sm font-medium text-neutral-200">{{ __('Company name') }}</label>
+                                <input type="text" name="contact_name" id="contact_name" value="{{ old('contact_name') }}" required
+                                    class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-accent focus:outline-hidden focus:ring-1 focus:ring-accent">
+                            </div>
+
+                            <div>
+                                <label for="contact_email" class="mb-1.5 block text-sm font-medium text-neutral-200">{{ __('Email address') }}</label>
+                                <input type="email" name="contact_email" id="contact_email" value="{{ old('contact_email') }}" required
+                                    class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-accent focus:outline-hidden focus:ring-1 focus:ring-accent">
+                            </div>
+
+                            <div>
+                                <label for="contact_phone" class="mb-1.5 block text-sm font-medium text-neutral-200">{{ __('Phone (optional)') }}</label>
+                                <input type="text" name="contact_phone" id="contact_phone" value="{{ old('contact_phone') }}"
+                                    class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-accent focus:outline-hidden focus:ring-1 focus:ring-accent">
+                            </div>
+
+                            <div>
+                                <label for="contact_body" class="mb-1.5 block text-sm font-medium text-neutral-200">{{ __('Message') }}</label>
+                                <textarea name="body" id="contact_body" rows="3" required
+                                    class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-accent focus:outline-hidden focus:ring-1 focus:ring-accent">{{ old('body') }}</textarea>
+                            </div>
+
+                            <button type="submit" class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
+                                {{ __('Send message') }}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
             <div id="auth-login-panel" class="relative hidden h-full w-full min-w-0 items-center overflow-hidden px-8 sm:px-0 lg:flex lg:p-8">
@@ -321,7 +366,7 @@
         (function () {
             const AUTH_SHELL_CLOSED = 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)]';
             const AUTH_SHELL_OPEN = 'lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]';
-            const AUTH_PROMO_TABS = ['modules', 'comparison', 'plans', 'about', 'recommendation'];
+            const AUTH_PROMO_TABS = ['modules', 'comparison', 'plans', 'about', 'recommendation', 'contact'];
 
             /**
              * Pestañas del panel oscuro (Módulos / Por qué Billingo /
@@ -399,6 +444,21 @@
             }
 
             requestAnimationFrame(forceAuthShellReflow);
+
+            @if ($errors->any())
+                {{-- Si el formulario "Contáctanos" volvió con errores, hay
+                     que dejar esa pestaña abierta (con los datos que ya
+                     había escrito) en vez de la de "Módulos" por defecto. --}}
+                window.showAuthPromoTab('contact');
+            @elseif (session('status'))
+                {{-- El mensaje de éxito (u otro "status" de sesión, como el
+                     de restablecer contraseña) vive en el panel del
+                     formulario -- en mobile hay que revelarlo a mano, si no
+                     queda escondido detrás del panel de info. --}}
+                if (window.matchMedia('(max-width: 1023px)').matches) {
+                    window.toggleMobilePanel();
+                }
+            @endif
         })();
         </script>
         @fluxScripts
