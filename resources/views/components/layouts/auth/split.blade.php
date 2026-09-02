@@ -54,7 +54,13 @@
         ],
     ];
 
-    $aboutPoints = [
+    $aboutPlatform = [
+        __('Invoicing, POS, quotations, receiving and payroll are all part of the same platform, sharing the same clients, products and stock -- not separate products bolted together.'),
+        __('Every electronic document follows the UBL format the DIAN requires, and gets validated before it\'s sent, not after.'),
+        __('You only turn on the modules your business actually needs, and can add more later without migrating anything.'),
+    ];
+
+    $aboutTeam = [
         __('We built Billingo because we ran into the same problem ourselves: juggling separate tools to invoice, sell and keep up with the DIAN.'),
         __('We\'re a small team, so every conversation with a client actually reaches the people who build the product.'),
         __('We keep adding modules based on what businesses using Billingo actually ask for, not a fixed roadmap.'),
@@ -203,13 +209,28 @@
                     </div>
 
                     <div id="auth-promo-tab-about" class="auth-promo-tab mt-6 hidden">
-                        <div class="space-y-3">
-                            @foreach ($aboutPoints as $point)
-                                <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-5">
-                                    <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">{{ $loop->iteration }}</span>
-                                    <p class="text-sm text-neutral-300">{{ $point }}</p>
-                                </div>
-                            @endforeach
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-400">{{ __('The platform') }}</h3>
+                            <div class="mt-3 space-y-3">
+                                @foreach ($aboutPlatform as $point)
+                                    <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-5">
+                                        <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">{{ $loop->iteration }}</span>
+                                        <p class="text-sm text-neutral-300">{{ $point }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-400">{{ __('How we work') }}</h3>
+                            <div class="mt-3 space-y-3">
+                                @foreach ($aboutTeam as $point)
+                                    <div class="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-5">
+                                        <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">{{ $loop->iteration }}</span>
+                                        <p class="text-sm text-neutral-300">{{ $point }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
 
