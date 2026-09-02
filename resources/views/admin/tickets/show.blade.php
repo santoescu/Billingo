@@ -50,7 +50,7 @@
                         <div class="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/40 dark:bg-purple-900/10">
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-400">{{ __('Contact details') }}</p>
                             <p class="text-sm font-medium text-purple-900 dark:text-purple-200">{{ $ticket->contact_name }}</p>
-                            <p class="text-sm text-purple-800 dark:text-purple-300">{{ $ticket->contact_email }}</p>
+                            <p class="break-words text-xs text-purple-800 dark:text-purple-300">{{ $ticket->contact_email }}</p>
                             @if ($ticket->contact_phone)
                                 <p class="text-sm text-purple-800 dark:text-purple-300">{{ $ticket->contact_phone }}</p>
                             @endif
@@ -64,7 +64,7 @@
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">{{ __('Contact details') }}</p>
                             <p class="text-sm font-medium text-blue-900 dark:text-blue-200">{{ $company->name }}</p>
                             @if ($company->email)
-                                <p class="text-sm text-blue-800 dark:text-blue-300">{{ $company->email }}</p>
+                                <p class="break-words text-xs text-blue-800 dark:text-blue-300">{{ $company->email }}</p>
                             @endif
                             @if ($company->phone)
                                 <p class="text-sm text-blue-800 dark:text-blue-300">{{ $company->phone }}</p>
