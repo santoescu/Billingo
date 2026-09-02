@@ -30,7 +30,7 @@
             </li>
         @elseif ($isOwn)
             <li class="ms-auto max-w-lg flex gap-x-2 sm:gap-x-4">
-                <div class="grow text-end space-y-1">
+                <div class="min-w-0 grow text-end space-y-1">
                     <div class="inline-flex flex-col items-end justify-end">
                         <div class="inline-block bg-accent rounded-2xl px-4 py-3 shadow-2xs">
                             <p class="text-start text-sm whitespace-pre-line break-words text-white">{{ $message->body }}</p>
@@ -41,7 +41,7 @@
             </li>
         @else
             <li class="max-w-lg flex gap-x-2 sm:gap-x-4 me-11">
-                <div class="w-full space-y-1">
+                <div class="min-w-0 w-full space-y-1">
                     <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800">
                         <p class="mb-1 text-xs font-semibold text-zinc-500 dark:text-neutral-400">{{ $authorName }}</p>
                         <p class="text-sm whitespace-pre-line break-words text-zinc-700 dark:text-zinc-300">{{ $message->body }}</p>
