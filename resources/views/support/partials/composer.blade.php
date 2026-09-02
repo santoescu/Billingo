@@ -12,12 +12,14 @@
       el mensaje como nota interna (is_internal=1) en vez de respuesta.
 --}}
 @if (! empty($cannedResponses) && $cannedResponses->isNotEmpty())
-    <select id="canned-response-select" class="mb-2 block w-full max-w-xs rounded-lg border border-gray-200 bg-white py-1.5 ps-3 pe-8 text-xs text-zinc-600 focus:border-accent focus:outline-hidden focus:ring-accent dark:border-neutral-700 dark:bg-neutral-800 dark:text-zinc-300">
-        <option value="">{{ __('Insert a template...') }}</option>
-        @foreach ($cannedResponses as $canned)
-            <option value="{{ $canned->body }}">{{ $canned->title }}</option>
-        @endforeach
-    </select>
+    <div class="mb-2 max-w-xs">
+        <select id="canned-response-select" class="hidden" data-hs-select='{!! \App\Support\SelectConfig::basic(__('Insert a template...')) !!}'>
+            <option value=""></option>
+            @foreach ($cannedResponses as $canned)
+                <option value="{{ $canned->body }}">{{ $canned->title }}</option>
+            @endforeach
+        </select>
+    </div>
 @endif
 
 <div class="relative">
