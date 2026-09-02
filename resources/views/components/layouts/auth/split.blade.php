@@ -114,9 +114,20 @@
              que se desborden. Arranca en "1fr 0fr" (panel oscuro ocupa
              todo, formulario en 0) y el botón lo cambia a "3fr 2fr" (la
              proporción original), animado. JS plano, sin Alpine, para no
-             depender de que ya esté hidratado al momento del clic. --}}
-        <div id="auth-shell" class="relative grid h-dvh items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:items-stretch lg:justify-normal lg:px-0 lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
-            <div class="bg-muted relative hidden h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-10 text-white lg:flex dark:border-r dark:border-neutral-800">
+             depender de que ya esté hidratado al momento del clic.
+
+             En mobile no hay espacio para deslizar dos columnas lado a
+             lado -- ahí, en vez de animar el grid, se alterna cuál de los
+             dos paneles está presente (display:none/flex vía JS) con
+             "toggleMobilePanel()": arranca mostrando el panel de info
+             (módulos/planes/nosotros) como landing, con un botón "Iniciar
+             sesión" que revela el formulario, y el formulario tiene un
+             botón para volver. Las clases "lg:flex" de cada panel siempre
+             ganan sobre lo que JS le haya puesto (hidden/flex sin prefijo)
+             a partir de "lg" -- por eso el estado mobile no puede filtrarse
+             a desktop aunque no se resetee al cambiar de tamaño. --}}
+        <div id="auth-shell" class="relative grid h-dvh items-stretch justify-center lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
+            <div id="auth-promo-panel" class="bg-muted relative flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-6 text-white sm:p-10 lg:flex dark:border-r dark:border-neutral-800">
                 <button type="button" id="auth-login-toggle-btn" aria-label="{{ __('Log in') }}" title="{{ __('Log in') }}"
                     onclick="window.toggleAuthLoginPanel()"
                     class="absolute end-6 top-6 z-30 hidden size-10 items-center justify-center rounded-full text-neutral-300 hover:bg-white/10 hover:text-white focus:outline-hidden lg:flex">
@@ -124,12 +135,18 @@
                 </button>
 
                 <div class="relative z-20">
-                    <a href="{{ route('home') }}" class="flex items-center text-lg font-medium" wire:navigate>
-                        <span class="flex h-10 w-10 items-center justify-center rounded-md">
-                            <x-app-logo-icon class="mr-2 h-7 fill-current text-white" />
-                        </span>
-                        {{ config('app.name', 'Laravel') }}
-                    </a>
+                    <div class="flex items-center justify-between gap-3">
+                        <a href="{{ route('home') }}" class="flex items-center text-lg font-medium" wire:navigate>
+                            <span class="flex h-10 w-10 items-center justify-center rounded-md">
+                                <x-app-logo-icon class="mr-2 h-7 fill-current text-white" />
+                            </span>
+                            {{ config('app.name', 'Laravel') }}
+                        </a>
+
+                        <button type="button" onclick="window.toggleMobilePanel()" class="shrink-0 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 lg:hidden">
+                            {{ __('Log in') }}
+                        </button>
+                    </div>
 
                     <p class="mt-8 max-w-xl text-2xl font-semibold leading-snug">{{ __('Electronic invoicing, point of sale and payroll, all in one place.') }}</p>
                     <p class="mt-3 max-w-xl text-sm text-neutral-300">{{ __('A platform built for Colombian businesses: issue electronic documents valid before the DIAN, sell over the counter and quote, without switching systems.') }}</p>
@@ -276,7 +293,12 @@
                     </div>
                 </div>
             </div>
-            <div class="relative flex h-full w-full min-w-0 items-center overflow-hidden lg:p-8">
+            <div id="auth-login-panel" class="relative hidden h-full w-full min-w-0 items-center overflow-hidden px-8 sm:px-0 lg:flex lg:p-8">
+                <button type="button" onclick="window.toggleMobilePanel()" class="absolute start-4 top-4 z-20 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-accent lg:hidden dark:text-neutral-400">
+                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+                    {{ __('Back') }}
+                </button>
+
                 <div class="mx-auto flex w-full max-w-[350px] flex-col justify-center space-y-6">
                     <a href="{{ route('home') }}" class="z-20 flex flex-col items-center gap-2 font-medium lg:hidden" wire:navigate>
                         <span class="flex h-9 w-9 items-center justify-center rounded-md">
@@ -333,6 +355,30 @@
 
                 shell.classList.replace(isOpen ? AUTH_SHELL_OPEN : AUTH_SHELL_CLOSED, isOpen ? AUTH_SHELL_CLOSED : AUTH_SHELL_OPEN);
                 icon.style.transform = isOpen ? '' : 'rotate(180deg)';
+            };
+
+            /**
+             * Alterna qué panel se ve en mobile (no hay espacio para los
+             * dos lado a lado): arranca mostrando el de info, el botón
+             * "Iniciar sesión" revela el formulario, "Volver" regresa. Las
+             * clases "lg:flex" de cada panel siempre ganan sobre lo que
+             * esto le ponga a partir de "lg" (no hace falta resetear nada
+             * al agrandar la ventana).
+             * @returns {void}
+             */
+            window.toggleMobilePanel = function () {
+                const promo = document.getElementById('auth-promo-panel');
+                const login = document.getElementById('auth-login-panel');
+                const showLogin = ! login.classList.contains('flex');
+
+                promo.classList.toggle('hidden', showLogin);
+                promo.classList.toggle('flex', ! showLogin);
+                login.classList.toggle('hidden', ! showLogin);
+                login.classList.toggle('flex', showLogin);
+
+                if (showLogin) {
+                    promo.scrollTop = 0;
+                }
             };
 
             /**
