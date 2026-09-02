@@ -55,6 +55,21 @@
                                 <p class="text-sm text-purple-800 dark:text-purple-300">{{ $ticket->contact_phone }}</p>
                             @endif
                         </div>
+                    @elseif ($company)
+                        {{-- Mismo estilo de tarjeta, pero con los datos ya
+                             registrados de la empresa -- para no tener que
+                             ir a buscarlos aparte al querer llamar/escribir
+                             directo en vez de contestar solo por el hilo. --}}
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-900/10">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">{{ __('Contact details') }}</p>
+                            <p class="text-sm font-medium text-blue-900 dark:text-blue-200">{{ $company->name }}</p>
+                            @if ($company->email)
+                                <p class="text-sm text-blue-800 dark:text-blue-300">{{ $company->email }}</p>
+                            @endif
+                            @if ($company->phone)
+                                <p class="text-sm text-blue-800 dark:text-blue-300">{{ $company->phone }}</p>
+                            @endif
+                        </div>
                     @endif
 
                     <div>
