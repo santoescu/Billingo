@@ -152,23 +152,30 @@
                     <p class="mt-3 max-w-xl text-sm text-neutral-300">{{ __('A platform built for Colombian businesses: issue electronic documents valid before the DIAN, sell over the counter and quote, without switching systems.') }}</p>
 
                     <div class="mt-10 border-b border-white/10">
-                        <nav class="flex gap-4">
-                            <button type="button" id="auth-promo-tab-modules-btn" class="auth-promo-tab-btn border-b-2 border-white py-2 text-sm font-medium text-white" onclick="window.showAuthPromoTab('modules')">
+                        {{-- overflow-x-auto + shrink-0 en cada botón: con 6
+                             pestañas ya no entran todas en una pantalla
+                             angosta -- sin esto, "Contáctanos" quedaba
+                             cortada e invisible por el overflow-x-hidden
+                             del panel (nunca hacía scroll, solo se veía
+                             recortada). Scrollbar oculta porque es un tab
+                             bar, no un área de contenido con scroll obvio. --}}
+                        <nav class="flex gap-4 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            <button type="button" id="auth-promo-tab-modules-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-white py-2 text-sm font-medium whitespace-nowrap text-white" onclick="window.showAuthPromoTab('modules')">
                                 {{ __('Modules') }}
                             </button>
-                            <button type="button" id="auth-promo-tab-comparison-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('comparison')">
+                            <button type="button" id="auth-promo-tab-comparison-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('comparison')">
                                 {{ __('Why Billingo') }}
                             </button>
-                            <button type="button" id="auth-promo-tab-plans-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('plans')">
+                            <button type="button" id="auth-promo-tab-plans-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('plans')">
                                 {{ __('Plans and pricing') }}
                             </button>
-                            <button type="button" id="auth-promo-tab-about-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('about')">
+                            <button type="button" id="auth-promo-tab-about-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('about')">
                                 {{ __('About us') }}
                             </button>
-                            <button type="button" id="auth-promo-tab-recommendation-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('recommendation')">
+                            <button type="button" id="auth-promo-tab-recommendation-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('recommendation')">
                                 {{ __('We recommend it') }}
                             </button>
-                            <button type="button" id="auth-promo-tab-contact-btn" class="auth-promo-tab-btn border-b-2 border-transparent py-2 text-sm font-medium text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('contact')">
+                            <button type="button" id="auth-promo-tab-contact-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('contact')">
                                 {{ __('Contact us') }}
                             </button>
                         </nav>
