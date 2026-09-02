@@ -126,7 +126,7 @@
              ganan sobre lo que JS le haya puesto (hidden/flex sin prefijo)
              a partir de "lg" -- por eso el estado mobile no puede filtrarse
              a desktop aunque no se resetee al cambiar de tamaño. --}}
-        <div id="auth-shell" class="relative grid h-dvh items-stretch justify-center lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
+        <div id="auth-shell" class="relative grid h-dvh grid-cols-[minmax(0,1fr)] items-stretch justify-center lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
             <div id="auth-promo-panel" class="bg-muted relative flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-6 text-white sm:p-10 lg:flex dark:border-r dark:border-neutral-800">
                 <button type="button" id="auth-login-toggle-btn" aria-label="{{ __('Log in') }}" title="{{ __('Log in') }}"
                     onclick="window.toggleAuthLoginPanel()"
