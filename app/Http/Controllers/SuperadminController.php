@@ -78,7 +78,12 @@ class SuperadminController extends Controller
         // contrato puede cubrir varias empresas del mismo cliente, ver CompanyContract).
         $otherCompanies = Company::where('_id', '!=', $companyId)->orderBy('name')->get();
 
-        return view('admin.company-edit', compact('company', 'members', 'contracts', 'otherCompanies'));
+        // Para el selector de "vendedor" del contrato -- solo gente del
+        // equipo (superadmin o con el rol 'referrer'), no cualquier usuario
+        // del sistema.
+        $referrers = User::whereIn('role', [User::ROLE_REFERRER, ...User::GLOBAL_ADMIN_ROLES])->orderBy('name')->get();
+
+        return view('admin.company-edit', compact('company', 'members', 'contracts', 'otherCompanies', 'referrers'));
     }
 
     /**
@@ -131,6 +136,8 @@ class SuperadminController extends Controller
             'pos_used' => 0,
             'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
             'cotizaciones_used' => 0,
+            'referrer_user_id' => $data['referrer_user_id'] ?? null,
+            'commission_percentage' => $data['commission_percentage'] ?? null,
         ]);
 
         session()->flash('toast', [
@@ -166,6 +173,8 @@ class SuperadminController extends Controller
             'invoicing_limit' => $data['invoicing_limit'] ?? null,
             'pos_limit' => $data['pos_limit'] ?? null,
             'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
+            'referrer_user_id' => $data['referrer_user_id'] ?? null,
+            'commission_percentage' => $data['commission_percentage'] ?? null,
         ]);
 
         session()->flash('toast', [
@@ -189,7 +198,7 @@ class SuperadminController extends Controller
         // deja en blanco -- 'nullable' no los convierte a null por sí solo, solo se salta el
         // resto de reglas, así que sin este paso "date"/"integer" fallarían o, peor, se
         // guardaría '' tal cual (Carbon la interpreta como "ahora").
-        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit']))
+        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit', 'referrer_user_id', 'commission_percentage']))
             ->map(fn ($value) => $value === '' ? null : $value)
             ->all());
 
@@ -210,6 +219,8 @@ class SuperadminController extends Controller
             'cotizaciones_limit' => ['nullable', 'integer', 'min:1'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['string'],
+            'referrer_user_id' => ['nullable', 'string'],
+            'commission_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
     }
 
@@ -464,6 +475,32 @@ class SuperadminController extends Controller
 
         $user = User::findOrFail($userId);
         $user->update(['role' => $user->isGlobalAdmin() ? null : 'superadmin']);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Updated :name', ['name' => __('User')]),
+        ]);
+
+        return redirect()->route('admin.users');
+    }
+
+    /**
+     * Otorgar o quitar el rol de vendedor ("referrer") a un usuario -- a
+     * diferencia del superadmin, no da acceso al panel de administración,
+     * solo deja que ese usuario entre a ver sus propias ventas/comisiones
+     * (ver ReferralController). No se puede tocar sobre un superadmin (el
+     * campo "role" solo guarda un valor a la vez): primero hay que quitarle
+     * el superadmin.
+     */
+    public function toggleReferrer(string $userId)
+    {
+        $user = User::findOrFail($userId);
+
+        if ($user->isGlobalAdmin()) {
+            abort(403, __('This user is already a superadmin.'));
+        }
+
+        $user->update(['role' => $user->isReferrer() ? null : User::ROLE_REFERRER]);
 
         session()->flash('toast', [
             'type' => 'success',

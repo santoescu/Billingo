@@ -1629,5 +1629,16 @@
     "Correct the rejected document :numeral and resend it to the DIAN.": "Corrija el documento rechazado :numeral y reenvíelo a la DIAN.",
     "You are correcting the rejected document :numeral. Fix the fields the DIAN complained about and resend it -- it will keep the same number.": "Está corrigiendo el documento rechazado :numeral. Corrija los campos que reclamó la DIAN y reenvíelo -- conservará el mismo número.",
     "Correct and resend": "Corregir y reenviar",
-    "Resend document": "Reenviar documento"
+    "Resend document": "Reenviar documento",
+    "My commissions": "Mis comisiones",
+    "Companies you brought in, and what you earn from each contract.": "Las empresas que trajiste y cuánto ganas por cada contrato.",
+    "Total commission": "Comisión total",
+    "Commission": "Comisión",
+    "Commission %": "Comisión %",
+    "Referrer": "Vendedor",
+    "No referrer": "Sin vendedor",
+    "Make referrer": "Hacer vendedor",
+    "Remove referrer": "Quitar vendedor",
+    "This user is already a superadmin.": "Este usuario ya es superadministrador.",
+    "sales": "ventas"
 }

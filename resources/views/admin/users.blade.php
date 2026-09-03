@@ -28,6 +28,7 @@
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Email') }}</th>
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Companies') }}</th>
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Superadmin') }}</th>
+                                    <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Referrer') }}</th>
                                     <th scope="col" class="px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -54,14 +55,31 @@
                                                 <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">{{ __('No') }}</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 text-right text-sm">
+                                        <td class="px-4 py-3 text-sm">
+                                            @if ($listedUser->isReferrer())
+                                                <span class="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">{{ __('Yes') }}</span>
+                                            @else
+                                                <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">{{ __('No') }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-end text-sm">
                                             @if ((string) $listedUser->_id !== (string) auth()->id())
-                                                <form method="POST" action="{{ route('admin.users.toggle-superadmin', $listedUser->_id) }}">
-                                                    @csrf
-                                                    <flux:button type="submit" size="sm" variant="{{ $listedUser->isGlobalAdmin() ? 'danger' : 'primary' }}">
-                                                        {{ $listedUser->isGlobalAdmin() ? __('Revoke') : __('Grant') }}
-                                                    </flux:button>
-                                                </form>
+                                                <div class="flex justify-end gap-2">
+                                                    <form method="POST" action="{{ route('admin.users.toggle-superadmin', $listedUser->_id) }}">
+                                                        @csrf
+                                                        <flux:button type="submit" size="sm" variant="{{ $listedUser->isGlobalAdmin() ? 'danger' : 'primary' }}">
+                                                            {{ $listedUser->isGlobalAdmin() ? __('Revoke') : __('Grant') }}
+                                                        </flux:button>
+                                                    </form>
+                                                    @unless ($listedUser->isGlobalAdmin())
+                                                        <form method="POST" action="{{ route('admin.users.toggle-referrer', $listedUser->_id) }}">
+                                                            @csrf
+                                                            <flux:button type="submit" size="sm" variant="{{ $listedUser->isReferrer() ? 'danger' : 'filled' }}">
+                                                                {{ $listedUser->isReferrer() ? __('Remove referrer') : __('Make referrer') }}
+                                                            </flux:button>
+                                                        </form>
+                                                    @endunless
+                                                </div>
                                             @else
                                                 <span class="text-xs text-gray-400 dark:text-neutral-500">{{ __('This is you') }}</span>
                                             @endif

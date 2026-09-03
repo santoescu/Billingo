@@ -22,6 +22,7 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
     protected $hidden = ['password', 'remember_token'];
 
     public const GLOBAL_ADMIN_ROLES = ['superadmin'];
+    public const ROLE_REFERRER = 'referrer';
 
     /**
      * Get the attributes that should be cast.
@@ -39,6 +40,17 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
     public function isGlobalAdmin(): bool
     {
         return in_array($this->role, self::GLOBAL_ADMIN_ROLES, true);
+    }
+
+    /**
+     * "Vendedor" de Billingo: alguien del equipo que puede quedar asignado
+     * como referido en un CompanyContract (ver commission_percentage) y
+     * entrar a ver sus propias ventas/comisiones -- no es lo mismo que
+     * superadmin, no ve el resto del panel.
+     */
+    public function isReferrer(): bool
+    {
+        return $this->role === self::ROLE_REFERRER;
     }
 
     /**

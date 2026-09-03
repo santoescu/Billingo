@@ -24,6 +24,13 @@
                     'url' => route('panel'),
                     'current' => request()->routeIs('panel'),
                 ] : null,
+                (auth()->user()?->isReferrer() || auth()->user()?->isGlobalAdmin()) ? [
+                    'id' => 'sidebar-referrals',
+                    'name' => __('My commissions'),
+                    'icon' => 'banknotes',
+                    'url' => route('referrals.index'),
+                    'current' => request()->routeIs('referrals.*'),
+                ] : null,
             ])),
         ],
 

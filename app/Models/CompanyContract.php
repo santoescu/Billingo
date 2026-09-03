@@ -33,6 +33,11 @@ class CompanyContract extends Model
         // siempre se controla con los contadores de arriba, nunca con este
         // desglose.
         'usage_by_company',
+        // Vendedor de Billingo al que se le atribuye esta venta, y el % que
+        // se gana sobre "price" -- ambos opcionales (no todo contrato viene
+        // de un vendedor con comisión).
+        'referrer_user_id',
+        'commission_percentage',
     ];
 
     const QUOTA_MODE_PER_MODULE = 'per_module';
@@ -51,7 +56,27 @@ class CompanyContract extends Model
             'ends_at' => 'date',
             'unlimited' => 'boolean',
             'period_started_at' => 'datetime',
+            'commission_percentage' => 'float',
         ];
+    }
+
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referrer_user_id');
+    }
+
+    /**
+     * Cuánto se gana el vendedor de este contrato en particular -- null si
+     * no tiene vendedor o % de comisión asignado (no todo contrato viene de
+     * una venta con comisión).
+     */
+    public function getCommissionAmountAttribute(): ?float
+    {
+        if (! $this->referrer_user_id || ! $this->commission_percentage || ! $this->price) {
+            return null;
+        }
+
+        return round($this->price * $this->commission_percentage / 100, 2);
     }
 
     /**

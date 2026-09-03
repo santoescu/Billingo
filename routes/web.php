@@ -18,6 +18,7 @@ use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\AdminSupportTicketController;
 use App\Http\Controllers\SellerController;
 use App\Http\Controllers\SupportTicketController;
@@ -65,6 +66,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/language', Language::class)->name('settings.language');
 
     Route::view('help', 'help.index')->name('help.index');
+
+    Route::get('referrals', [ReferralController::class, 'index'])->name('referrals.index');
 
     Route::post('dashboard/select-company', [CompanyController::class, 'select'])->name('dashboard.select-company');
 
@@ -249,6 +252,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('users', [SuperadminController::class, 'users'])->name('users');
         Route::post('users/{userId}/toggle-superadmin', [SuperadminController::class, 'toggleSuperadmin'])->name('users.toggle-superadmin');
+        Route::post('users/{userId}/toggle-referrer', [SuperadminController::class, 'toggleReferrer'])->name('users.toggle-referrer');
 
         Route::get('notifications', [SuperadminController::class, 'notificationsCreate'])->name('notifications.create');
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');

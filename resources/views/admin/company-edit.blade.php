@@ -7,6 +7,8 @@
     $quotaModeSelectConfig = \App\Support\SelectConfig::basic();
     $renewalSelectConfig = \App\Support\SelectConfig::basic();
     $contractCompaniesSelectConfig = \App\Support\SelectConfig::searchable(__('Select companies...'), __('Search...'));
+    $referrerSelectConfig = \App\Support\SelectConfig::basic(__('No referrer'));
+    $referrersById = $referrers->keyBy(fn ($referrer) => (string) $referrer->_id);
 @endphp
 
 <x-layouts.app :title="__('Edit :name', ['name' => $company->name])">
@@ -198,6 +200,8 @@
                                         'pos_limit' => $contract->pos_limit,
                                         'cotizaciones_limit' => $contract->cotizaciones_limit,
                                         'company_ids' => collect($contract->company_ids ?? [])->reject(fn ($id) => (string) $id === (string) $company->_id)->values(),
+                                        'referrer_user_id' => $contract->referrer_user_id,
+                                        'commission_percentage' => $contract->commission_percentage,
                                     ]) }})"
                                 >
                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
@@ -271,6 +275,20 @@
                                         {{ $contract->renewal_type === 'monthly' ? __('Renews monthly') : __('Fixed package') }}
                                     </span>
                                 </div>
+
+                                @if ($contract->referrer_user_id)
+                                    <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600 dark:border-neutral-700 dark:text-neutral-400">
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <svg class="size-3.5 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                            {{ $referrersById->get((string) $contract->referrer_user_id)?->name ?? __('Unknown') }}
+                                        </span>
+                                        @if ($contract->commission_percentage)
+                                            <span class="rounded-md bg-indigo-100 px-2 py-0.5 font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                {{ rtrim(rtrim(number_format($contract->commission_percentage, 2), '0'), '.') }}% · {{ $contract->commission_amount !== null ? number_format($contract->commission_amount, 2, '.', ',') : '—' }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
 
                             </div>
                         </div>
@@ -356,6 +374,22 @@
                         <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
                             <span class="text-sm">$</span>
                         </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Referrer') }}</label>
+                        <select name="referrer_user_id" id="contract-referrer" data-hs-select='{!! $referrerSelectConfig !!}' class="hidden">
+                            <option value="">{{ __('No referrer') }}</option>
+                            @foreach ($referrers as $referrer)
+                                <option value="{{ $referrer->_id }}">{{ $referrer->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="contract-commission" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Commission %') }}</label>
+                        <input type="number" min="0" max="100" step="0.01" name="commission_percentage" id="contract-commission" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
                     </div>
                 </div>
 
@@ -731,6 +765,8 @@
 
                 setSelectValue('contract-renewal-type', contract?.renewal_type ?? '{{ \App\Models\CompanyContract::RENEWAL_LIFETIME }}');
                 setSelectValue('contract-quota-mode', contract?.quota_mode ?? '{{ \App\Models\CompanyContract::QUOTA_MODE_PER_MODULE }}');
+                setSelectValue('contract-referrer', contract?.referrer_user_id ?? '');
+                document.getElementById('contract-commission').value = contract?.commission_percentage ?? '';
 
                 const companyIdsEl = document.getElementById('contract-company-ids');
                 const companyIdsInstance = window.HSSelect && HSSelect.getInstance(companyIdsEl);
