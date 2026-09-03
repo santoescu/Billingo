@@ -88,6 +88,9 @@
                         .then((data) => {
                             tbody.innerHTML = data.rows_html;
                             initDocumentsTable();
+
+                            if (window.HSDropdown) HSDropdown.autoInit();
+                            if (window.HSOverlay) HSOverlay.autoInit();
                         })
                         .finally(() => {
                             if (refreshBtn) refreshBtn.disabled = false;
