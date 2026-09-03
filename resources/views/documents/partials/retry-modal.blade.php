@@ -101,6 +101,8 @@
                     }
 
                     button.disabled = true;
+                    const icon = button.querySelector('svg');
+                    if (icon) icon.classList.add('animate-spin');
 
                     try {
                         const response = await fetch(button.dataset.url, {
@@ -123,6 +125,7 @@
                         showDocRetryResult(false, error.message || @json(__('Could not validate the document.')), error.rules);
                     } finally {
                         button.disabled = false;
+                        if (icon) icon.classList.remove('animate-spin');
                     }
                 });
             }
