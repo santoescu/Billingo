@@ -145,6 +145,13 @@
                     'url' => route('companies.members.index'),
                     'current' => request()->routeIs('companies.members.*'),
                 ],
+                session('selected_company.role') === 'owner' ? [
+                    'id' => 'sidebar-activity-log',
+                    'name' => __('Activity log'),
+                    'icon' => 'clock',
+                    'url' => route('companies.activity-log.index'),
+                    'current' => request()->routeIs('companies.activity-log.*'),
+                ] : null,
                 [
                     'id' => 'sidebar-support',
                     'name' => __('Support'),

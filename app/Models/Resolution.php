@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use MongoDB\Laravel\Eloquent\Model;
 
 class Resolution extends Model
 {
+    use Auditable;
+
     protected $connection = 'mongodb';
     protected $table = 'resolutions';
 
@@ -56,6 +59,11 @@ class Resolution extends Model
     public function documentosEmitidos()
     {
         return $this->hasMany(DocumentoEmitido::class);
+    }
+
+    protected function auditLabel(): string
+    {
+        return trim($this->prefix . ' (' . $this->document_type . ')');
     }
 
     public function scopeActive($query)

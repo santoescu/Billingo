@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\CannedResponseController;
 use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CatalogLinkController;
+use App\Http\Controllers\CompanyActivityLogController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyMemberController;
 use App\Http\Controllers\DashboardController;
@@ -98,6 +100,11 @@ Route::middleware(['auth'])->group(function () {
             Route::put('members/{userId}', [CompanyMemberController::class, 'update'])->name('members.update');
             Route::delete('members/{userId}', [CompanyMemberController::class, 'destroy'])->name('members.destroy');
         });
+
+        // Solo el 'owner' -- la propia CompanyActivityLogController::index()
+        // hace el chequeo estricto (company.owner también deja pasar a
+        // administradores de módulo, y acá no queremos eso).
+        Route::get('activity-log', [CompanyActivityLogController::class, 'index'])->name('activity-log.index');
     });
 
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
@@ -271,6 +278,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('canned-responses', [CannedResponseController::class, 'index'])->name('canned-responses.index');
         Route::post('canned-responses', [CannedResponseController::class, 'store'])->name('canned-responses.store');
         Route::delete('canned-responses/{cannedResponse}', [CannedResponseController::class, 'destroy'])->name('canned-responses.destroy');
+
+        Route::get('activity-log', [AdminActivityLogController::class, 'index'])->name('activity-log.index');
     });
 });
 

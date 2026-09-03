@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use MongoDB\Laravel\Eloquent\Model;
 use RuntimeException;
 
 class DianCertificate extends Model
 {
+    use Auditable;
+
     protected $connection = 'mongodb';
     protected $table = 'dian_certificates';
 

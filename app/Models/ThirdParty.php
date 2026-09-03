@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use MongoDB\Laravel\Eloquent\Model;
 
 class ThirdParty extends Model
 {
+    use Auditable;
+
     protected $connection = 'mongodb';
     protected $table = 'third_parties';
 

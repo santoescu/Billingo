@@ -1662,5 +1662,16 @@
     "All time": "Todo",
     "From": "Desde",
     "To": "Hasta",
-    "Custom range": "Rango personalizado"
+    "Custom range": "Rango personalizado",
+    "Activity log": "Registro de actividad",
+    "Everything your team created, edited or deleted in this company.": "Todo lo que tu equipo creó, editó o eliminó en esta empresa.",
+    "Everything created, edited or deleted across every company.": "Todo lo que se creó, editó o eliminó en cada empresa.",
+    "Deleted": "Eliminado",
+    "Client/Provider": "Cliente/Proveedor",
+    "Catalog link": "Link de catálogo",
+    "View changes": "Ver cambios",
+    "Changes": "Cambios",
+    "Filter": "Filtrar",
+    "Date range": "Rango de fechas",
+    "activity": "actividad"
 }

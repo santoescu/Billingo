@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use MongoDB\Laravel\Eloquent\Model;
 
 class CompanyMember extends Model
 {
+    use Auditable;
+
     protected $connection = 'mongodb';
     protected $table = 'company_members';
 
@@ -24,5 +27,10 @@ class CompanyMember extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    protected function auditLabel(): string
+    {
+        return User::find($this->user_id)?->name ?? (string) $this->user_id;
     }
 }
