@@ -34,12 +34,16 @@ class SupportTicket extends Model
         'contact_name',
         'contact_phone',
         'contact_email',
+        'satisfaction_rating',
+        'satisfaction_comment',
+        'satisfaction_submitted_at',
     ];
 
     protected function casts(): array
     {
         return [
             'staff_last_viewed_at' => 'datetime',
+            'satisfaction_submitted_at' => 'datetime',
         ];
     }
 

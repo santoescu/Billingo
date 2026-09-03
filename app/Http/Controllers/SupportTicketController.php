@@ -170,6 +170,42 @@ class SupportTicketController extends Controller
         return redirect()->route('support.show', $ticket->_id);
     }
 
+    /**
+     * Encuesta de satisfacción ("¿te sirvió?"): solo tiene sentido con el
+     * ticket ya cerrado, y solo se puede calificar una vez -- si se
+     * reabre y se vuelve a cerrar, queda disponible de nuevo (la
+     * calificación anterior no se borra al reabrir, solo cambia el
+     * estado).
+     */
+    public function submitSatisfaction(Request $request, string $supportTicket)
+    {
+        $company = $this->currentCompany($request);
+
+        $ticket = $company->supportTickets()->where('_id', $supportTicket)->first();
+
+        abort_unless($ticket, 404);
+        abort_unless($ticket->status === SupportTicket::STATUS_CLOSED, 422);
+        abort_if($ticket->satisfaction_rating, 422);
+
+        $data = $request->validate([
+            'satisfaction_rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'satisfaction_comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $ticket->update([
+            'satisfaction_rating' => $data['satisfaction_rating'],
+            'satisfaction_comment' => $data['satisfaction_comment'] ?? null,
+            'satisfaction_submitted_at' => now(),
+        ]);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Thanks for your feedback!'),
+        ]);
+
+        return redirect()->route('support.show', $ticket->_id);
+    }
+
     private function changeStatus(SupportTicket $ticket, User $actor, string $newStatus): void
     {
         if ($newStatus === $ticket->status) {

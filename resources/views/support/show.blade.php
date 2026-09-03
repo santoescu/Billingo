@@ -48,6 +48,10 @@
                 @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'company', 'otherLabel' => __('You'), 'activities' => $activities, 'activityUsers' => $activityUsers])
             </div>
 
+            @if ($ticket->status === \App\Models\SupportTicket::STATUS_CLOSED)
+                @include('support.partials.satisfaction', ['ticket' => $ticket])
+            @endif
+
             <form action="{{ route('support.reply', $ticket->_id) }}" method="POST" class="shrink-0">
                 @csrf
                 @include('support.partials.composer')
