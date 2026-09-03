@@ -120,7 +120,7 @@
                                     @else
                                         <div class="flex flex-wrap gap-1">
                                             @forelse ($member->membership->modules ?? [] as $assignment)
-                                                <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
+                                                <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $moduleCatalog[$assignment['module']]['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200' }}">
                                                     {{ $moduleCatalog[$assignment['module']]['name'] ?? $assignment['module'] }}: {{ ucfirst($assignment['role']) }}
                                                 </span>
                                             @empty
@@ -129,20 +129,28 @@
                                         </div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 text-right">
+                                <td class="px-4 py-3 text-end text-sm">
                                     @if ($member->membership->role !== 'owner')
-                                        <div class="flex justify-end gap-2">
-                                            <flux:button
-                                                size="sm"
-                                                variant="primary"
-                                                icon="pencil-square"
+                                        <div class="flex justify-end gap-1">
+                                            <button
+                                                type="button"
+                                                class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                                                aria-label="{{ __('Edit') }}"
+                                                title="{{ __('Edit') }}"
                                                 onclick="openEditMemberModal({!! Illuminate\Support\Js::from($member) !!})"
-                                            ></flux:button>
+                                            >
+                                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                                    <path d="m15 5 4 4"></path>
+                                                </svg>
+                                            </button>
 
                                             <form action="{{ route('admin.companies.members.destroy', [$company->_id, $member->_id]) }}" method="POST">
                                                 @csrf
                                                 @method('DELETE')
-                                                <flux:button size="sm" variant="danger" icon="trash" type="submit"></flux:button>
+                                                <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
+                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                                </button>
                                             </form>
                                         </div>
                                     @endif

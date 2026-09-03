@@ -44,7 +44,7 @@
                             @if (! empty($company->modules))
                                 <div class="flex flex-wrap gap-1 pt-1">
                                     @foreach ($company->modules as $moduleKey)
-                                        <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
+                                        <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ config("modules.$moduleKey.badge_classes", 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200') }}">
                                             {{ config("modules.$moduleKey.name", $moduleKey) }}
                                         </span>
                                     @endforeach

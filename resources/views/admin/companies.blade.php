@@ -40,7 +40,7 @@
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
                                             <div class="flex flex-wrap gap-1">
                                                 @forelse ($company->modules ?? [] as $moduleKey)
-                                                    <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
+                                                    <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $moduleCatalog[$moduleKey]['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200' }}">
                                                         {{ $moduleCatalog[$moduleKey]['name'] ?? $moduleKey }}
                                                     </span>
                                                 @empty
@@ -57,9 +57,12 @@
                                                 {{ $company->status === 'inactive' ? __('Inactive') : __('Active') }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-4 text-right">
-                                            <a href="{{ route('admin.companies.edit', $company->_id) }}">
-                                                <flux:button size="sm" variant="primary" icon="pencil-square"></flux:button>
+                                        <td class="px-4 py-4 text-end text-sm">
+                                            <a href="{{ route('admin.companies.edit', $company->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" title="{{ __('Edit') }}">
+                                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                                    <path d="m15 5 4 4"></path>
+                                                </svg>
                                             </a>
                                         </td>
                                     </tr>
