@@ -61,12 +61,16 @@
 
     $basicSelectConfig = \App\Support\SelectConfig::basic();
     $searchableSelectConfig = \App\Support\SelectConfig::searchable();
+
+    $editMode = (bool) ($editDocument ?? null);
 @endphp
 
 <x-layouts.app :title="__('New document')">
     @include('partials.tittle', [
-        'title' => __('New document'),
-        'subheading' => __('Issue an electronic document for this company.'),
+        'title' => $editMode ? __('Correct document') : __('New document'),
+        'subheading' => $editMode
+            ? __('Correct the rejected document :numeral and resend it to the DIAN.', ['numeral' => $editDocument->numeral])
+            : __('Issue an electronic document for this company.'),
     ])
 
     @if ($posMode ?? false)
@@ -74,6 +78,12 @@
     @else
         <div class="mb-6">
             <a href="{{ route('documents.index') }}" class="text-sm font-medium text-accent hover:underline">&larr; {{ __('Back to issued documents') }}</a>
+        </div>
+    @endif
+
+    @if ($editMode)
+        <div class="mb-6 rounded-md bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+            {{ __('You are correcting the rejected document :numeral. Fix the fields the DIAN complained about and resend it -- it will keep the same number.', ['numeral' => $editDocument->numeral]) }}
         </div>
     @endif
 
@@ -96,31 +106,41 @@
         @if ($quotationId ?? null)
             <input type="hidden" name="quotation_id" value="{{ $quotationId }}">
         @endif
+        @if ($editMode)
+            <input type="hidden" name="edit_document_id" value="{{ $editDocument->_id }}">
+        @endif
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
                 <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Document') }}</h3>
             </div>
             <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div id="doc-tipo_documento-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                <div id="doc-tipo_documento-field" class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
                     <select id="doc-tipo_documento" name="tipo_documento" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                         @foreach ($documentTypeLabels as $code => $label)
-                            <option value="{{ $code }}" @selected(old('tipo_documento', '01') === $code)>{{ $code }} - {{ $label }}</option>
+                            <option value="{{ $code }}" @selected(old('tipo_documento', $editDocument->tipo_documento ?? '01') === $code)>{{ $code }} - {{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                <div class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Operation type') }}</label>
                     <select id="doc-tipo_operacion" name="tipo_operacion" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>
-                <div id="doc-resolution-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                <div id="doc-resolution-field" class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Resolution') }}</label>
-                    <select id="doc-resolution" name="resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
+                    <select id="doc-resolution" name="resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                        @if ($editMode)
+                            <option value="{{ $editDocument->resolution_id }}" selected data-prefix="{{ $editDocument->prefix }}" data-next-number="{{ $editDocument->secuencial }}">{{ $editDocument->prefix }}</option>
+                        @endif
+                    </select>
                 </div>
                 @if ($posMode ?? false)
                     <flux:input id="doc-prefix-display" :label="__('Prefix')" value="{{ $shift->fvResolution?->prefix }}" readonly disabled />
                     <flux:input id="doc-secuencial-display" :label="__('Number')" value="{{ $shift->fvResolution ? ($shift->fvResolution->current_number ?: $shift->fvResolution->range_from) : '' }}" readonly disabled />
+                @elseif ($editMode)
+                    <flux:input id="doc-prefix-display" :label="__('Prefix')" value="{{ $editDocument->prefix }}" readonly disabled />
+                    <flux:input id="doc-secuencial-display" :label="__('Number')" value="{{ $editDocument->secuencial }}" readonly disabled />
                 @else
                     <flux:input id="doc-prefix-display" :label="__('Prefix')" value="" readonly disabled />
                     <flux:input id="doc-secuencial-display" :label="__('Number')" value="" readonly disabled />
@@ -380,7 +400,7 @@
             <a href="{{ route('documents.index') }}">
                 <flux:button type="button" variant="filled">{{ __('Cancel') }}</flux:button>
             </a>
-            <flux:button type="submit" variant="primary" id="documentSubmitBtn">{{ __('Issue document') }}</flux:button>
+            <flux:button type="submit" variant="primary" id="documentSubmitBtn">{{ $editMode ? __('Resend document') : __('Issue document') }}</flux:button>
         </div>
     </form>
 
@@ -775,6 +795,7 @@
                 const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
                 const allClientsById = @json($clients->keyBy('id'));
                 const quotationPrefill = @json($quotationPrefill ?? null);
+                const editPrefill = @json($editPrefill ?? null);
                 let lineIndex = 0;
                 let paymentLineIndex = 0;
                 let chargeLineIndex = 0;
@@ -856,7 +877,7 @@
                  * @returns {void}
                  */
                 function fillPrefixSecuencial() {
-                    if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
+                    if ({{ (($posMode ?? false) || $editMode) ? 'true' : 'false' }}) {
                         return;
                     }
 
@@ -944,7 +965,7 @@
                     rebuildSelect(document.getElementById('doc-tipo_operacion'), operationTypes.map(({ code, label }) => ({ value: code, label: code + ' - ' + label })));
                     updateReferenceVisibility();
 
-                    if ({{ ($posMode ?? false) ? 'true' : 'false' }}) {
+                    if ({{ (($posMode ?? false) || $editMode) ? 'true' : 'false' }}) {
                         return;
                     }
 
@@ -1806,7 +1827,7 @@
 
                     function resetSubmitButton() {
                         submitBtn.disabled = false;
-                        submitBtn.textContent = '{{ __('Issue document') }}';
+                        submitBtn.textContent = '{{ $editMode ? __('Resend document') : __('Issue document') }}';
                     }
 
                     function resetConfirmButton() {
@@ -2591,6 +2612,43 @@
                 };
 
                 /**
+                 * Igual que saveLineTax(), pero armando el badge directo a
+                 * partir de un impuesto ya guardado (shape interno
+                 * "impuestos" de un documento) en vez de leerlo del mini
+                 * formulario -- usado para precargar las líneas de un
+                 * documento rechazado que se está corrigiendo (ver
+                 * "editPrefill" más abajo).
+                 * @param {HTMLElement} row
+                 * @param {object} tax
+                 * @returns {void}
+                 */
+                function addLineTaxFromData(row, tax) {
+                    const template = document.getElementById('documentLineTaxBadgeTemplate');
+                    const taxIndex = parseInt(row.dataset.taxIndex || '0', 10);
+                    const html = template.innerHTML.replaceAll('__LINEINDEX__', row.dataset.lineIndex).replaceAll('__TAXINDEX__', taxIndex);
+                    const container = row.querySelector('.line-taxes-body');
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = html;
+                    const badge = wrapper.firstElementChild;
+                    container.appendChild(badge);
+                    row.dataset.taxIndex = taxIndex + 1;
+
+                    const tipo = tax.tipo || '01';
+                    const porcentaje = parseFloat(tax.porcentaje) || 0;
+                    const base = (tax.base_gravable !== null && tax.base_gravable !== undefined) ? parseFloat(tax.base_gravable) : null;
+
+                    badge.querySelector('.line-tax-tipo').value = tipo;
+                    badge.querySelector('.line-tax-porcentaje').value = porcentaje;
+                    badge.querySelector('.line-tax-base').value = base !== null ? base : '';
+
+                    const porcentajeLabel = porcentaje.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                    const baseLabel = base !== null ? ' · ' + formatMoney(base) : '';
+                    badge.querySelector('.line-tax-label').textContent = (taxNames[tipo] || tipo) + ' ' + porcentajeLabel + '%' + baseLabel;
+
+                    updateAddTaxButtonState(row);
+                }
+
+                /**
                  * Quita un impuesto de una línea. El botón "+" de "agregar
                  * impuesto" puede estar viviendo dentro de esta misma fila
                  * de impuesto (si era la última) -- se saca antes de borrar
@@ -2919,6 +2977,52 @@
                                 setSelectValue(precioSelect, '');
                             }
                             recalcLine(row);
+                        });
+                    }
+
+                    if (editPrefill) {
+                        applyClientToFields(editPrefill.client, departmentSelect);
+                        setSelectValue(document.getElementById('doc-tipo_operacion'), editPrefill.tipo_operacion);
+                        updateReferenceVisibility();
+
+                        editPrefill.lines.forEach((line) => {
+                            const row = addDocumentLine();
+                            row.applyProduct(line.product);
+                            const cantidadInput = row.querySelector('.line-cantidad');
+                            if (cantidadInput) {
+                                cantidadInput.value = line.qty;
+                                cantidadInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            if (line.warehouse_id) {
+                                const bodegaSelect = row.querySelector('.line-bodega');
+                                setSelectValue(bodegaSelect, line.warehouse_id);
+                                bodegaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            setLinePriceValue(row, line.unit_price);
+                            const precioSelect = row.querySelector('.line-precio-select');
+                            if (precioSelect) {
+                                setSelectValue(precioSelect, '');
+                            }
+
+                            if (line.descuento) {
+                                const tipo = line.descuento.valor_tipo || 'porcentaje';
+                                setSelectValue(row.querySelector('.line-descuento-tipo-select'), tipo);
+                                row.querySelector('.line-descuento-tipo').value = tipo;
+                                updateDiscountPrefix(row);
+                                handleLineDiscountInput(row, String(line.descuento.valor ?? 0));
+                            }
+
+                            (line.impuestos || []).forEach((tax) => addLineTaxFromData(row, tax));
+
+                            recalcLine(row);
+                        });
+
+                        editPrefill.payment_means.forEach((means) => {
+                            const row = addPaymentLine();
+                            setSelectValue(row.querySelector('select[name^="payment_means_id"]'), means.id || '1');
+                            const codeSelect = row.querySelector('.payment-code-select');
+                            setSelectValue(codeSelect, means.codigo || '10');
+                            codeSelect?.dispatchEvent(new Event('change', { bubbles: true }));
                         });
                     }
 

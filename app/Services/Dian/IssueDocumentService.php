@@ -145,15 +145,22 @@ class IssueDocumentService
      *   numeral/secuencial/resolución ya asignados -- no reclama un número
      *   nuevo, es literalmente reenviar el mismo documento.
      *
+     * Si viene $editedRequest (el usuario corrigió datos desde
+     * documents/create.blade.php en modo edición, ver
+     * DocumentoEmitidoController::resolveEditingDocument()), se salta el
+     * camino de la regla 90 (el documento cambió, no tiene sentido
+     * sincronizar con lo que la DIAN ya tenía) y se reenvía con el payload
+     * recién mapeado en vez del que ya estaba guardado.
+     *
      * @throws RuntimeException Si la sincronización de la regla 90 vuelve a fallar, o si la resolución original ya no existe.
      */
-    public function retry(Company $company, DocumentoEmitido $documento, ?string $userId = null): DocumentoEmitido
+    public function retry(Company $company, DocumentoEmitido $documento, ?string $userId = null, ?array $editedRequest = null): DocumentoEmitido
     {
         if ($documento->status === DocumentoEmitido::STATUS_ACCEPTED) {
             return $documento;
         }
 
-        if ($documento->status === DocumentoEmitido::STATUS_REJECTED && $this->hasAlreadyProcessedRule($documento) && $documento->uuid) {
+        if (! $editedRequest && $documento->status === DocumentoEmitido::STATUS_REJECTED && $this->hasAlreadyProcessedRule($documento) && $documento->uuid) {
             if ($this->syncWithAlreadyProcessedDocument($company, $documento, $documento->uuid)) {
                 return $documento->fresh();
             }
@@ -167,8 +174,10 @@ class IssueDocumentService
             throw new RuntimeException(__('The original resolution for this document no longer exists.'));
         }
 
+        $payload = $editedRequest ? $this->mapper->map($company, $editedRequest) : ($documento->payload ?? []);
+
         return $this->buildSignSubmitAndPersist(
-            $company, $documento->payload ?? [], $documento->tipo_documento, $resolution,
+            $company, $payload, $documento->tipo_documento, $resolution,
             $documento->numeral, $documento->secuencial, $documento->ambiente, $documento,
             userId: $userId,
         );

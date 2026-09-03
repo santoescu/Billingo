@@ -1624,5 +1624,10 @@
     "Sending...": "Enviando...",
     "Validated": "Validado",
     "Could not validate": "No se pudo validar",
-    "The document was validated successfully.": "El documento se validó correctamente."
+    "The document was validated successfully.": "El documento se validó correctamente.",
+    "Correct document": "Corregir documento",
+    "Correct the rejected document :numeral and resend it to the DIAN.": "Corrija el documento rechazado :numeral y reenvíelo a la DIAN.",
+    "You are correcting the rejected document :numeral. Fix the fields the DIAN complained about and resend it -- it will keep the same number.": "Está corrigiendo el documento rechazado :numeral. Corrija los campos que reclamó la DIAN y reenvíelo -- conservará el mismo número.",
+    "Correct and resend": "Corregir y reenviar",
+    "Resend document": "Reenviar documento"
 }

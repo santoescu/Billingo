@@ -83,6 +83,13 @@ class DocumentoEmitidoController extends Controller
      * precarga el cliente y las líneas de esa cotización (ver
      * "quotationPrefill" en documents/create.blade.php).
      *
+     * Si viene "edit_document_id" en la URL (botón "Editar" de un documento
+     * rechazado, ver documents/show.blade.php e index.blade.php), precarga
+     * el cliente/líneas/medio de pago ya guardados en ese documento (ver
+     * mapEditPrefillForJs()) y fija tipo de documento + resolución + número
+     * a los que ya tenía -- al reenviar (issueFromRequest()) se corrige el
+     * mismo registro, sin reclamar un número nuevo.
+     *
      * @param  Request  $request
      * @param  QuotationController  $quotationController  Resuelve y traduce la cotización a precargar, si aplica.
      * @return \Illuminate\View\View
@@ -104,6 +111,14 @@ class DocumentoEmitidoController extends Controller
         $quotationPrefill = $quotation ? $quotationController->mapQuotationLinesForJs($company, $quotation, $this) : null;
         $quotationId = $quotation ? (string) $quotation->_id : null;
 
+        $editDocument = null;
+        $editPrefill = null;
+        if ($editId = $request->query('edit_document_id')) {
+            $editDocument = $company->documentosEmitidos()->where('_id', $editId)->where('status', DocumentoEmitido::STATUS_REJECTED)->first();
+            abort_unless($editDocument, 404);
+            $editPrefill = $this->mapEditPrefillForJs($editDocument);
+        }
+
         $canEditPrice = User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []);
 
         return view('documents.create', compact(
@@ -117,7 +132,78 @@ class DocumentoEmitidoController extends Controller
             'quotationPrefill',
             'quotationId',
             'canEditPrice',
+            'editDocument',
+            'editPrefill',
         ));
+    }
+
+    /**
+     * Traduce el cliente, las líneas (con su descuento e impuestos ya
+     * guardados) y el medio de pago de un documento rechazado al shape que
+     * consume documents/create.blade.php en modo edición -- mismo criterio
+     * que QuotationController::mapQuotationLinesForJs(), pero partiendo del
+     * payload ya mapeado del propio documento en vez de una cotización.
+     *
+     * @return array{client: array, lines: array, tipo_operacion: string, payment_means: array}
+     */
+    private function mapEditPrefillForJs(DocumentoEmitido $documento): array
+    {
+        $payload = $documento->payload ?? [];
+        $customerParty = $payload['accounting_customer_party'] ?? [];
+
+        $client = [
+            'id' => $documento->cliente_id,
+            'identification_type' => $customerParty['tipo_identificacion'] ?? '13',
+            'identificacion' => $customerParty['identificacion'] ?? '',
+            'name' => $customerParty['razon_social'] ?? '',
+            'person_type' => $customerParty['tipo_persona'] ?? '2',
+            'fiscal_responsibilities' => $customerParty['responsabilidades_fiscales'] ?? null,
+            'address' => $customerParty['direccion'] ?? null,
+            'department_code' => $customerParty['departamento_codigo'] ?? null,
+            'city_code' => $customerParty['ciudad_codigo'] ?? null,
+            'phone' => $customerParty['telefono'] ?? null,
+            'email' => $customerParty['email'] ?? null,
+        ];
+
+        $lineas = $payload['lineas'] ?? [];
+        $codes = collect($lineas)->pluck('codigo')->filter()->values()->all();
+        $productsByCode = Product::where('company_id', (string) $documento->company_id)->whereIn('code', $codes)->get()->keyBy('code');
+
+        $lines = collect($lineas)->map(function (array $linea) use ($productsByCode) {
+            $product = $productsByCode->get($linea['codigo'] ?? null);
+
+            $productJs = $product
+                ? $this->mapProductsForJs(collect([$product]))->first()
+                : [
+                    'id' => null,
+                    'code' => $linea['codigo'] ?? '',
+                    'barcode' => $linea['codigo_barras'] ?? null,
+                    'description' => $linea['descripcion'] ?? '',
+                    'unit_code' => $linea['unidad_medida'] ?? 'EA',
+                    'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
+                    'tracks_inventory' => false,
+                    'stock' => 0,
+                    'prices' => [],
+                    'warehouses' => [],
+                    'image_url' => null,
+                ];
+
+            return [
+                'product' => $productJs,
+                'qty' => (float) ($linea['cantidad'] ?? 1),
+                'warehouse_id' => $linea['bodega_id'] ?? null,
+                'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
+                'descuento' => $linea['descuento'] ?? null,
+                'impuestos' => $linea['impuestos'] ?? [],
+            ];
+        })->values()->all();
+
+        return [
+            'client' => $client,
+            'lines' => $lines,
+            'tipo_operacion' => $payload['customization_id'] ?? '10',
+            'payment_means' => array_values(array_filter($payload['payment_means_list'] ?? [$payload['payment_means'] ?? null])),
+        ];
     }
 
     /**
@@ -459,15 +545,49 @@ class DocumentoEmitidoController extends Controller
      * "tipo_documento"/"resolution_id" en el request -- la numeración ya
      * quedó fija al abrir el turno de caja.
      *
+     * Si el request trae "edit_document_id" (botón "Editar" de un documento
+     * rechazado, ver resolveEditingDocument()), no emite un documento nuevo:
+     * corrige y reenvía ese mismo registro con los datos del formulario,
+     * reusando su resolución/numeral ya asignados (ver
+     * IssueDocumentService::retry()).
+     *
      * @throws InvalidArgumentException|RuntimeException Errores de validación de negocio (resolución agotada, resolución inválida, etc.), pensados para mostrarse tal cual al usuario.
      */
     public function issueFromRequest(Request $request, IssueDocumentService $service): DocumentoEmitido
     {
         $company = $this->currentCompany($request);
+        $editingDocument = $this->resolveEditingDocument($request, $company);
 
-        $document = $this->buildDocumentFromRequest($request, $company, claimNumber: true);
+        $document = $this->buildDocumentFromRequest($request, $company, claimNumber: ! $editingDocument, editingDocument: $editingDocument);
+
+        if ($editingDocument) {
+            return $service->retry($company, $editingDocument, (string) $request->user()->_id, editedRequest: ['document' => $document]);
+        }
 
         return $service->issue($company, ['document' => $document], (string) $request->user()->_id);
+    }
+
+    /**
+     * Si el request trae "edit_document_id", busca ese documento
+     * (perteneciente a la empresa activa) y exige que esté rechazado --
+     * es la única forma de que tenga sentido corregirlo y reenviarlo en
+     * vez de emitir uno nuevo (ver documents/create.blade.php en modo
+     * edición).
+     */
+    private function resolveEditingDocument(Request $request, Company $company): ?DocumentoEmitido
+    {
+        $id = $request->input('edit_document_id');
+
+        if (! $id) {
+            return null;
+        }
+
+        $documento = $company->documentosEmitidos()->where('_id', $id)->first();
+
+        abort_unless($documento, 404);
+        abort_unless($documento->status === DocumentoEmitido::STATUS_REJECTED, 422);
+
+        return $documento;
     }
 
     /**
@@ -477,11 +597,14 @@ class DocumentoEmitidoController extends Controller
      * cambia entre los dos es "secuencial": la emisión real reclama el
      * siguiente número de la resolución (lo consume); la vista previa solo
      * lo consulta ("current_number" tal cual está, sin tocarlo) para
-     * mostrar cuál sería, sin saltárselo si el usuario cancela.
+     * mostrar cuál sería, sin saltárselo si el usuario cancela. Si viene
+     * $editingDocument, ninguno de los dos aplica: siempre se reusa el
+     * numeral que ese documento ya tenía asignado (nunca se reclama uno
+     * nuevo por corregir un rechazo).
      *
      * @throws InvalidArgumentException Si la resolución elegida no es válida.
      */
-    private function buildDocumentFromRequest(Request $request, Company $company, bool $claimNumber): array
+    private function buildDocumentFromRequest(Request $request, Company $company, bool $claimNumber, ?DocumentoEmitido $editingDocument = null): array
     {
         $data = $request->validate([
             'tipo_documento' => ['required', 'string', 'in:' . implode(',', self::CREATABLE_DOCUMENT_TYPES)],
@@ -553,9 +676,9 @@ class DocumentoEmitidoController extends Controller
 
         $data['prefix'] = $resolution->prefix;
 
-        $data['secuencial'] = $claimNumber
-            ? $resolution->claimNextNumber()
-            : (int) ($resolution->current_number ?: $resolution->range_from);
+        $data['secuencial'] = $editingDocument
+            ? $editingDocument->secuencial
+            : ($claimNumber ? $resolution->claimNextNumber() : (int) ($resolution->current_number ?: $resolution->range_from));
 
         return $this->buildDocumentJson($company, $data);
     }
@@ -571,9 +694,10 @@ class DocumentoEmitidoController extends Controller
     public function preview(Request $request, IssueDocumentService $service)
     {
         $company = $this->currentCompany($request);
+        $editingDocument = $this->resolveEditingDocument($request, $company);
 
         try {
-            $document = $this->buildDocumentFromRequest($request, $company, claimNumber: false);
+            $document = $this->buildDocumentFromRequest($request, $company, claimNumber: false, editingDocument: $editingDocument);
             $documento = $service->buildPreview($company, ['document' => $document]);
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
