@@ -1,17 +1,3 @@
-@php
-    
-    $nitIdentificationType = '31';
-
-    $documentTypeLabels = [
-        '01' => __('Electronic sales invoice'),
-        '02' => __('Invoice (export)'),
-        '03' => __('Invoice (contingency, paper)'),
-        '04' => __('Invoice (DIAN contingency)'),
-        '91' => __('Credit note'),
-        '92' => __('Debit note'),
-    ];
-@endphp
-
 <x-layouts.app :title="__('Issued documents')">
     @include('partials.tittle', [
         'title' => __('Issued documents'),
@@ -28,9 +14,15 @@
                             <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                         </div>
 
-                        <a href="{{ route('documents.create') }}" id="new-document-btn">
-                            <flux:button type="button" variant="primary" icon="plus">{{ __('New document') }}</flux:button>
-                        </a>
+                        <div class="flex gap-2">
+                            <button type="button" id="documents-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadDocumentsTable()">
+                                <svg id="documents-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                            </button>
+
+                            <a href="{{ route('documents.create') }}" id="new-document-btn">
+                                <flux:button type="button" variant="primary" icon="plus">{{ __('New document') }}</flux:button>
+                            </a>
+                        </div>
                     </div>
 
                     <div class="overflow-hidden">
@@ -47,43 +39,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @forelse ($documentos as $documento)
-                                    @php
-                                        $customerParty = $documento->payload['accounting_customer_party'] ?? [];
-                                        $customerName = $documento->cliente?->name ?? ($customerParty['razon_social'] ?? null);
-                                        $customerIdentification = $customerParty['identificacion'] ?? null;
-                                        $customerDv = $customerParty['tipo_identificacion'] === $nitIdentificationType ? ($customerParty['dv'] ?? null) : null;
-                                    @endphp
-                                    <tr>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            <div>EMI: {{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</div>
-                                            <div>EXP: {{ $documento->fecha_expedicion?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</div>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $documento->numeral }}</td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            {{ $documentTypeLabels[$documento->tipo_documento ?? ''] ?? $documento->tipo_documento }}
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            <div class="text-gray-800 dark:text-neutral-200">{{ $customerName ?? '—' }}</div>
-                                            <div>{{ $customerIdentification ?? '—' }}{{ $customerDv ? '-' . $customerDv : '' }}</div>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $documento->total_formatted }}</td>
-                                        <td class="px-4 py-4 text-sm">
-                                            <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
-                                        </td>
-                                        <td class="px-4 py-4 text-end text-sm">
-                                            <div class="flex justify-end items-center gap-3">
-                                                <a href="{{ route('documents.show', $documento->_id) }}" class="document-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
-                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Issued documents')]) }}</td>
-                                    </tr>
-                                @endforelse
+                                @include('documents.partials.rows')
                             </tbody>
                         </table>
                     </div>
@@ -93,18 +49,57 @@
     </div>
 
     @include('partials.datatable-pagination')
+    @include('documents.partials.retry-modal')
 
     @push('scripts')
         <script>
-            /**
-             * table.order([]).draw(): sin esto, DataTables reordena por la
-             * primera columna visible (la fecha, como texto) y pisa el orden
-             * más nuevo -> más viejo que ya viene armado desde el backend.
-             */
-            document.addEventListener('DOMContentLoaded', function () {
-                const table = initWorkflowDataTable('#documentsTable', '#hs-table-with-pagination-search');
-                table.order([]).draw();
-            });
+            (function () {
+                /**
+                 * table.order([]).draw(): sin esto, DataTables reordena por la
+                 * primera columna visible (la fecha, como texto) y pisa el orden
+                 * más nuevo -> más viejo que ya viene armado desde el backend.
+                 */
+                function initDocumentsTable() {
+                    const table = initWorkflowDataTable('#documentsTable', '#hs-table-with-pagination-search', {
+                        columnDefs: [{ targets: -1, orderable: false }],
+                    });
+                    table.order([]).draw();
+                }
+
+                /**
+                 * La tabla de documentos ya no viene lista en el HTML inicial
+                 * (ver DocumentoEmitidoController::index()) -- se pide por AJAX
+                 * apenas carga la página para no bloquear el primer render con
+                 * la consulta completa del historial, igual que hace
+                 * loadProductsTable() en products/index.blade.php.
+                 * @returns {void}
+                 */
+                function loadDocumentsTable() {
+                    const tbody = document.querySelector('#documentsTable tbody');
+                    if (! tbody) return;
+
+                    const refreshBtn = document.getElementById('documents-refresh-btn');
+                    const refreshIcon = document.getElementById('documents-refresh-icon');
+                    if (refreshBtn) refreshBtn.disabled = true;
+                    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+                    fetch('{{ route('documents.data') }}', { headers: { Accept: 'application/json' } })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            tbody.innerHTML = data.rows_html;
+                            initDocumentsTable();
+                        })
+                        .finally(() => {
+                            if (refreshBtn) refreshBtn.disabled = false;
+                            if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                        });
+                }
+
+                window.loadDocumentsTable = loadDocumentsTable;
+
+                document.addEventListener('DOMContentLoaded', loadDocumentsTable);
+                document.addEventListener('livewire:navigated', loadDocumentsTable);
+            })();
         </script>
     @endpush
 </x-layouts.app>

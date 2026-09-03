@@ -37,10 +37,25 @@ class DocumentoEmitidoController extends Controller
     private const NOTA_DOCUMENT_TYPES = ['91', '92'];
 
     /**
+     * $documentos vacío a propósito: la tabla se llena por AJAX (ver data())
+     * apenas termina de cargar la página, en vez de bloquear el primer
+     * render con la consulta completa del historial (mismo patrón que
+     * ProductController::index()/data()).
+     */
+    public function index(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $documentos = collect();
+
+        return view('documents.index', compact('company', 'documentos'));
+    }
+
+    /**
      * Lista los documentos emitidos por la empresa activa en su ambiente
      * DIAN actual (habilitación o producción), más recientes primero.
      */
-    public function index(Request $request)
+    public function data(Request $request)
     {
         $company = $this->currentCompany($request);
         $environment = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
