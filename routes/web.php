@@ -159,14 +159,18 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['company.selected', 'company.role:invoicing,administrador,vendedor,auditor'])
         ->prefix('documents')->name('documents.')->group(function () {
             Route::get('/', [DocumentoEmitidoController::class, 'index'])->name('index');
+            Route::get('data', [DocumentoEmitidoController::class, 'data'])->name('data');
             Route::get('create', [DocumentoEmitidoController::class, 'create'])->name('create');
             Route::get('create/options', [DocumentoEmitidoController::class, 'createOptions'])->name('create-options');
             Route::get('create/factura-lookup', [DocumentoEmitidoController::class, 'facturaLookup'])->name('create-factura-lookup');
             Route::get('create/validate-uuid', [DocumentoEmitidoController::class, 'validateUuid'])->name('create-validate-uuid');
             Route::post('/', [DocumentoEmitidoController::class, 'store'])->name('store');
+            Route::post('preview', [DocumentoEmitidoController::class, 'preview'])->name('preview');
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
             Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
+            Route::get('{documento}/invoice-preview', [DocumentoEmitidoController::class, 'invoicePreview'])->name('invoice-preview');
             Route::post('{documento}/toggle-paid', [DocumentoEmitidoController::class, 'togglePaid'])->name('toggle-paid');
+            Route::post('{documento}/retry', [DocumentoEmitidoController::class, 'retry'])->name('retry');
         });
 
     Route::middleware(['company.selected', 'company.role:pos,administrador,cajero,auditor'])

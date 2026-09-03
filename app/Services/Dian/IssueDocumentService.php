@@ -83,6 +83,114 @@ class IssueDocumentService
     }
 
     /**
+     * Arma un DocumentoEmitido "de mentira" (sin guardar, sin UUID, sin
+     * firmar ni enviar nada a la DIAN) con los mismos datos y totales que
+     * tendría el documento real, para mostrar como vista previa antes de
+     * emitir de verdad -- ver DocumentoEmitidoController::preview(), que
+     * la renderiza con la misma plantilla documents/invoice-pdf.blade.php
+     * (esa ya tolera $documento->uuid vacío, no muestra el QR en ese caso).
+     * No reclama numeración ni consume cupo del contrato -- eso solo pasa
+     * al emitir de verdad (ver issue()).
+     *
+     * @throws InvalidArgumentException Si el request no trae los datos mínimos (mismo criterio que issue()).
+     */
+    public function buildPreview(Company $company, array $request): DocumentoEmitido
+    {
+        $payload = $this->mapper->map($company, $request);
+        $tipoDocumento = $payload['tipo_documento'];
+        $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+        $resolution = $this->resolveResolution($company, $tipoDocumento, $ambiente, $payload['prefix'] ?? null);
+        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.Numeral" o "document.secuencial" (junto con "document.PREFIX") con el número del documento.');
+
+        $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
+        $payload['lineas'] = $calculo['lineas'];
+        $payload['impuestos'] = $calculo['impuestos'];
+
+        $documento = new DocumentoEmitido([
+            'company_id' => (string) $company->_id,
+            'tipo_documento' => $tipoDocumento,
+            'resolution_id' => (string) $resolution->_id,
+            'prefix' => $resolution->prefix,
+            'numeral' => $numeral,
+            'cliente_id' => $payload['cliente_id'] ?? null,
+            'payload' => $payload,
+            'ambiente' => $ambiente,
+            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            'total' => $calculo['totales']['payable_amount'],
+            'currency' => $payload['moneda'] ?? 'COP',
+            'payment_means_id' => $payload['payment_means']['id'] ?? null,
+            'payment_means_code' => $payload['payment_means']['codigo'] ?? null,
+            'notes' => $payload['notas'] ?? null,
+        ]);
+        $documento->issue_date = $this->resolveIssueDateTime($payload);
+        $documento->exists = false;
+
+        return $documento;
+    }
+
+    /**
+     * Reintenta un documento que quedó pendiente o rechazado -- para el
+     * botón "Validar" del show del documento, pensado sobre todo para
+     * cuando la causa fue una caída transitoria de la conexión con la DIAN
+     * (al emitir, o al sincronizar la regla 90), no un rechazo real.
+     *
+     * - Si el rechazo fue por la regla 90 (documento ya procesado antes),
+     *   reintenta SOLO la sincronización con la versión que la DIAN ya
+     *   tiene autorizada (ver syncWithAlreadyProcessedDocument()), usando
+     *   el UUID ya guardado como xml_document_key -- no se vuelve a firmar
+     *   ni a enviar nada.
+     * - En cualquier otro caso (pendiente, o rechazado por otro motivo),
+     *   reintenta el envío completo (firma + envío), reusando el mismo
+     *   numeral/secuencial/resolución ya asignados -- no reclama un número
+     *   nuevo, es literalmente reenviar el mismo documento.
+     *
+     * @throws RuntimeException Si la sincronización de la regla 90 vuelve a fallar, o si la resolución original ya no existe.
+     */
+    public function retry(Company $company, DocumentoEmitido $documento, ?string $userId = null): DocumentoEmitido
+    {
+        if ($documento->status === DocumentoEmitido::STATUS_ACCEPTED) {
+            return $documento;
+        }
+
+        if ($documento->status === DocumentoEmitido::STATUS_REJECTED && $this->hasAlreadyProcessedRule($documento) && $documento->uuid) {
+            if ($this->syncWithAlreadyProcessedDocument($company, $documento, $documento->uuid)) {
+                return $documento->fresh();
+            }
+
+            throw new RuntimeException(__('Could not sync with the DIAN yet. Try again in a moment.'));
+        }
+
+        $resolution = Resolution::find($documento->resolution_id);
+
+        if (! $resolution) {
+            throw new RuntimeException(__('The original resolution for this document no longer exists.'));
+        }
+
+        return $this->buildSignSubmitAndPersist(
+            $company, $documento->payload ?? [], $documento->tipo_documento, $resolution,
+            $documento->numeral, $documento->secuencial, $documento->ambiente, $documento,
+            userId: $userId,
+        );
+    }
+
+    /**
+     * Detecta si el último rechazo guardado en el documento fue por la
+     * regla 90 (documento ya procesado antes) -- mismo texto que arma
+     * buildStatusMessage() a partir de la respuesta de la DIAN.
+     */
+    private function hasAlreadyProcessedRule(DocumentoEmitido $documento): bool
+    {
+        foreach ($documento->status_message['reglas'] ?? [] as $regla) {
+            if (str_contains($regla, self::ALREADY_PROCESSED_RULE)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Crea una venta del POS: SIEMPRE en la colección "documentos_pos"
      * (totalmente separada de "documentos_emitidos" -- esa es solo para
      * documentos electrónicos reales), numerada con la Resolution manual
@@ -564,15 +672,39 @@ class IssueDocumentService
      * @param  string  $xmlDocumentKey  xml_document_key de la respuesta de SendBillSync.
      * @return bool True si se pudo traer el XML y sincronizar; false si hay que seguir el flujo normal.
      */
-    private function syncWithAlreadyProcessedDocument(Company $company, DocumentoEmitido $documento, string $xmlDocumentKey): bool
+    public function syncWithAlreadyProcessedDocument(Company $company, DocumentoEmitido $documento, string $xmlDocumentKey): bool
     {
-        try {
-            $xmlInfo = $this->client->getXmlByDocumentKey($company, $xmlDocumentKey);
-        } catch (RuntimeException $e) {
-            Log::warning('GetXmlByDocumentKey falló al sincronizar un documento con regla 90.', [
+        // Se guarda de una, pase lo que pase con GetXmlByDocumentKey más
+        // abajo: si falla (ej. corte transitorio con la DIAN), "uuid" queda
+        // con la clave correcta para poder reintentar la sincronización
+        // después (ver DocumentoEmitidoController::validate()) sin depender
+        // de nada más que ya no tengamos a mano.
+        $documento->timestamps = false;
+        $documento->update(['uuid' => $xmlDocumentKey]);
+        $documento->timestamps = true;
+
+        $xmlInfo = null;
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $xmlInfo = $this->client->getXmlByDocumentKey($company, $xmlDocumentKey);
+                $lastError = null;
+                break;
+            } catch (RuntimeException $e) {
+                $lastError = $e;
+
+                if ($attempt < 3) {
+                    usleep(500_000);
+                }
+            }
+        }
+
+        if ($lastError) {
+            Log::warning('GetXmlByDocumentKey falló al sincronizar un documento con regla 90 (3 intentos).', [
                 'company_id' => (string) $company->_id,
                 'xml_document_key' => $xmlDocumentKey,
-                'error' => $e->getMessage(),
+                'error' => $lastError->getMessage(),
             ]);
 
             return false;

@@ -1,9 +1,9 @@
 @php
     $documentTypeLabels = [
         '01' => __('Electronic sales invoice'),
-        '02' => __('Invoice (export)'),
-        '03' => __('Invoice (contingency, paper)'),
-        '04' => __('Invoice (DIAN contingency)'),
+        '02' => __('Electronic sales invoice (export)'),
+        '03' => __('Electronic transmission instrument (type 03)'),
+        '04' => __('Electronic sales invoice (type 04)'),
         '91' => __('Credit note'),
         '92' => __('Debit note'),
     ];
@@ -153,9 +153,18 @@
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Summary') }}</h3>
                 </div>
                 <div class="p-4 flex flex-col gap-3 text-sm">
-                    <div class="flex justify-between">
+                    <div class="flex justify-between items-center">
                         <span class="text-gray-500 dark:text-neutral-500">{{ __('Status') }}</span>
-                        <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
+                            @if (in_array($documento->status, [\App\Models\DocumentoEmitido::STATUS_PENDING, \App\Models\DocumentoEmitido::STATUS_REJECTED], true))
+                                <button type="button" class="document-retry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="{{ route('documents.retry', $documento->_id) }}" aria-label="{{ __('Validate') }}" title="{{ __('Validate') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 shrink-0">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                    </svg>
+                                </button>
+                            @endif
+                        </div>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500 dark:text-neutral-500">{{ __('Issue date') }}</span>
@@ -217,6 +226,14 @@
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Downloads') }}</h3>
                 </div>
                 <div class="p-4 flex flex-row flex-wrap gap-3">
+                    @if ($documento->uuid)
+                        <a href="{{ route('documents.invoice-preview', $documento->_id) }}" target="_blank">
+                            <flux:button type="button" variant="filled" icon="document-text">
+                                {{ __('View PDF') }}
+                            </flux:button>
+                        </a>
+                    @endif
+
                     <a
                         href="data:application/xml;charset=utf-8,{{ rawurlencode($documento->xml ?? '') }}"
                         download="{{ $documento->numeral }}.xml"
@@ -240,4 +257,6 @@
             </div>
         </div>
     </div>
+
+    @include('documents.partials.retry-modal')
 </x-layouts.app>

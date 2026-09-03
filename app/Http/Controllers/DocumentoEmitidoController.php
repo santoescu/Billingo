@@ -20,6 +20,8 @@ use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
 use App\Services\Dian\IssueDocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use RuntimeException;
@@ -48,7 +50,9 @@ class DocumentoEmitidoController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('documents.index', compact('company', 'documentos'));
+        $rowsHtml = view('documents.partials.rows', compact('documentos'))->render();
+
+        return response()->json(['rows_html' => $rowsHtml]);
     }
 
     /**
@@ -381,14 +385,29 @@ class DocumentoEmitidoController extends Controller
      * Arma el JSON del documento (mismo shape que espera la API) a partir
      * del formulario, y lo emite con IssueDocumentService.
      */
+    /**
+     * Responde en JSON cuando el formulario lo pide (ver el fetch() en
+     * documents/create.blade.php) -- así, si falla, se le muestra un modal
+     * con el motivo sin recargar la página, en vez de perder todas las
+     * líneas ya cargadas como pasaba antes con back()->withInput() (no
+     * alcanza a reconstruir el estado armado por JS).
+     */
     public function store(Request $request, IssueDocumentService $service)
     {
         try {
             $documento = $this->issueFromRequest($request, $service);
         } catch (InvalidArgumentException|RuntimeException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->withErrors(['message' => $e->getMessage()])->withInput();
         } catch (Throwable $e) {
             report($e);
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => __('Could not issue the document.')], 500);
+            }
 
             return back()->withErrors(['message' => __('Could not issue the document.')])->withInput();
         }
@@ -403,6 +422,15 @@ class DocumentoEmitidoController extends Controller
                 ? __('Document issued and accepted by the DIAN.')
                 : __('The document was sent, but the DIAN did not accept it yet. Check the details.'),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect_url' => route('documents.show', $documento->_id),
+                'status' => $documento->status,
+                'accepted' => $documento->status === DocumentoEmitido::STATUS_ACCEPTED,
+                'status_message' => $documento->status_message,
+            ]);
+        }
 
         return redirect()->route('documents.show', $documento->_id);
     }
@@ -422,6 +450,24 @@ class DocumentoEmitidoController extends Controller
     {
         $company = $this->currentCompany($request);
 
+        $document = $this->buildDocumentFromRequest($request, $company, claimNumber: true);
+
+        return $service->issue($company, ['document' => $document], (string) $request->user()->_id);
+    }
+
+    /**
+     * Valida el formulario y arma el JSON del documento (mismo shape que
+     * espera la API) -- compartido entre issueFromRequest() (emisión real)
+     * y preview() (vista previa, sin reclamar número). El único punto que
+     * cambia entre los dos es "secuencial": la emisión real reclama el
+     * siguiente número de la resolución (lo consume); la vista previa solo
+     * lo consulta ("current_number" tal cual está, sin tocarlo) para
+     * mostrar cuál sería, sin saltárselo si el usuario cancela.
+     *
+     * @throws InvalidArgumentException Si la resolución elegida no es válida.
+     */
+    private function buildDocumentFromRequest(Request $request, Company $company, bool $claimNumber): array
+    {
         $data = $request->validate([
             'tipo_documento' => ['required', 'string', 'in:' . implode(',', self::CREATABLE_DOCUMENT_TYPES)],
             'tipo_operacion' => ['required', 'string', 'max:5'],
@@ -492,11 +538,44 @@ class DocumentoEmitidoController extends Controller
 
         $data['prefix'] = $resolution->prefix;
 
-        $data['secuencial'] = $resolution->claimNextNumber();
+        $data['secuencial'] = $claimNumber
+            ? $resolution->claimNextNumber()
+            : (int) ($resolution->current_number ?: $resolution->range_from);
 
-        $document = $this->buildDocumentJson($company, $data);
+        return $this->buildDocumentJson($company, $data);
+    }
 
-        return $service->issue($company, ['document' => $document], (string) $request->user()->_id);
+    /**
+     * Vista previa del documento antes de emitirlo de verdad: arma el
+     * mismo PDF que se vería después de emitido (documents/invoice-pdf.blade.php),
+     * pero sin firmar ni enviar nada a la DIAN, ni reclamar el número de
+     * la resolución -- si el usuario cancela desde el modal de
+     * confirmación, no se pierde ningún número. Se muestra embebido en un
+     * iframe dentro de ese modal (ver el fetch() en documents/create.blade.php).
+     */
+    public function preview(Request $request, IssueDocumentService $service)
+    {
+        $company = $this->currentCompany($request);
+
+        try {
+            $document = $this->buildDocumentFromRequest($request, $company, claimNumber: false);
+            $documento = $service->buildPreview($company, ['document' => $document]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $paymentMeansCode = $documento->payment_means_code
+            ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
+            : null;
+
+        $pdf = Pdf::loadView('documents.invoice-pdf', [
+            'company' => $company,
+            'documento' => $documento,
+            'paymentMeansCode' => $paymentMeansCode,
+            'qrDataUri' => null,
+        ])->setPaper('letter', 'portrait');
+
+        return $pdf->stream('preview.pdf');
     }
 
     /**
@@ -1103,6 +1182,50 @@ class DocumentoEmitidoController extends Controller
     }
 
     /**
+     * Botón "Validar" del show del documento -- reintenta uno que quedó
+     * pendiente o rechazado (ver IssueDocumentService::retry() para el
+     * criterio: regla 90 vs reenvío completo). Solo tiene sentido para esos
+     * dos estados; para uno ya aceptado no hace nada.
+     */
+    public function retry(Request $request, string $documento, IssueDocumentService $service)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+        abort_unless(in_array($documento->status, [DocumentoEmitido::STATUS_PENDING, DocumentoEmitido::STATUS_REJECTED], true), 422);
+
+        try {
+            $documento = $service->retry($company, $documento, (string) $request->user()->_id);
+        } catch (RuntimeException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->withErrors(['message' => $e->getMessage()]);
+        }
+
+        if ($documento->status !== DocumentoEmitido::STATUS_ACCEPTED) {
+            $reglas = $documento->status_message['reglas'] ?? [];
+            $resumen = $documento->status_message['resumen'] ?? null;
+            $message = $resumen ?: __('The DIAN rejected the document again.');
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message, 'reglas' => $reglas], 422);
+            }
+
+            return back()->withErrors(['message' => $message]);
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['redirect_url' => route('documents.show', $documento->_id)]);
+        }
+
+        return redirect()->route('documents.show', $documento->_id);
+    }
+
+    /**
      * Recibo en PDF (formato angosto, tipo ticket) para descargar -- usado
      * sobre todo por el checkout del POS, pero disponible para cualquier
      * documento ya emitido. Reusa los mismos datos que documents.show(), sin
@@ -1134,6 +1257,46 @@ class DocumentoEmitidoController extends Controller
         ))->setPaper([0, 0, 226.77, 800], 'portrait'); 
 
         return $pdf->download('recibo-' . $documento->numeral . '.pdf');
+    }
+
+    /**
+     * Representación gráfica tamaño carta de un documento electrónico ya
+     * emitido (factura, nota crédito/débito) -- a diferencia de receiptPdf()
+     * (tirilla angosta, pensada para el POS), esta cumple el contenido
+     * mínimo exigido por la DIAN para la representación gráfica de la
+     * factura electrónica: https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/guia-de-uso-facturacion-gratuita-dian/
+     * Solo aplica a documentos con CUFE/CUDE (emitidos electrónicamente);
+     * las remisiones no tienen representación legal como factura. Se
+     * muestra embebida (stream) en vez de forzar la descarga -- mismo
+     * criterio que PosController::receiptPreview() y QuotationController::preview().
+     */
+    public function invoicePreview(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+        abort_unless($documento->uuid, 404);
+
+        $paymentMeansCode = $documento->payment_means_code
+            ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
+            : null;
+
+        $qrDataUri = null;
+        if ($documento->qr_validation_url) {
+            $qrCode = new QrCode(data: $documento->qr_validation_url, size: 300, margin: 8);
+            $qrDataUri = (new PngWriter())->write($qrCode)->getDataUri();
+        }
+
+        $pdf = Pdf::loadView('documents.invoice-pdf', compact(
+            'company',
+            'documento',
+            'paymentMeansCode',
+            'qrDataUri',
+        ))->setPaper('letter', 'portrait');
+
+        return $pdf->stream($documento->numeral . '.pdf');
     }
 
     /**

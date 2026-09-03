@@ -384,6 +384,59 @@
         </div>
     </form>
 
+    <div id="document-issue-error-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="document-issue-error-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="document-issue-error-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Could not issue the document.') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#document-issue-error-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <div class="flex gap-3">
+                        <span class="shrink-0 flex size-9 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                            <svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        </span>
+                        <div id="document-issue-error-message" class="text-sm text-gray-700 dark:text-neutral-300"></div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 p-4 pt-0">
+                    <flux:button type="button" variant="primary" data-hs-overlay="#document-issue-error-modal">{{ __('Understood') }}</flux:button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="document-preview-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="document-preview-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-4xl sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="document-preview-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Preview') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#document-preview-modal">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">{{ __('This is what the document will look like. Nothing has been sent to the DIAN yet, confirm to sign and send it for real.') }}</p>
+                    <iframe id="document-preview-iframe" class="w-full rounded-lg border border-gray-200 dark:border-neutral-700" style="height: 65vh;"></iframe>
+                </div>
+                <div class="flex justify-end gap-3 p-4 pt-0">
+                    <flux:button type="button" variant="ghost" data-hs-overlay="#document-preview-modal">{{ __('Cancel') }}</flux:button>
+                    <flux:button type="button" id="document-preview-confirm-btn" variant="primary">{{ __('Confirm and send') }}</flux:button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @if ($posMode ?? false)
         <div id="pos-result-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="pos-result-modal-label">
             <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
@@ -1670,6 +1723,181 @@
                 }
 
                 /**
+                 * Muestra el modal de error de emisión con el motivo puntual
+                 * que mandó el servidor (ej. "ya no tienen certificados
+                 * vigentes", o la lista de reglas que rechazó la DIAN), en
+                 * vez de un mensaje genérico perdido en la parte de arriba
+                 * de la página.
+                 * @param {string} message
+                 * @param {string[]} [rules] Lista de reglas de la DIAN (rechazo), si aplica -- se muestra como viñetas debajo del mensaje.
+                 * @returns {void}
+                 */
+                function showDocumentIssueError(message, rules) {
+                    const box = document.getElementById('document-issue-error-message');
+                    box.innerHTML = '';
+
+                    const p = document.createElement('p');
+                    p.textContent = message;
+                    box.appendChild(p);
+
+                    if (rules && rules.length) {
+                        const ul = document.createElement('ul');
+                        ul.className = 'mt-2 list-disc list-inside space-y-1 text-xs text-gray-600 dark:text-neutral-400';
+                        rules.forEach((rule) => {
+                            const li = document.createElement('li');
+                            li.textContent = rule;
+                            ul.appendChild(li);
+                        });
+                        box.appendChild(ul);
+                    }
+
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#document-issue-error-modal');
+                    }
+                }
+
+                /**
+                 * Igual que initPosAjaxCheckout(), pero para la facturación
+                 * normal (no POS), con un paso extra: antes de emitir de
+                 * verdad, arma una vista previa del PDF (sin firmar ni
+                 * enviar nada a la DIAN, ni reclamar el número de la
+                 * resolución -- ver DocumentoEmitidoController::preview())
+                 * y la muestra en un modal para que se confirme. Solo ahí
+                 * se manda la emisión real por fetch; si la DIAN la
+                 * rechaza (o falta un certificado vigente, etc.), se
+                 * muestra el motivo en un modal sin recargar la página --
+                 * antes, al recargar con back()->withInput(), se perdían
+                 * todas las líneas ya armadas por JS (withInput() no
+                 * alcanza a reconstruir ese estado). En modo POS no hace
+                 * falta nada de esto -- initPosAjaxCheckout() ya intercepta
+                 * el submit primero.
+                 * @returns {void}
+                 */
+                function initDocumentAjaxSubmit() {
+                    const form = document.getElementById('documentForm');
+                    if (! form || document.getElementById('pos-result-modal')) {
+                        return;
+                    }
+
+                    const submitBtn = document.getElementById('documentSubmitBtn');
+                    const previewIframe = document.getElementById('document-preview-iframe');
+                    const confirmBtn = document.getElementById('document-preview-confirm-btn');
+                    let previewBlobUrl = null;
+
+                    /**
+                     * Pone el botón en estado "cargando": lo deshabilita y le
+                     * mete el mismo spinner (animate-spin) que ya se usa en
+                     * la búsqueda de cliente por identificación, delante del
+                     * texto.
+                     * @param {HTMLButtonElement} button
+                     * @param {string} loadingText
+                     * @returns {void}
+                     */
+                    function setButtonLoading(button, loadingText) {
+                        button.disabled = true;
+                        button.innerHTML = `
+                            <span class="inline-flex items-center justify-center gap-2">
+                                <span class="animate-spin inline-block size-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="${@json(__('Loading'))}"></span>
+                                <span>${loadingText}</span>
+                            </span>
+                        `;
+                    }
+
+                    function resetSubmitButton() {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '{{ __('Issue document') }}';
+                    }
+
+                    function resetConfirmButton() {
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = '{{ __('Confirm and send') }}';
+                    }
+
+                    form.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+
+                        setButtonLoading(submitBtn, '{{ __('Loading preview...') }}');
+
+                        try {
+                            const formData = new FormData(form);
+                            const response = await fetch('{{ route('documents.preview') }}', {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'application/json',
+                                },
+                                body: formData,
+                            });
+
+                            if (! response.ok) {
+                                const data = await response.json();
+                                throw new Error(data.message || '{{ __('Could not issue the document.') }}');
+                            }
+
+                            const blob = await response.blob();
+                            if (previewBlobUrl) {
+                                URL.revokeObjectURL(previewBlobUrl);
+                            }
+                            previewBlobUrl = URL.createObjectURL(blob);
+                            previewIframe.src = previewBlobUrl;
+
+                            resetSubmitButton();
+
+                            if (window.HSOverlay) {
+                                HSOverlay.autoInit();
+                                HSOverlay.open('#document-preview-modal');
+                            }
+                        } catch (error) {
+                            showDocumentIssueError(error.message || '{{ __('Could not issue the document.') }}');
+                            resetSubmitButton();
+                        }
+                    });
+
+                    confirmBtn.addEventListener('click', async () => {
+                        setButtonLoading(confirmBtn, '{{ __('Sending...') }}');
+
+                        const formData = new FormData(form);
+
+                        try {
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'application/json',
+                                },
+                                body: formData,
+                            });
+                            const data = await response.json();
+
+                            if (! response.ok) {
+                                throw new Error(data.message || '{{ __('Could not issue the document.') }}');
+                            }
+
+                            if (data.accepted) {
+                                window.location.href = data.redirect_url;
+                                return;
+                            }
+
+                            if (window.HSOverlay) {
+                                HSOverlay.close('#document-preview-modal');
+                            }
+
+                            const rules = data.status_message?.reglas ?? [];
+                            const summary = data.status_message?.resumen || '{{ __('The document was sent, but the DIAN did not accept it yet. Check the details.') }}';
+                            showDocumentIssueError(summary, rules);
+                            resetConfirmButton();
+                        } catch (error) {
+                            if (window.HSOverlay) {
+                                HSOverlay.close('#document-preview-modal');
+                            }
+                            showDocumentIssueError(error.message || '{{ __('Could not issue the document.') }}');
+                            resetConfirmButton();
+                        }
+                    });
+                }
+
+                /**
                  * Deshabilita el botón de envío desde el primer submit, para
                  * evitar ventas duplicadas si alguien le da clic varias
                  * veces a "Emitir documento" (por ejemplo porque no ve
@@ -2622,6 +2850,7 @@
                     initEmptyLineSubmitCleanup();
                     initSubmitProcessingState();
                     initPosAjaxCheckout();
+                    initDocumentAjaxSubmit();
 
                     initAllProductsModal();
 
