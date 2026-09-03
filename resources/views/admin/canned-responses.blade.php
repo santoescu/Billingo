@@ -4,6 +4,8 @@
         'subheading' => __('Reusable snippets the team can insert while replying to a support ticket.'),
     ])
 
+    @include('admin.tickets.partials.tabs', ['activeTab' => 'templates'])
+
     <div class="flex flex-col gap-6">
         <div class="flex justify-end">
             <button type="button" id="canned-response-add-btn"

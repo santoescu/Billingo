@@ -4,6 +4,8 @@
         'subheading' => __('Requests, complaints and claims filed by companies, across all of them.'),
     ])
 
+    @include('admin.tickets.partials.tabs', ['activeTab' => 'tickets'])
+
     <div class="flex flex-col gap-4">
         <form method="GET" action="{{ route('admin.tickets.index') }}" class="flex flex-wrap items-end gap-3">
             <div class="w-40">

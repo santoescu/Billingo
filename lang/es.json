@@ -1646,5 +1646,21 @@
     "Any comments? (optional)": "¿Algún comentario? (opcional)",
     "Send feedback": "Enviar calificación",
     ":count star|:count stars": ":count estrella|:count estrellas",
-    "Satisfaction": "Satisfacción"
+    "Satisfaction": "Satisfacción",
+    "Support dashboard": "Panel de soporte",
+    "An overview of support activity across all companies.": "Un panorama de la actividad de soporte de todas las empresas.",
+    "Templates": "Plantillas",
+    "Average response time": "Tiempo promedio de respuesta",
+    "Average satisfaction": "Satisfacción promedio",
+    "By module": "Por módulo",
+    "No data yet": "Aún no hay datos",
+    ":minutes min": ":minutes min",
+    ":hours h :minutes min": ":hours h :minutes min",
+    ":hours h": ":hours h",
+    ":count rating|:count ratings": ":count calificación|:count calificaciones",
+    "Last 3 months": "Últimos 3 meses",
+    "All time": "Todo",
+    "From": "Desde",
+    "To": "Hasta",
+    "Custom range": "Rango personalizado"
 }

@@ -228,6 +228,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('{supportTicket}/mensajes', [SupportTicketController::class, 'reply'])->name('reply');
             Route::post('{supportTicket}/cerrar', [SupportTicketController::class, 'close'])->name('close');
             Route::post('{supportTicket}/reabrir', [SupportTicketController::class, 'reopen'])->name('reopen');
+            Route::post('{supportTicket}/satisfaccion', [SupportTicketController::class, 'submitSatisfaction'])->name('satisfaction');
         });
 
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
@@ -257,6 +258,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('notifications', [SuperadminController::class, 'notificationsCreate'])->name('notifications.create');
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');
 
+        Route::get('tickets/dashboard', [AdminSupportTicketController::class, 'dashboard'])->name('tickets.dashboard');
         Route::get('tickets', [AdminSupportTicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [AdminSupportTicketController::class, 'create'])->name('tickets.create');
         Route::post('tickets', [AdminSupportTicketController::class, 'store'])->name('tickets.store');

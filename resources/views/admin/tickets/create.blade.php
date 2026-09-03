@@ -8,6 +8,8 @@
         'subheading' => __('Open a request on behalf of a company -- e.g. a follow-up or notice that starts from this side.'),
     ])
 
+    @include('admin.tickets.partials.tabs', ['activeTab' => 'tickets'])
+
     <form method="POST" action="{{ route('admin.tickets.store') }}" class="max-w-2xl space-y-6">
         @csrf
 

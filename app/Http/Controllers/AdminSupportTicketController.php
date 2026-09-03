@@ -14,6 +14,90 @@ use Illuminate\Http\Request;
 class AdminSupportTicketController extends Controller
 {
     /**
+     * Panorama general de soporte: cuántos tickets hay por estado, el
+     * desglose por módulo, el tiempo promedio hasta la primera respuesta
+     * del staff, y la satisfacción promedio de los que ya se calificaron
+     * (ver SupportTicketController::submitSatisfaction()). Todo calculado
+     * en PHP sobre la colección ya filtrada por rango de fechas -- mismo
+     * criterio que index(), que ya trae los tickets a memoria para
+     * filtrar/ordenar; si el volumen crece mucho, ahí habría que revisar
+     * los dos a la vez.
+     *
+     * El rango filtra por "created_at" (cuándo se abrió el ticket), no por
+     * última actividad -- así un ticket abierto en agosto pero cerrado en
+     * septiembre sigue contando para agosto al comparar mes a mes.
+     */
+    public function dashboard(Request $request)
+    {
+        $from = $request->filled('from') ? \Carbon\Carbon::parse($request->query('from'))->startOfDay() : null;
+        $to = $request->filled('to') ? \Carbon\Carbon::parse($request->query('to'))->endOfDay() : null;
+
+        $query = SupportTicket::query();
+
+        if ($from) {
+            $query->where('created_at', '>=', $from);
+        }
+
+        if ($to) {
+            $query->where('created_at', '<=', $to);
+        }
+
+        $tickets = $query->get();
+
+        $totalOpen = $tickets->where('status', SupportTicket::STATUS_OPEN)->count();
+        $totalAssigned = $tickets->where('status', SupportTicket::STATUS_ASSIGNED)->count();
+        $totalClosed = $tickets->where('status', SupportTicket::STATUS_CLOSED)->count();
+
+        $byModule = $tickets
+            ->groupBy(fn (SupportTicket $ticket) => $ticket->module ?: 'general')
+            ->map(fn ($group, $module) => [
+                'label' => $module === 'general' ? __('General') : (config('modules')[$module]['name'] ?? $module),
+                'badge_classes' => config("modules.$module.badge_classes", 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200'),
+                'count' => $group->count(),
+            ])
+            ->sortByDesc('count')
+            ->values();
+
+        // Primer mensaje del staff por ticket -- el tiempo de respuesta se
+        // mide desde que se creó el ticket hasta esa primera respuesta, no
+        // hasta cualquier mensaje de staff (uno de seguimiento no cuenta).
+        $firstStaffReplyByTicket = SupportTicketMessage::where('author_role', SupportTicketMessage::AUTHOR_STAFF)
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('support_ticket_id')
+            ->map(fn ($messages) => $messages->first());
+
+        $responseMinutes = $tickets
+            ->map(function (SupportTicket $ticket) use ($firstStaffReplyByTicket) {
+                $firstReply = $firstStaffReplyByTicket->get((string) $ticket->_id);
+
+                if (! $firstReply || ! $ticket->created_at) {
+                    return null;
+                }
+
+                return $ticket->created_at->diffInMinutes($firstReply->created_at);
+            })
+            ->filter(fn ($minutes) => $minutes !== null);
+
+        $avgResponseMinutes = $responseMinutes->isNotEmpty() ? (int) round($responseMinutes->avg()) : null;
+
+        $ratedTickets = $tickets->pluck('satisfaction_rating')->filter();
+        $avgSatisfaction = $ratedTickets->isNotEmpty() ? round($ratedTickets->avg(), 1) : null;
+
+        return view('admin.tickets.dashboard', [
+            'totalOpen' => $totalOpen,
+            'totalAssigned' => $totalAssigned,
+            'totalClosed' => $totalClosed,
+            'byModule' => $byModule,
+            'avgResponseMinutes' => $avgResponseMinutes,
+            'avgSatisfaction' => $avgSatisfaction,
+            'ratedCount' => $ratedTickets->count(),
+            'dateFrom' => $from?->format('Y-m-d'),
+            'dateTo' => $to?->format('Y-m-d'),
+        ]);
+    }
+
+    /**
      * Formulario para que el staff de Billingo abra un ticket a nombre de
      * una empresa cualquiera (p. ej. un aviso o seguimiento que arranca
      * desde este lado, no desde una solicitud de la empresa).
