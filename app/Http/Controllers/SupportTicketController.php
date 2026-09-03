@@ -76,7 +76,10 @@ class SupportTicketController extends Controller
     /**
      * Hilo de mensajes de un ticket, verificando que sea de la empresa
      * activa. Nunca incluye las notas internas del staff (is_internal) --
-     * esas no son parte de la conversación con la empresa.
+     * esas no son parte de la conversación con la empresa. Los cambios de
+     * estado/asignación se intercalan en el mismo hilo (ver
+     * support.partials.messages) -- sin la prioridad, que es solo para
+     * que el staff se organice, no le aporta nada a la empresa.
      */
     public function show(Request $request, string $supportTicket)
     {
@@ -86,10 +89,19 @@ class SupportTicketController extends Controller
 
         abort_unless($ticket, 404);
 
+        $activities = $ticket->activities()
+            ->whereIn('action', [SupportTicketActivity::ACTION_STATUS, SupportTicketActivity::ACTION_ASSIGNED])
+            ->get();
+
+        $userIds = $activities->pluck('user_id')->merge($activities->pluck('to'))->filter()->unique()->values()->all();
+        $activityUsers = User::whereIn('_id', $userIds)->get()->keyBy(fn ($user) => (string) $user->_id);
+
         return view('support.show', [
             'company' => $company,
             'ticket' => $ticket,
             'messages' => $ticket->messages()->where('is_internal', '!=', true)->get(),
+            'activities' => $activities,
+            'activityUsers' => $activityUsers,
         ]);
     }
 

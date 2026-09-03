@@ -8,10 +8,35 @@
     Requiere: $messages (colección de SupportTicketMessage), $ownRole,
     $otherLabel (nombre a mostrar para el lado ajeno cuando no hay usuario,
     p. ej. el nombre de la empresa).
+
+    Opcionales: $activities (colección de SupportTicketActivity, ya
+    filtrada a estado/asignación) y $activityUsers -- si vienen, se
+    intercalan en el hilo ordenados por fecha junto a los mensajes, como
+    una línea de sistema (ni burbuja ni nota interna).
 --}}
+@php
+    $timeline = isset($activities)
+        ? $messages->concat($activities)->sortBy('created_at')->values()
+        : $messages;
+@endphp
 <ul class="space-y-5">
-    @foreach ($messages as $message)
+    @foreach ($timeline as $item)
+        @if ($item instanceof \App\Models\SupportTicketActivity)
+            <li class="mx-auto flex flex-col items-center gap-1 text-center text-xs text-zinc-400 dark:text-neutral-500">
+                <span>{{ $item->describe($activityUsers) }} · {{ $item->created_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</span>
+                @if ($item->action === \App\Models\SupportTicketActivity::ACTION_STATUS)
+                    <span class="flex items-center gap-1.5">
+                        <span class="rounded-md px-1.5 py-0.5 text-[11px] font-medium {{ \App\Models\SupportTicket::statusBadgeClasses($item->from) }}">{{ \App\Models\SupportTicket::statusLabel($item->from) }}</span>
+                        <svg class="size-3 shrink-0 text-zinc-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        <span class="rounded-md px-1.5 py-0.5 text-[11px] font-medium {{ \App\Models\SupportTicket::statusBadgeClasses($item->to) }}">{{ \App\Models\SupportTicket::statusLabel($item->to) }}</span>
+                    </span>
+                @endif
+            </li>
+            @continue
+        @endif
+
         @php
+            $message = $item;
             $isOwn = $message->author_role === $ownRole;
             $authorName = $message->is_staff ? __('Billingo support') : ($message->user?->name ?? $otherLabel);
             $timestamp = $message->created_at?->setTimezone('America/Bogota')->format('Y-m-d H:i');

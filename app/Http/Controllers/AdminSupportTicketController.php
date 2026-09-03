@@ -156,6 +156,11 @@ class AdminSupportTicketController extends Controller
 
         $activityUsers = User::whereIn('_id', $activityUserIds)->get()->keyBy(fn ($user) => (string) $user->_id);
 
+        // Para el hilo del chat solo se intercalan estado/asignación -- la
+        // prioridad es info de triage interna, se queda solo en el
+        // historial de la barra lateral (abajo, con badges).
+        $chatActivities = $activities->whereIn('action', [SupportTicketActivity::ACTION_STATUS, SupportTicketActivity::ACTION_ASSIGNED]);
+
         return view('admin.tickets.show', [
             'ticket' => $ticket,
             'company' => $company,
@@ -163,6 +168,7 @@ class AdminSupportTicketController extends Controller
             'staffUsers' => User::where('role', 'superadmin')->orderBy('name')->get(),
             'activities' => $activities,
             'activityUsers' => $activityUsers,
+            'chatActivities' => $chatActivities,
             'cannedResponses' => CannedResponse::orderBy('title')->get(),
         ]);
     }

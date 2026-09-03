@@ -45,7 +45,7 @@
             </div>
 
             <div id="ticket-messages" class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 p-4 dark:border-neutral-700 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-                @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'company', 'otherLabel' => __('You')])
+                @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'company', 'otherLabel' => __('You'), 'activities' => $activities, 'activityUsers' => $activityUsers])
             </div>
 
             <form action="{{ route('support.reply', $ticket->_id) }}" method="POST" class="shrink-0">

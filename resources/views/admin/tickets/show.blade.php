@@ -156,7 +156,7 @@
 
                 <div class="order-1 flex min-h-0 max-w-3xl flex-1 flex-col gap-4 lg:order-none">
                     <div id="ticket-messages" class="h-[60vh] shrink-0 overflow-y-auto rounded-lg border border-gray-200 p-4 dark:border-neutral-700 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-                        @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'staff', 'otherLabel' => $company?->name ?? $ticket->contact_name])
+                        @include('support.partials.messages', ['messages' => $messages, 'ownRole' => 'staff', 'otherLabel' => $company?->name ?? $ticket->contact_name, 'activities' => $chatActivities, 'activityUsers' => $activityUsers])
                     </div>
 
                     <form action="{{ route('admin.tickets.reply', $ticket->_id) }}" method="POST" class="shrink-0">
