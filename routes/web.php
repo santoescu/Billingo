@@ -77,6 +77,11 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('companies/{id}/certificate', [CompanyController::class, 'destroyCertificate'])->name('companies.certificate.destroy');
     Route::post('companies/{id}/certificate/validate', [CompanyController::class, 'validateExistingCertificate'])->name('companies.certificate.validate');
     Route::post('certificate/validate', [CompanyController::class, 'validateCertificate'])->name('certificate.validate');
+
+    Route::get('companies/{id}/certificates', [CompanyController::class, 'listCertificates'])->name('companies.certificates.index');
+    Route::post('companies/{id}/certificates', [CompanyController::class, 'storeCertificateEntry'])->name('companies.certificates.store');
+    Route::get('companies/{id}/certificates/{certificateId}/download', [CompanyController::class, 'downloadCertificateEntry'])->name('companies.certificates.download');
+    Route::delete('companies/{id}/certificates/{certificateId}', [CompanyController::class, 'destroyCertificateEntry'])->name('companies.certificates.destroy');
     Route::post('companies/{id}/api-token', [CompanyController::class, 'regenerateApiToken'])->name('companies.api-token.regenerate');
 
     Route::post('companies/{id}/dian/send-test-set', [DianController::class, 'sendTestSet'])->name('companies.dian.send-test-set');

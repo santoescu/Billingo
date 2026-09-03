@@ -456,20 +456,22 @@ class DianSoapClient
     }
 
     /**
-     * Extrae el certificado y la llave privada del .p12 guardado, usando la
-     * clave ya validada. Ambos vienen en formato PEM directamente de
+     * Extrae el certificado y la llave privada del .p12 vigente de la
+     * empresa (el más reciente entre los que no han vencido -- ver
+     * Company::activeDianCertificate()), en formato PEM directamente de
      * openssl_pkcs12_read().
      */
     private function loadCertificateAndKey(Company $company): array
     {
-        if (! $company->dian_certificate_content || ! $company->dian_certificate_password) {
-            throw new RuntimeException(__('This company has no validated certificate configured.'));
+        $certificate = $company->activeDianCertificate();
+
+        if (! $certificate) {
+            throw new RuntimeException(__('You no longer have any valid certificates. Please add one before signing.'));
         }
 
-        $content = $company->dian_certificate_content;
         $certs = [];
 
-        if (! openssl_pkcs12_read($content, $certs, $company->dian_certificate_password)) {
+        if (! openssl_pkcs12_read($certificate->content, $certs, $certificate->password)) {
             throw new RuntimeException(__('The password does not match this certificate.'));
         }
 

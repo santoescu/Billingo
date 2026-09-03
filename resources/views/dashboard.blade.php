@@ -228,80 +228,12 @@
                     <flux:input id="edit-company-dian_software_id" label="{{ __('Software ID') }}" name="dian_software_id" />
                 </div>
 
-                <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('The digital certificate is used to sign documents for all three modules (issuance, receiving and payroll), not just this one.') }}</p>
+                <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('The digital certificate is used to sign documents for all three modules (issuance, receiving and payroll), not just this one. When signing, the most recent certificate that has not expired yet is used.') }}</p>
 
-                <div id="edit-company-certificate-existing" class="hidden p-3 flex items-center justify-between gap-x-3 bg-white border border-gray-200 rounded-lg dark:bg-neutral-800 dark:border-neutral-700">
-                    <div class="flex items-center gap-x-3 min-w-0">
-                        <span class="size-8 shrink-0 flex justify-center items-center bg-gray-100 text-gray-500 rounded-lg dark:bg-neutral-700 dark:text-neutral-400">
-                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-                        </span>
-                        <p id="edit-company-certificate-existing-name" class="text-sm font-medium text-gray-800 dark:text-white truncate"></p>
-                    </div>
-                    <button type="button" id="edit-company-certificate-remove" class="shrink-0 text-gray-400 hover:text-red-600 focus:outline-hidden dark:hover:text-red-400" title="{{ __('Remove') }}">
-                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                    </button>
+                <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 dark:border-neutral-700">
+                    <p class="text-sm font-medium text-gray-800 dark:text-white">{{ __('Digital certificates') }}</p>
+                    <flux:button type="button" variant="filled" icon="lock-closed" onclick="openCertificateManageModal()">{{ __('Digital certificates') }}</flux:button>
                 </div>
-
-                <div id="edit-company-certificate-upload" data-hs-file-upload='{
-                        "url": "#",
-                        "singleton": true,
-                        "autoHideTrigger": true
-                    }'>
-                        <template data-hs-file-upload-preview>
-                            <div class="p-3 bg-white border border-gray-200 rounded-lg dark:bg-neutral-800 dark:border-neutral-700">
-                                <div class="mb-1 flex justify-between items-center">
-                                    <div class="flex items-center gap-x-3">
-                                        <span class="size-8 shrink-0 flex justify-center items-center bg-gray-100 text-gray-500 rounded-lg dark:bg-neutral-700 dark:text-neutral-400" data-hs-file-upload-file-icon>
-                                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-medium text-gray-800 dark:text-white truncate">
-                                                <span data-hs-file-upload-file-name></span>.<span data-hs-file-upload-file-ext></span>
-                                            </p>
-                                            <p class="text-xs text-gray-500 dark:text-neutral-400" data-hs-file-upload-file-size data-hs-file-upload-file-success></p>
-                                            <p class="text-xs text-red-500" style="display: none;" data-hs-file-upload-file-error>{{ __('Upload failed. Try again.') }}</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-x-2">
-                                        <button type="button" class="text-gray-400 hover:text-gray-600 focus:outline-hidden dark:hover:text-neutral-200" data-hs-file-upload-reload title="{{ __('Retry') }}">
-                                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                                        </button>
-                                        <button type="button" class="text-gray-400 hover:text-gray-600 focus:outline-hidden dark:hover:text-neutral-200" data-hs-file-upload-remove title="{{ __('Remove') }}">
-                                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center gap-x-3 whitespace-nowrap">
-                                    <div class="flex w-full h-2 bg-gray-100 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" data-hs-file-upload-progress-bar>
-                                        <div class="flex flex-col justify-center rounded-full overflow-hidden bg-accent text-xs text-white text-center whitespace-nowrap transition-all duration-500 hs-file-upload-complete:bg-green-500" style="width: 0" data-hs-file-upload-progress-bar-pane></div>
-                                    </div>
-                                    <div class="w-10 text-end">
-                                        <span class="text-sm text-gray-800 dark:text-white">
-                                            <span data-hs-file-upload-progress-bar-value>0</span>%
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <div class="cursor-pointer h-20 flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-lg text-center dark:border-neutral-600" data-hs-file-upload-trigger>
-                            <svg class="shrink-0 size-5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/></svg>
-                            <p class="text-sm text-gray-600 dark:text-neutral-400">
-                                {{ __('Drop your certificate here or') }} <span class="font-semibold text-accent">{{ __('browse') }}</span>
-                            </p>
-                        </div>
-
-                    <div class="mt-2 space-y-2 empty:mt-0" data-hs-file-upload-previews></div>
-                </div>
-
-                <div class="flex items-end gap-2">
-                    <div class="flex-1">
-                        <flux:input id="edit-company-dian_certificate_password" type="password" name="dian_certificate_password" :label="__('Certificate password')" />
-                    </div>
-                    <flux:button type="button" id="edit-company-certificate-validate" variant="filled">{{ __('Validate') }}</flux:button>
-                </div>
-                <p id="edit-company-certificate-validation-message" class="hidden text-xs"></p>
 
                 <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 dark:border-neutral-700">
                     <div>
@@ -369,29 +301,330 @@
         </div>
     </div>
 
+    <div id="certificate-manage" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="certificate-manage-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-2xl sm:w-full m-3 sm:mx-auto">
+            <div class="w-full max-h-[calc(100vh-3.5rem)] flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 id="certificate-manage-label" class="font-bold text-gray-800 dark:text-white">{{ __('Digital certificates') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#certificate-manage">
+                        <span class="sr-only">Close</span>
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="overflow-y-auto p-4 space-y-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    <div class="overflow-hidden border border-gray-200 rounded-lg dark:border-neutral-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                            <thead class="bg-gray-50 dark:bg-neutral-700">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Certificate') }}</th>
+                                    <th scope="col" class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Start date') }}</th>
+                                    <th scope="col" class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('End date') }}</th>
+                                    <th scope="col" class="px-3 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Status') }}</th>
+                                    <th scope="col" class="px-3 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="certificate-manage-list" class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-4 dark:border-neutral-700">
+                        <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200 mb-3">{{ __('Add digital certificate') }}</h4>
+
+                        <div id="certificate-manage-upload" data-hs-file-upload='{
+                                "url": "#",
+                                "autoProcessQueue": false,
+                                "singleton": true,
+                                "autoHideTrigger": true
+                            }'>
+                            <template data-hs-file-upload-preview>
+                                <div class="p-3 bg-white border border-gray-200 rounded-lg dark:bg-neutral-800 dark:border-neutral-700">
+                                    <div class="mb-1 flex justify-between items-center">
+                                        <div class="flex items-center gap-x-3">
+                                            <span class="size-8 shrink-0 flex justify-center items-center bg-gray-100 text-gray-500 rounded-lg dark:bg-neutral-700 dark:text-neutral-400" data-hs-file-upload-file-icon>
+                                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                            </span>
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-medium text-gray-800 dark:text-white truncate">
+                                                    <span data-hs-file-upload-file-name></span>.<span data-hs-file-upload-file-ext></span>
+                                                </p>
+                                                <p class="text-xs text-gray-500 dark:text-neutral-400" data-hs-file-upload-file-size></p>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-gray-400 hover:text-red-600 focus:outline-hidden dark:hover:text-red-400" data-hs-file-upload-remove title="{{ __('Remove') }}">
+                                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center gap-x-3 whitespace-nowrap">
+                                        <div class="flex w-full h-2 bg-gray-100 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" data-hs-file-upload-progress-bar>
+                                            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-accent text-xs text-white text-center whitespace-nowrap transition-all duration-500 hs-file-upload-complete:bg-green-500" style="width: 0" data-hs-file-upload-progress-bar-pane></div>
+                                        </div>
+                                        <div class="w-10 text-end">
+                                            <span class="text-sm text-gray-800 dark:text-white">
+                                                <span data-hs-file-upload-progress-bar-value>0</span>%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div class="cursor-pointer h-20 flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-lg text-center dark:border-neutral-600" data-hs-file-upload-trigger>
+                                <svg class="shrink-0 size-5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/></svg>
+                                <p class="text-sm text-gray-600 dark:text-neutral-400">
+                                    {{ __('Drop your certificate here or') }} <span class="font-semibold text-accent">{{ __('browse') }}</span>
+                                </p>
+                            </div>
+
+                            <div class="mt-2 space-y-2 empty:mt-0" data-hs-file-upload-previews></div>
+                        </div>
+
+                        <input type="file" id="certificate-manage-file-input" class="hidden" accept=".p12,.pfx">
+
+                        <div class="flex items-end gap-2 mt-3">
+                            <div class="flex-1">
+                                <flux:input id="certificate-manage-password" type="password" :label="__('Certificate password')" />
+                            </div>
+                            <flux:button type="button" id="certificate-manage-validate" variant="filled">{{ __('Validate') }}</flux:button>
+                        </div>
+                        <p id="certificate-manage-validation-message" class="hidden text-xs mt-1"></p>
+
+                        <div class="flex gap-3 mt-3">
+                            <flux:spacer />
+                            <flux:button type="button" id="certificate-manage-submit" variant="primary">{{ __('Add') }}</flux:button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             const municipiosByDepartment = @json($departments->mapWithKeys(fn ($department) => [$department->codigo => $department->municipios ?? []]));
 
-            // Los botones "Editar" traen los datos de la empresa horneados en el
-            // HTML desde que cargó la página. Si el certificado se sube/quita por
-            // AJAX (sin recargar la página), guardamos el último estado aquí para
-            // que, si vuelves a abrir el mismo panel, no se vea la info vieja.
-            const certificateFilenameOverrides = {};
-            let certificateValidated = false;
+            function renderCertificatesTable(certificates) {
+                const tbody = document.getElementById('certificate-manage-list');
 
-            function markCertificateUnvalidated() {
-                certificateValidated = false;
-                document.getElementById('edit-company-certificate-validation-message').classList.add('hidden');
+                if (!certificates.length) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-neutral-500 dark:text-neutral-400">${@json(__('No certificates uploaded yet.'))}</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = certificates.map((certificate) => {
+                    const badgeClasses = certificate.is_expired
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                        : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+                    const badgeText = certificate.is_expired ? @json(__('Expired')) : @json(__('Valid'));
+
+                    return `
+                        <tr>
+                            <td class="px-3 py-2 text-sm text-gray-800 dark:text-neutral-200 break-words">${certificate.original_name ?? @json(__('Certificate'))}</td>
+                            <td class="px-3 py-2 text-sm text-gray-600 dark:text-neutral-400">${certificate.valid_from ?? '—'}</td>
+                            <td class="px-3 py-2 text-sm text-gray-600 dark:text-neutral-400">${certificate.valid_to ?? '—'}</td>
+                            <td class="px-3 py-2 text-sm">
+                                <span class="rounded-md px-1.5 py-0.5 text-[11px] font-medium ${badgeClasses}">${badgeText}</span>
+                            </td>
+                            <td class="px-3 py-2 text-end text-sm">
+                                <div class="flex justify-end items-center gap-1">
+                                    <a href="/companies/${window.currentEditCompany.id}/certificates/${certificate.id}/download" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" title="${@json(__('Download'))}">
+                                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                                    </a>
+                                    <button type="button" class="certificate-delete-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-certificate-id="${certificate.id}" title="${@json(__('Remove'))}">
+                                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                tbody.querySelectorAll('.certificate-delete-btn').forEach((button) => {
+                    button.addEventListener('click', async function () {
+                        if (!(await window.appConfirmDialog.ask(@json(__('This action cannot be undone.'))))) {
+                            return;
+                        }
+
+                        fetch(`/companies/${window.currentEditCompany.id}/certificates/${this.dataset.certificateId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json',
+                            },
+                        }).then(() => loadCertificatesList());
+                    });
+                });
             }
 
-            function showCertificateValidationResult(valid, message) {
-                certificateValidated = valid;
-                const el = document.getElementById('edit-company-certificate-validation-message');
-                el.textContent = message;
-                el.classList.remove('hidden', 'text-green-600', 'dark:text-green-400', 'text-red-600', 'dark:text-red-400');
-                el.classList.add(...(valid ? ['text-green-600', 'dark:text-green-400'] : ['text-red-600', 'dark:text-red-400']));
+            function loadCertificatesList() {
+                const tbody = document.getElementById('certificate-manage-list');
+                tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-neutral-500 dark:text-neutral-400">${@json(__('Loading...'))}</td></tr>`;
+
+                fetch(`/companies/${window.currentEditCompany.id}/certificates`, {
+                    headers: { 'Accept': 'application/json' },
+                })
+                    .then((response) => response.json())
+                    .then((data) => renderCertificatesTable(data.certificates ?? []));
             }
+
+            window.openCertificateManageModal = function () {
+                document.getElementById('certificate-manage-file-input').value = '';
+                document.getElementById('certificate-manage-password').value = '';
+                document.getElementById('certificate-manage-validation-message').classList.add('hidden');
+
+                const uploadEl = document.getElementById('certificate-manage-upload');
+                if (window.HSFileUpload) {
+                    HSFileUpload.autoInit();
+                }
+                const uploadInstance = window.HSFileUpload && HSFileUpload.getInstance(uploadEl, true);
+                if (uploadInstance?.element?.dropzone) {
+                    uploadInstance.element.dropzone.removeAllFiles(true);
+                }
+
+                loadCertificatesList();
+
+                if (window.HSOverlay) {
+                    HSOverlay.autoInit();
+                    HSOverlay.open('#certificate-manage');
+                }
+            };
+
+            function initCertificateManageUpload() {
+                const uploadEl = document.getElementById('certificate-manage-upload');
+                if (!uploadEl || uploadEl.dataset.bound === 'true') {
+                    return;
+                }
+                uploadEl.dataset.bound = 'true';
+
+                const fileInput = document.getElementById('certificate-manage-file-input');
+                const passwordInput = document.getElementById('certificate-manage-password');
+                const validateBtn = document.getElementById('certificate-manage-validate');
+                const submitBtn = document.getElementById('certificate-manage-submit');
+                const messageEl = document.getElementById('certificate-manage-validation-message');
+                let certificateValidated = false;
+
+                function markUnvalidated() {
+                    certificateValidated = false;
+                    messageEl.classList.add('hidden');
+                }
+
+                function showValidationResult(valid, message) {
+                    certificateValidated = valid;
+                    messageEl.textContent = message;
+                    messageEl.classList.remove('hidden', 'text-green-600', 'dark:text-green-400', 'text-red-600', 'dark:text-red-400');
+                    messageEl.classList.add(...(valid ? ['text-green-600', 'dark:text-green-400'] : ['text-red-600', 'dark:text-red-400']));
+                }
+
+                passwordInput.addEventListener('input', markUnvalidated);
+
+                validateBtn.addEventListener('click', function () {
+                    if (!fileInput.files.length) {
+                        showValidationResult(false, @json(__('Choose a certificate file first.')));
+                        return;
+                    }
+                    if (!passwordInput.value) {
+                        showValidationResult(false, @json(__('Enter the certificate password first.')));
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('certificate', fileInput.files[0]);
+                    formData.append('certificate_password', passwordInput.value);
+
+                    fetch(@json(route('certificate.validate')), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                    })
+                        .then((response) => response.json())
+                        .then((data) => showValidationResult(!!data.valid, data.message))
+                        .catch(() => showValidationResult(false, @json(__('Could not validate the certificate.'))));
+                });
+
+                submitBtn.addEventListener('click', function () {
+                    if (!fileInput.files.length || !passwordInput.value) {
+                        showValidationResult(false, @json(__('Choose a certificate file and password first.')));
+                        return;
+                    }
+                    if (!certificateValidated) {
+                        showValidationResult(false, @json(__('Validate the certificate password before saving.')));
+                        return;
+                    }
+
+                    submitBtn.disabled = true;
+
+                    const formData = new FormData();
+                    formData.append('certificate', fileInput.files[0]);
+                    formData.append('certificate_password', passwordInput.value);
+
+                    fetch(`/companies/${window.currentEditCompany.id}/certificates`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                    })
+                        .then(async (response) => {
+                            const data = await response.json();
+                            if (!response.ok) {
+                                throw new Error(data.message || @json(__('Could not upload the certificate.')));
+                            }
+
+                            fileInput.value = '';
+                            passwordInput.value = '';
+                            markUnvalidated();
+                            const uploadInstance = window.HSFileUpload && HSFileUpload.getInstance(uploadEl, true);
+                            if (uploadInstance?.element?.dropzone) {
+                                uploadInstance.element.dropzone.removeAllFiles(true);
+                            }
+                            loadCertificatesList();
+                        })
+                        .catch((error) => showValidationResult(false, error.message))
+                        .finally(() => {
+                            submitBtn.disabled = false;
+                        });
+                });
+
+                if (window.HSFileUpload) {
+                    HSFileUpload.autoInit();
+                }
+                const uploadInstance = window.HSFileUpload && HSFileUpload.getInstance(uploadEl, true);
+                if (uploadInstance?.element?.dropzone) {
+                    const dropzone = uploadInstance.element.dropzone;
+
+                    dropzone.on('addedfile', function (file) {
+                        const transfer = new DataTransfer();
+                        transfer.items.add(file);
+                        fileInput.files = transfer.files;
+                        markUnvalidated();
+
+                        const previewElement = file.previewElement;
+                        if (previewElement) {
+                            previewElement.classList.add('complete');
+                            const bar = previewElement.querySelector('[data-hs-file-upload-progress-bar]');
+                            const pane = previewElement.querySelector('[data-hs-file-upload-progress-bar-pane]');
+                            const value = previewElement.querySelector('[data-hs-file-upload-progress-bar-value]');
+                            if (bar) bar.setAttribute('aria-valuenow', '100');
+                            if (pane) pane.style.width = '100%';
+                            if (value) value.textContent = '100';
+                        }
+                    });
+
+                    dropzone.on('removedfile', function () {
+                        fileInput.value = '';
+                        markUnvalidated();
+                    });
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', initCertificateManageUpload);
+            document.addEventListener('livewire:navigated', initCertificateManageUpload);
 
             function setSelectValue(selectId, value) {
                 const el = document.getElementById(selectId);
@@ -401,11 +634,6 @@
                 } else {
                     el.value = value ?? '';
                 }
-            }
-
-            function showExistingCertificate(filename) {
-                document.getElementById('edit-company-certificate-existing-name').textContent = filename ?? '';
-                document.getElementById('edit-company-certificate-existing').classList.toggle('hidden', !filename);
             }
 
             /**
@@ -522,60 +750,6 @@
                     reader.readAsDataURL(file);
                 });
 
-                document.getElementById('edit-company-certificate-remove').addEventListener('click', async function () {
-                    const companyId = this.dataset.companyId;
-                    if (!companyId || !(await window.appConfirmDialog.ask(@json(__('This action cannot be undone.'))))) {
-                        return;
-                    }
-
-                    fetch(`/companies/${companyId}/certificate`, {
-                        method: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            'Accept': 'application/json',
-                        },
-                    }).then((response) => {
-                        if (response.ok) {
-                            certificateFilenameOverrides[companyId] = null;
-                            showExistingCertificate(null);
-                        }
-                    });
-                });
-
-                document.getElementById('edit-company-dian_certificate_password').addEventListener('input', markCertificateUnvalidated);
-
-                document.getElementById('edit-company-certificate-validate').addEventListener('click', function () {
-                    const companyId = this.dataset.companyId;
-                    const password = document.getElementById('edit-company-dian_certificate_password').value;
-
-                    if (!password) {
-                        showCertificateValidationResult(false, @json(__('Enter the certificate password first.')));
-                        return;
-                    }
-
-                    fetch(`/companies/${companyId}/certificate/validate`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ certificate_password: password }),
-                    })
-                        .then((response) => response.json())
-                        .then((data) => showCertificateValidationResult(!!data.valid, data.message))
-                        .catch(() => showCertificateValidationResult(false, @json(__('Could not validate the certificate.'))));
-                });
-
-                document.getElementById('editCompanyForm').addEventListener('submit', function (event) {
-                    const password = document.getElementById('edit-company-dian_certificate_password').value;
-                    const hasCertificate = !document.getElementById('edit-company-certificate-existing').classList.contains('hidden');
-
-                    if (password && hasCertificate && !certificateValidated) {
-                        event.preventDefault();
-                        showCertificateValidationResult(false, @json(__('Validate the certificate password before saving.')));
-                    }
-                });
             }
 
             document.addEventListener('DOMContentLoaded', init);
@@ -613,37 +787,11 @@
                 setSelectValue('edit-company-dian_environment', company.dian_environment || '2');
                 document.getElementById('edit-company-dian_pin').value = company.dian_pin ?? '';
                 document.getElementById('edit-company-dian_software_id').value = company.dian_software_id ?? '';
-                document.getElementById('edit-company-dian_certificate_password').value = '';
-                markCertificateUnvalidated();
-
-                const knownFilename = Object.prototype.hasOwnProperty.call(certificateFilenameOverrides, company.id)
-                    ? certificateFilenameOverrides[company.id]
-                    : company.dian_certificate_filename;
-                showExistingCertificate(knownFilename);
-
-                const uploadEl = document.getElementById('edit-company-certificate-upload');
-                if (window.HSFileUpload) {
-                    HSFileUpload.autoInit();
-                }
-                const uploadInstance = window.HSFileUpload && HSFileUpload.getInstance(uploadEl, true);
-                if (uploadInstance?.element?.dropzone) {
-                    const dropzone = uploadInstance.element.dropzone;
-                    dropzone.removeAllFiles(true);
-                    dropzone.options.url = `/companies/${company.id}/certificate`;
-                    dropzone.options.headers = { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content };
-                    dropzone.off('success');
-                    dropzone.on('success', function (file, response) {
-                        certificateFilenameOverrides[company.id] = response?.filename ?? null;
-                        showExistingCertificate(response?.filename);
-                        markCertificateUnvalidated();
-                    });
-                }
-
                 document.getElementById('editCompanyForm').action = `/companies/${company.id}`;
-                document.getElementById('edit-company-certificate-remove').dataset.companyId = company.id;
-                document.getElementById('edit-company-certificate-validate').dataset.companyId = company.id;
 
                 window.currentEditCompany = company;
+                loadCertificatesList();
+
                 document.getElementById('edit-company-habilitacion-status').textContent = company.dian_habilitado
                     ? @json(__('Already enabled.'))
                     : @json(__('Not enabled yet.'));

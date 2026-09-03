@@ -371,21 +371,24 @@ class UblDocumentSigner
     }
 
     /**
-     * Carga el certificado y la llave privada de la empresa desde su .p12/.pfx.
+     * Carga el certificado y la llave privada del .p12/.pfx vigente de la
+     * empresa (el más reciente entre los que no han vencido -- ver
+     * Company::activeDianCertificate()).
      *
      * @param  Company  $company  Empresa cuyo certificado se va a cargar.
      * @return array{0: string, 1: string, 2: array} Certificado PEM, llave privada PEM, y certificados adicionales de la cadena.
      */
     private function loadCertificateChain(Company $company): array
     {
-        if (! $company->dian_certificate_content || ! $company->dian_certificate_password) {
-            throw new RuntimeException(__('This company has no validated certificate configured.'));
+        $certificate = $company->activeDianCertificate();
+
+        if (! $certificate) {
+            throw new RuntimeException(__('You no longer have any valid certificates. Please add one before signing.'));
         }
 
-        $content = $company->dian_certificate_content;
         $certs = [];
 
-        if (! openssl_pkcs12_read($content, $certs, $company->dian_certificate_password)) {
+        if (! openssl_pkcs12_read($certificate->content, $certs, $certificate->password)) {
             throw new RuntimeException(__('The password does not match this certificate.'));
         }
 

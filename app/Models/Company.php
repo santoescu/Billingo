@@ -243,6 +243,61 @@ class Company extends Model
         return $this->identificacion;
     }
 
+    public function dianCertificates()
+    {
+        return $this->hasMany(DianCertificate::class)->orderByDesc('created_at');
+    }
+
+    /**
+     * El certificado que se usa para firmar en este momento: el más
+     * reciente entre los que todavía no vencieron. Si ninguno está vigente
+     * (o no hay ninguno cargado todavía) devuelve null -- quien firme debe
+     * avisar que hace falta agregar uno nuevo, no reusar uno vencido.
+     */
+    public function activeDianCertificate(): ?DianCertificate
+    {
+        $this->migrateLegacyDianCertificate();
+
+        return $this->dianCertificates()
+            ->get()
+            ->reject(fn (DianCertificate $certificate) => $certificate->is_expired)
+            ->first();
+    }
+
+    /**
+     * Antes de que existiera esta colección, cada empresa solo tenía un
+     * certificado guardado directo en sus propios campos ("dian_certificate_*").
+     * La primera vez que se consulta la lista de certificados de una empresa
+     * que todavía tiene ese campo legado (y no se ha migrado todavía), se
+     * copia a un registro de DianCertificate para que conviva con los nuevos
+     * sin perder el que ya estaba configurado.
+     */
+    public function migrateLegacyDianCertificate(): void
+    {
+        if (! $this->dian_certificate_content || ! $this->dian_certificate_password) {
+            return;
+        }
+
+        if ($this->dianCertificates()->count() > 0) {
+            return;
+        }
+
+        try {
+            $info = DianCertificate::parseInfo($this->dian_certificate_content, $this->dian_certificate_password);
+        } catch (\RuntimeException) {
+            return;
+        }
+
+        $this->dianCertificates()->create([
+            'content' => $this->dian_certificate_content,
+            'password' => $this->dian_certificate_password,
+            'original_name' => $this->dian_certificate_original_name,
+            'subject_name' => $info['subject_name'],
+            'valid_from' => $info['valid_from'],
+            'valid_to' => $info['valid_to'],
+        ]);
+    }
+
     public function getDianCertificateFilenameAttribute(): ?string
     {
         if (! $this->dian_certificate_content) {

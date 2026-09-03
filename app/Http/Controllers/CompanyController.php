@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\CompanyMember;
 use App\Models\Department;
+use App\Models\DianCertificate;
 use App\Models\FiscalResponsibility;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -205,6 +206,102 @@ class CompanyController extends Controller
             'dian_certificate_password' => null,
             'dian_certificate_original_name' => null,
         ]);
+
+        return response()->json(['message' => __('Certificate removed.')]);
+    }
+
+    /**
+     * Lista todos los certificados digitales de la empresa (no solo el
+     * legado de campos únicos), migrando primero el certificado legado si
+     * hace falta -- ver Company::migrateLegacyDianCertificate().
+     */
+    public function listCertificates(Request $request, string $id)
+    {
+        $company = $this->authorizeCompanyAdmin($request, $id);
+        $company->migrateLegacyDianCertificate();
+
+        return response()->json([
+            'certificates' => $company->dianCertificates()->get()->map(fn (DianCertificate $certificate) => [
+                'id' => (string) $certificate->_id,
+                'original_name' => $certificate->original_name,
+                'subject_name' => $certificate->subject_name,
+                'valid_from' => optional($certificate->valid_from)->format('Y-m-d'),
+                'valid_to' => optional($certificate->valid_to)->format('Y-m-d'),
+                'is_expired' => $certificate->is_expired,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Sube un nuevo certificado digital -- a diferencia del certificado
+     * legado (que se sobreescribía), esto siempre agrega uno nuevo a la
+     * lista de la empresa, dejando el histórico completo disponible.
+     */
+    public function storeCertificateEntry(Request $request, string $id)
+    {
+        $company = $this->authorizeCompanyAdmin($request, $id);
+
+        $request->validate([
+            'certificate' => 'required|file|max:5120',
+            'certificate_password' => 'required|string',
+        ]);
+
+        $file = $request->file('certificate');
+        $extension = strtolower($file->getClientOriginalExtension());
+
+        if (! in_array($extension, ['p12', 'pfx'], true)) {
+            return response()->json(['message' => __('The certificate must be a .p12 or .pfx file.')], 422);
+        }
+
+        $content = file_get_contents($file->getRealPath());
+        $password = $request->input('certificate_password');
+
+        try {
+            $info = DianCertificate::parseInfo($content, $password);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $company->dianCertificates()->create([
+            'content' => $content,
+            'password' => $password,
+            'original_name' => $file->getClientOriginalName(),
+            'subject_name' => $info['subject_name'],
+            'valid_from' => $info['valid_from'],
+            'valid_to' => $info['valid_to'],
+        ]);
+
+        return response()->json(['message' => __('Certificate uploaded.')]);
+    }
+
+    /**
+     * Descarga el archivo .p12/.pfx tal cual se subió (mismo nombre
+     * original), para que se pueda volver a instalar en otro lado si hace
+     * falta.
+     */
+    public function downloadCertificateEntry(Request $request, string $id, string $certificateId)
+    {
+        $company = $this->authorizeCompanyAdmin($request, $id);
+
+        $certificate = $company->dianCertificates()->where('_id', $certificateId)->first();
+        abort_unless($certificate, 404);
+
+        $filename = $certificate->original_name ?: 'certificado.p12';
+
+        return response($certificate->content, 200, [
+            'Content-Type' => 'application/x-pkcs12',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * Borra un certificado puntual de la lista (no todo el histórico).
+     */
+    public function destroyCertificateEntry(Request $request, string $id, string $certificateId)
+    {
+        $company = $this->authorizeCompanyAdmin($request, $id);
+
+        $company->dianCertificates()->where('_id', $certificateId)->delete();
 
         return response()->json(['message' => __('Certificate removed.')]);
     }
