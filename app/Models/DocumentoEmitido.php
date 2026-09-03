@@ -114,6 +114,25 @@ class DocumentoEmitido extends Model
         return $this->payment_means_id === self::PAYMENT_MEANS_CREDIT;
     }
 
+    /**
+     * URL de consulta pública del documento en el catálogo de la DIAN --
+     * misma fórmula que UblDocumentBuilder::qrValidationUrl() (no se pudo
+     * reusar directo por ser privado ahí), necesaria para el código QR de
+     * la representación gráfica.
+     */
+    public function getQrValidationUrlAttribute(): ?string
+    {
+        if (! $this->uuid) {
+            return null;
+        }
+
+        $host = $this->ambiente === Company::DIAN_AMBIENTE_PRODUCCION
+            ? 'https://catalogo-vpfe.dian.gov.co'
+            : 'https://catalogo-vpfe-hab.dian.gov.co';
+
+        return "{$host}/document/searchqr?documentkey={$this->uuid}";
+    }
+
     public function getIsPaidAttribute(): bool
     {
         return ! is_null($this->paid_at);

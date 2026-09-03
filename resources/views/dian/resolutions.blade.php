@@ -3,9 +3,9 @@
     
     $documentTypeLabels = [
         '01' => __('Electronic sales invoice'),
-        '02' => __('Invoice (export)'),
-        '03' => __('Invoice (contingency, paper)'),
-        '04' => __('Invoice (DIAN contingency)'),
+        '02' => __('Electronic sales invoice (export)'),
+        '03' => __('Electronic transmission instrument (type 03)'),
+        '04' => __('Electronic sales invoice (type 04)'),
         '91' => __('Credit note'),
         '92' => __('Debit note'),
         'FV' => __('Sales invoice'),
