@@ -212,6 +212,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [QuotationController::class, 'create'])->name('create');
             Route::post('/', [QuotationController::class, 'store'])->name('store');
             Route::get('list', [QuotationController::class, 'index'])->name('index');
+            Route::get('data', [QuotationController::class, 'data'])->name('data');
             Route::get('{quotation}', [QuotationController::class, 'show'])->name('show');
             Route::get('{quotation}/pdf', [QuotationController::class, 'pdf'])->name('pdf');
             Route::get('{quotation}/preview', [QuotationController::class, 'preview'])->name('preview');

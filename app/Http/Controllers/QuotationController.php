@@ -94,18 +94,35 @@ class QuotationController extends Controller
     }
 
     /**
-     * Lista las cotizaciones de la empresa activa, más recientes primero.
+     * $quotations vacío a propósito: la tabla se llena por AJAX (ver data())
+     * apenas termina de cargar la página, en vez de bloquear el primer
+     * render con la consulta completa del historial (mismo patrón que
+     * DocumentoEmitidoController::index()/data()).
      */
     public function index(Request $request)
     {
         $company = $this->currentCompany($request);
 
-        $quotations = $company->quotations()->orderByDesc('created_at')->get();
+        $quotations = collect();
         $catalogLinks = $company->catalogLinks()->orderByDesc('created_at')->get();
         $warehouses = $company->warehouses()->orderBy('name')->get();
         $priceTypes = $company->priceTypes()->orderBy('name')->get();
 
         return view('quotations.index', compact('company', 'quotations', 'catalogLinks', 'warehouses', 'priceTypes'));
+    }
+
+    /**
+     * Lista las cotizaciones de la empresa activa, más recientes primero.
+     */
+    public function data(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $quotations = $company->quotations()->orderByDesc('created_at')->get();
+
+        $rowsHtml = view('quotations.partials.rows', compact('quotations'))->render();
+
+        return response()->json(['rows_html' => $rowsHtml]);
     }
 
     /**
