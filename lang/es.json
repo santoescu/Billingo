@@ -1693,5 +1693,7 @@
     "DIAN payment method code": "Código de medio de pago DIAN",
     "Testing environment": "Ambiente de pruebas",
     "Sales invoices issued from the point of sale.": "Facturas de venta emitidas desde el punto de venta.",
-    ":count used": ":count usados"
+    ":count used": ":count usados",
+    "Already know what you need?": "¿Ya sabes lo que necesitas?",
+    "Sign up and create your company": "Regístrate y crea tu empresa"
 }

@@ -342,6 +342,11 @@
                                 {{ __('Send message') }}
                             </button>
                         </form>
+
+                        <p class="mt-4 max-w-md text-sm text-neutral-400">
+                            {{ __('Already know what you need?') }}
+                            <a href="{{ route('register') }}" class="font-semibold text-white underline underline-offset-2 hover:text-accent" wire:navigate>{{ __('Sign up and create your company') }}</a>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -457,11 +462,17 @@
                      que dejar esa pestaña abierta (con los datos que ya
                      había escrito) en vez de la de "Módulos" por defecto. --}}
                 window.showAuthPromoTab('contact');
-            @elseif (session('status'))
+            @elseif (session('status') || request()->routeIs('register'))
                 {{-- El mensaje de éxito (u otro "status" de sesión, como el
                      de restablecer contraseña) vive en el panel del
                      formulario -- en mobile hay que revelarlo a mano, si no
-                     queda escondido detrás del panel de info. --}}
+                     queda escondido detrás del panel de info. Lo mismo para
+                     "/register": si el usuario venía del login con el panel
+                     de info abierto y le da "Inscribirme", cada página es
+                     una recarga completa (no hay SPA) que reinicia el JS al
+                     estado por defecto -- sin esto, en mobile aterrizaba de
+                     nuevo en el panel de info en vez de seguir directo al
+                     formulario de registro que acababa de pedir. --}}
                 if (window.matchMedia('(max-width: 1023px)').matches) {
                     window.toggleMobilePanel();
                 }
