@@ -2,6 +2,14 @@
     $appearance = session('appearance', 'light');
     $isDark = $appearance === 'dark';
 
+    // El panel del formulario arranca cerrado (ancho 0) en desktop -- el
+    // usuario lo abre con la flecha. En /register eso significa que, si
+    // venía del login con el panel ya abierto y le da "Inscribirme", la
+    // página nueva vuelve a nacer cerrada (esta clase sale directo del
+    // HTML server-side, no depende de que ningún JS corra a tiempo) --
+    // para esa ruta arranca abierto desde el primer render.
+    $authShellOpenByDefault = request()->routeIs('register');
+
     $moduleDescriptions = [
         'invoicing' => __('DIAN-certified electronic invoicing, with online validation and automatic delivery to your clients.'),
         'receiving' => __('Centralized reception of your suppliers\' electronic documents, with full history and traceability.'),
@@ -126,12 +134,12 @@
              ganan sobre lo que JS le haya puesto (hidden/flex sin prefijo)
              a partir de "lg" -- por eso el estado mobile no puede filtrarse
              a desktop aunque no se resetee al cambiar de tamaño. --}}
-        <div id="auth-shell" class="relative grid h-dvh grid-cols-[minmax(0,1fr)] items-stretch justify-center lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
+        <div id="auth-shell" class="relative grid h-dvh grid-cols-[minmax(0,1fr)] items-stretch justify-center lg:max-w-none {{ $authShellOpenByDefault ? 'lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)]' }} lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
             <div id="auth-promo-panel" class="bg-muted relative flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-6 text-white sm:p-10 lg:flex dark:border-r dark:border-neutral-800">
                 <button type="button" id="auth-login-toggle-btn" aria-label="{{ __('Log in') }}" title="{{ __('Log in') }}"
                     onclick="window.toggleAuthLoginPanel()"
                     class="absolute end-6 top-6 z-30 hidden size-10 items-center justify-center rounded-full text-neutral-300 hover:bg-white/10 hover:text-white focus:outline-hidden lg:flex">
-                    <svg id="auth-login-toggle-icon" class="size-5 shrink-0 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                    <svg id="auth-login-toggle-icon" class="size-5 shrink-0 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ $authShellOpenByDefault ? 'transform: rotate(180deg)' : '' }}"><path d="m15 18-6-6 6-6"></path></svg>
                 </button>
 
                 <div class="relative z-20">
