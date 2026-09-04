@@ -38,6 +38,9 @@
 
                         <button type="submit" class="w-full space-y-2 pr-8 text-left">
                             <h2 class="text-lg font-semibold text-gray-800 dark:text-white">{{ $company->name }}</h2>
+                            @if (($company->dian_environment ?? \App\Models\Company::DIAN_AMBIENTE_PRUEBAS) !== \App\Models\Company::DIAN_AMBIENTE_PRODUCCION)
+                                <span class="inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{{ __('Testing environment') }}</span>
+                            @endif
                             <p class="text-sm text-neutral-500 dark:text-neutral-400">
                                 {{ __('Identification') }}: {{ $company->identificacion }}{{ $company->dv ? '-' . $company->dv : '' }}
                             </p>

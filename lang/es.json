@@ -1690,5 +1690,6 @@
     "Fixed test set": "Set de pruebas fijo",
     "File name": "Nombre del archivo",
     "Certificate holder": "Titular del certificado",
-    "DIAN payment method code": "Código de medio de pago DIAN"
+    "DIAN payment method code": "Código de medio de pago DIAN",
+    "Testing environment": "Ambiente de pruebas"
 }
