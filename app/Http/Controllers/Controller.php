@@ -64,7 +64,13 @@ abstract class Controller
      * obligar al usuario a buscar o crear uno cada vez -- ver
      * DocumentJsonMapper::resolveCustomerParty(), que solo exige los datos
      * completos del cliente si todavía no existe. Usado por POS y
-     * Cotizaciones.
+     * Cotizaciones. Dirección/ciudad/departamento van con datos de relleno
+     * (Bogotá D.C.) en vez de quedar vacíos: son obligatorios para emitir
+     * una factura electrónica (ver PosController::issueElectronic()), y sin
+     * esto la primera venta a "Consumidor final" nunca se podía facturar
+     * electrónicamente hasta que alguien entrara a completar el cliente a
+     * mano. Teléfono/correo son de relleno también, pero esos si quedan
+     * vacíos no bloquean nada -- son opcionales en el UBL.
      */
     protected function defaultClient(Company $company): ThirdParty
     {
@@ -81,6 +87,11 @@ abstract class Controller
             'identification_type' => '13',
             'identificacion' => '222222222222',
             'person_type' => '2',
+            'address' => 'Calle 0 # 0-00',
+            'city_code' => '11001',
+            'department_code' => '11',
+            'phone' => '0000000000',
+            'email' => 'consumidorfinal@example.com',
         ]);
     }
 }
