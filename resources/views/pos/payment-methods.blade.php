@@ -1,5 +1,9 @@
 @php
     $basicSelectConfig = \App\Support\SelectConfig::basic();
+    // "floating": el select vive dentro del panel con scroll propio del
+    // modal -- sin esto, el dropdown quedaba recortado por ese overflow
+    // (se cortaba justo donde termina el botón "Guardar").
+    $dianCodeSelectConfig = \App\Support\SelectConfig::searchable(__('No DIAN equivalent'), __('Search...'), floating: true);
 @endphp
 
 <x-layouts.app :title="__('Payment methods')">
@@ -91,7 +95,7 @@
                 <flux:input name="name" id="payment-method-name" :label="__('Name')" maxlength="255" required />
                 <div id="payment-method-dian-code-field">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('DIAN equivalent') }}</label>
-                    <select name="dian_payment_means_code" id="payment-method-dian-code" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                    <select name="dian_payment_means_code" id="payment-method-dian-code" data-hs-select='{!! $dianCodeSelectConfig !!}' class="hidden">
                         <option value=""></option>
                         @foreach ($paymentMeansCodes as $paymentMeansCode)
                             <option value="{{ $paymentMeansCode->codigo }}">{{ $paymentMeansCode->codigo }} - {{ $paymentMeansCode->medio }}</option>
