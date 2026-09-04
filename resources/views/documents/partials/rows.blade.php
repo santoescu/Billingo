@@ -71,7 +71,4 @@
         </td>
     </tr>
 @empty
-    <tr>
-        <td colspan="7" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Issued documents')]) }}</td>
-    </tr>
 @endforelse

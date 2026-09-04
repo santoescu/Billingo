@@ -62,6 +62,7 @@
                 function initDocumentsTable() {
                     const table = initWorkflowDataTable('#documentsTable', '#hs-table-with-pagination-search', {
                         columnDefs: [{ targets: -1, orderable: false }],
+                        emptyTable: "{{ __('There are no registered :name.', ['name' => __('Issued documents')]) }}",
                     });
                     table.order([]).draw();
                 }

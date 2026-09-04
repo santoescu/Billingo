@@ -12,9 +12,18 @@
      * se acumulan binds duplicados apuntando cada uno a una instancia
      * distinta de la tabla.
      *
+     * "emptyTable" es el mensaje para cuando la tabla arranca sin filas
+     * (distinto de "zeroRecords", que es para una búsqueda sin resultados).
+     * Por eso el placeholder de "no hay nada todavía" NO debe venir como
+     * una fila real en el HTML (un <tr><td colspan="n"> cuenta como fila
+     * de datos con una sola columna real, y DataTables tira "Requested
+     * unknown parameter '1' for row 0" al intentar ordenar/buscar sobre
+     * las columnas que le faltan) -- el <tbody> debe quedar vacío y dejar
+     * que DataTables muestre este mensaje por su cuenta.
+     *
      * @param {string} selector Selector de la tabla.
      * @param {string} searchSelector Selector del input de búsqueda.
-     * @param {object} [options={}] pageLength, zeroRecords, columnDefs.
+     * @param {object} [options={}] pageLength, zeroRecords, emptyTable, columnDefs.
      * @returns {object} Instancia de DataTable.
      */
     window.initWorkflowDataTable = function(selector, searchSelector, options = {}) {
@@ -22,11 +31,21 @@
             $(selector).DataTable().destroy();
         }
 
+        // DataTables mete este texto tal cual dentro del <td> que genera
+        // (colspan automático a todas las columnas) -- se envuelve en un
+        // div con el mismo estilo que usan los "no hay nada todavía"
+        // armados a mano en el resto de la app (centrado + gris, visible
+        // en claro y oscuro), para que quede igual sin repetir esas clases
+        // en cada vista que llama a initWorkflowDataTable().
+        const emptyStateHtml = (text) => `<div class="px-4 py-6 text-center text-sm text-neutral-400">${text}</div>`;
+        const zeroRecordsText = options.zeroRecords || "{{ __('No matching records found') }}";
+
         const table = $(selector).DataTable({
             dom: 't<"workflow-datatable-footer flex flex-col gap-2 py-3 px-4 sm:flex-row sm:items-center sm:justify-between"<"workflow-datatable-info-wrap"><"workflow-datatable-pagination">>',
             pageLength: options.pageLength || 50,
             language: {
-                zeroRecords: options.zeroRecords || "{{ __('No matching records found') }}",
+                zeroRecords: emptyStateHtml(zeroRecordsText),
+                emptyTable: emptyStateHtml(options.emptyTable || zeroRecordsText),
             },
             columnDefs: options.columnDefs || [],
             drawCallback: function(settings) {
