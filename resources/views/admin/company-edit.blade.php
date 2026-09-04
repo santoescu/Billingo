@@ -252,7 +252,7 @@
                                                 @if ($contract->unlimited)
                                                     <span class="inline-flex items-center gap-1 text-xs font-medium text-accent">
                                                         <svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"></path></svg>
-                                                        {{ __('Unlimited') }}
+                                                        {{ __(':count used', ['count' => $used]) }} &middot; {{ __('Unlimited') }}
                                                     </span>
                                                 @elseif ($limit === null)
                                                     <span class="text-xs font-semibold text-gray-700 dark:text-neutral-300">{{ $used }} &middot; ∞</span>
