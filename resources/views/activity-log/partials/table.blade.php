@@ -39,7 +39,7 @@
                     <td class="px-4 py-3 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $log->label }}</td>
                     <td class="px-4 py-3 text-end text-sm">
                         @if (! empty($log->changes))
-                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View changes') }}" title="{{ __('View changes') }}" onclick="showActivityLogChanges(@json($log->changes), @json($log->action), @json($log->label))">
+                            <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View changes') }}" title="{{ __('View changes') }}" onclick="showActivityLogChanges({{ \Illuminate\Support\Js::from($log->changes) }}, {{ \Illuminate\Support\Js::from($log->action) }}, {{ \Illuminate\Support\Js::from($log->label) }})">
                                 <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
                         @endif
