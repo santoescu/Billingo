@@ -1,9 +1,6 @@
 @php
     $basicSelectConfig = \App\Support\SelectConfig::basic();
-    // "floating": el select vive dentro del panel con scroll propio del
-    // modal -- sin esto, el dropdown quedaba recortado por ese overflow
-    // (se cortaba justo donde termina el botón "Guardar").
-    $dianCodeSelectConfig = \App\Support\SelectConfig::searchable(__('No DIAN equivalent'), __('Search...'), floating: true);
+    $dianCodeSelectConfig = \App\Support\SelectConfig::searchable(__('No DIAN equivalent'), __('Search...'));
 @endphp
 
 <x-layouts.app :title="__('Payment methods')">
@@ -76,8 +73,8 @@
         </div>
     </div>
 
-    <div id="payment-method-panel" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-lg w-full z-80 bg-white border-s border-gray-200 dark:bg-neutral-800 dark:border-neutral-700" role="dialog" tabindex="-1" aria-labelledby="payment-method-panel-label">
-        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+    <div id="payment-method-panel" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-lg w-full z-80 bg-white border-s border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 flex flex-col" role="dialog" tabindex="-1" aria-labelledby="payment-method-panel-label">
+        <div class="shrink-0 flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
             <h3 id="payment-method-panel-label" class="font-bold text-gray-800 dark:text-white">{{ __('New payment method') }}</h3>
             <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#payment-method-panel">
                 <span class="sr-only">Close</span>
@@ -87,7 +84,7 @@
                 </svg>
             </button>
         </div>
-        <div class="overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+        <div class="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
             <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">{{ __('If you leave the DIAN equivalent empty, this payment method cannot be used for a sale issued as an electronic invoice.') }}</p>
             <form id="paymentMethodForm" method="POST" action="{{ route('pos.payment-methods.store') }}" class="space-y-4">
                 @csrf

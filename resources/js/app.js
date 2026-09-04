@@ -5,12 +5,6 @@ window.ClipboardJS = ClipboardJS;
 import clipboardHelper from 'preline/helpers/clipboard';
 window.hsClipboardHelper = clipboardHelper;
 
-// Preline's select usa "dropdownScope: window" (SelectConfig::searchable(..., floating: true))
-// para posicionar el dropdown con Floating UI cuando vive dentro de un panel con scroll
-// propio (ej. un modal) -- sin esto expuesto como global, esa opción no abre el dropdown.
-import * as FloatingUIDOM from '@floating-ui/dom';
-window.FloatingUIDOM = FloatingUIDOM;
-
 import "preline";
 import '@preline/select'
 import '@preline/overlay';

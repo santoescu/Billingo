@@ -30,13 +30,8 @@ class SelectConfig
      *
      * @param  string|null  $placeholder  Texto del placeholder; por defecto __('Select...').
      * @param  string|null  $searchPlaceholder  Texto del buscador; por defecto __('Search').
-     * @param  bool  $floating  Si el select vive dentro de un panel con scroll propio
-     *                          (ej. un modal), el dropdown queda recortado por ese
-     *                          overflow -- "dropdownScope: window" hace que Preline lo
-     *                          posicione con Floating UI relativo al viewport en vez de
-     *                          al contenedor, así puede salirse del panel.
      */
-    public static function searchable(?string $placeholder = null, ?string $searchPlaceholder = null, bool $floating = false): string
+    public static function searchable(?string $placeholder = null, ?string $searchPlaceholder = null): string
     {
         $json = <<<'JSON'
         {
@@ -53,16 +48,10 @@ class SelectConfig
         }
         JSON;
 
-        $config = json_decode($json, true);
-
-        if ($floating) {
-            $config['dropdownScope'] = 'window';
-        }
-
         return str_replace(
             ['__SEARCH_PLACEHOLDER__', '__SELECT_PLACEHOLDER__'],
             [$searchPlaceholder ?? __('Search'), $placeholder ?? __('Select...')],
-            json_encode($config)
+            $json
         );
     }
 
