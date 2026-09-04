@@ -10,8 +10,13 @@
 
     <div class="flex items-center gap-3">
         @if (filled(data_get($selectedCompany, 'name')))
-            <div class="rounded-md bg-gray-100 px-4 py-3 text-lg font-semibold text-accent dark:bg-neutral-800">
-                {{ data_get($selectedCompany, 'name') }}
+            <div class="text-right">
+                <div class="rounded-md bg-gray-100 px-4 py-3 text-lg font-semibold text-accent dark:bg-neutral-800">
+                    {{ data_get($selectedCompany, 'name') }}
+                </div>
+                @if ((data_get($selectedCompany, 'dian_environment') ?? \App\Models\Company::DIAN_AMBIENTE_PRUEBAS) !== \App\Models\Company::DIAN_AMBIENTE_PRODUCCION)
+                    <span class="mt-1 inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{{ __('Testing environment') }}</span>
+                @endif
             </div>
         @endif
 

@@ -354,6 +354,7 @@ class CompanyController extends Controller
                 'identificacion' => $company->identificacion,
                 'role' => $membership->role,
                 'modules' => $myModules,
+                'dian_environment' => $company->dian_environment,
             ],
         ]);
 
