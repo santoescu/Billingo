@@ -1,8 +1,3 @@
-@php
-    
-    $nitIdentificationType = '31';
-@endphp
-
 <x-layouts.app :title="__('Sales')">
     @include('partials.tittle', [
         'title' => __('Sales'),
@@ -19,9 +14,15 @@
                             <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                         </div>
 
-                        <a href="{{ route('pos.create') }}">
-                            <flux:button type="button" variant="primary" icon="plus">{{ __('New sale') }}</flux:button>
-                        </a>
+                        <div class="flex gap-2">
+                            <button type="button" id="pos-sales-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadPosSalesTable()">
+                                <svg id="pos-sales-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                            </button>
+
+                            <a href="{{ route('pos.create') }}">
+                                <flux:button type="button" variant="primary" icon="plus">{{ __('New sale') }}</flux:button>
+                            </a>
+                        </div>
                     </div>
 
                     <div class="overflow-hidden">
@@ -37,40 +38,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @forelse ($documentos as $documento)
-                                    @php
-                                        $customerParty = $documento->payload['accounting_customer_party'] ?? [];
-                                        $customerName = $documento->cliente?->name ?? ($customerParty['razon_social'] ?? null);
-                                        $customerIdentification = $customerParty['identificacion'] ?? null;
-                                        $customerDv = $customerParty['tipo_identificacion'] === $nitIdentificationType ? ($customerParty['dv'] ?? null) : null;
-                                    @endphp
-                                    <tr>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
-                                        <td class="px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $documento->numeral }}</td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            <div class="text-gray-800 dark:text-neutral-200">{{ $customerName ?? '—' }}</div>
-                                            <div>{{ $customerIdentification ?? '—' }}{{ $customerDv ? '-' . $customerDv : '' }}</div>
-                                        </td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $documento->total_formatted }}</td>
-                                        <td class="px-4 py-4 text-sm">
-                                            <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
-                                        </td>
-                                        <td class="px-4 py-4 text-end text-sm">
-                                            <div class="flex justify-end gap-1">
-                                                <a href="{{ route('pos.sales.receipt-preview', $documento->_id) }}" target="_blank" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View PDF') }}" title="{{ __('View PDF') }}">
-                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-                                                </a>
-                                                <a href="{{ route('pos.sales.show', $documento->_id) }}" class="pos-sale-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}" title="{{ __('View') }}">
-                                                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Sales')]) }}</td>
-                                    </tr>
-                                @endforelse
+                                @include('pos.sales.partials.rows')
                             </tbody>
                         </table>
                     </div>
@@ -83,10 +51,43 @@
 
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const table = initWorkflowDataTable('#posSalesTable', '#hs-table-with-pagination-search');
-                table.order([]).draw();
-            });
+            /**
+             * La tabla de ventas ya no viene lista en el HTML inicial (ver
+             * PosController::sales()) -- se pide por AJAX apenas carga la
+             * página para no bloquear el primer render con la consulta
+             * completa del historial, igual que hace loadDocumentsTable()
+             * en documents/index.blade.php.
+             * @returns {void}
+             */
+            function loadPosSalesTable() {
+                const tbody = document.querySelector('#posSalesTable tbody');
+                if (! tbody) return;
+
+                const refreshBtn = document.getElementById('pos-sales-refresh-btn');
+                const refreshIcon = document.getElementById('pos-sales-refresh-icon');
+                if (refreshBtn) refreshBtn.disabled = true;
+                if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+                fetch('{{ route('pos.sales.data') }}', { headers: { Accept: 'application/json' } })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        tbody.innerHTML = data.rows_html;
+
+                        const table = initWorkflowDataTable('#posSalesTable', '#hs-table-with-pagination-search', {
+                            emptyTable: "{{ __('There are no registered :name.', ['name' => __('Sales')]) }}",
+                        });
+                        table.order([]).draw();
+                    })
+                    .finally(() => {
+                        if (refreshBtn) refreshBtn.disabled = false;
+                        if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                    });
+            }
+
+            window.loadPosSalesTable = loadPosSalesTable;
+
+            document.addEventListener('DOMContentLoaded', loadPosSalesTable);
+            document.addEventListener('livewire:navigated', loadPosSalesTable);
         </script>
     @endpush
 </x-layouts.app>

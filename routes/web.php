@@ -189,6 +189,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('shift', [PosController::class, 'shift'])->name('shift');
             Route::post('checkout', [PosController::class, 'checkout'])->name('checkout');
             Route::get('sales', [PosController::class, 'sales'])->name('sales.index');
+            Route::get('sales/data', [PosController::class, 'salesData'])->name('sales.data');
             Route::get('sales/{sale}', [PosController::class, 'showSale'])->name('sales.show');
             Route::put('sales/{sale}', [PosController::class, 'updateSale'])->name('sales.update');
             Route::get('sales/{sale}/receipt.pdf', [PosController::class, 'receiptPdf'])->name('sales.receipt-pdf');

@@ -413,13 +413,28 @@ class PosController extends Controller
     }
 
     /**
+     * $documentos vacío a propósito: la tabla se llena por AJAX (ver
+     * salesData()) apenas termina de cargar la página, en vez de bloquear
+     * el primer render con la consulta completa del historial (mismo
+     * patrón que DocumentoEmitidoController::index()/data()).
+     */
+    public function sales(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $documentos = collect();
+
+        return view('pos.sales.index', compact('company', 'documentos'));
+    }
+
+    /**
      * Lista las ventas del POS (talonario o electrónicas) de la empresa
      * activa -- colección separada de "documentos_emitidos" (esa es solo
      * documentos electrónicos reales), para poder ver de un vistazo cuánto
      * se ha vendido por el POS sin importar si terminó facturado
      * electrónicamente o no.
      */
-    public function sales(Request $request)
+    public function salesData(Request $request)
     {
         $company = $this->currentCompany($request);
 
@@ -427,7 +442,9 @@ class PosController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('pos.sales.index', compact('company', 'documentos'));
+        $rowsHtml = view('pos.sales.partials.rows', compact('documentos'))->render();
+
+        return response()->json(['rows_html' => $rowsHtml]);
     }
 
     public function showSale(Request $request, string $sale)
