@@ -1968,6 +1968,9 @@
                             initWorkflowDataTable('#productsTable', '#hs-table-with-pagination-search', {
                                 columnDefs: [{ targets: -1, orderable: false }],
                             });
+
+                            if (window.HSDropdown) HSDropdown.autoInit();
+                            if (window.HSOverlay) HSOverlay.autoInit();
                         })
                         .finally(() => {
                             if (refreshBtn) refreshBtn.disabled = false;
