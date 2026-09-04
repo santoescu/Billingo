@@ -99,7 +99,7 @@ class QuotationController extends Controller
      * render con la consulta completa del historial (mismo patrón que
      * DocumentoEmitidoController::index()/data()).
      */
-    public function index(Request $request)
+    public function index(Request $request, DocumentoEmitidoController $documentController)
     {
         $company = $this->currentCompany($request);
 
@@ -107,8 +107,9 @@ class QuotationController extends Controller
         $catalogLinks = $company->catalogLinks()->orderByDesc('created_at')->get();
         $warehouses = $company->warehouses()->orderBy('name')->get();
         $priceTypes = $company->priceTypes()->orderBy('name')->get();
+        $hasResolution = $documentController->resolutionsFor($company, 'COT')->isNotEmpty();
 
-        return view('quotations.index', compact('company', 'quotations', 'catalogLinks', 'warehouses', 'priceTypes'));
+        return view('quotations.index', compact('company', 'quotations', 'catalogLinks', 'warehouses', 'priceTypes', 'hasResolution'));
     }
 
     /**

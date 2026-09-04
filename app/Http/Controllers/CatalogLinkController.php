@@ -17,11 +17,25 @@ class CatalogLinkController extends Controller
      * Crea un link nuevo: sin bodega (catálogo con todas juntas) o atado a
      * una bodega puntual de la empresa (el catálogo solo muestra/vende lo
      * que hay ahí). Una empresa puede tener varios a la vez, por ejemplo uno
-     * general y uno por sucursal.
+     * general y uno por sucursal. El botón que abre este formulario ya
+     * queda deshabilitado en la vista si no hay resolución de cotizaciones
+     * (ver quotations/index.blade.php), pero se revalida acá también: sin
+     * resolución, cualquier cotización que llegue por el link nunca se
+     * podría emitir (ver PublicCatalogController::store()), así que mejor
+     * ni dejar crear el link.
      */
-    public function store(Request $request)
+    public function store(Request $request, DocumentoEmitidoController $documentController)
     {
         $company = $this->currentCompany($request);
+
+        if ($documentController->resolutionsFor($company, 'COT')->isEmpty()) {
+            session()->flash('toast', [
+                'type' => 'error',
+                'message' => __('There is no active quotation numbering resolution. Create one from Resolutions first.'),
+            ]);
+
+            return redirect()->route('quotations.index');
+        }
 
         // Las opciones válidas de bodega/tipo de precio se resuelven ANTES
         // del validate() y se usan con Rule::in(), para que una bodega o

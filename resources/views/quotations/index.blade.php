@@ -4,6 +4,14 @@
         'subheading' => __('Quotations made for clients, not yet converted into a sale.'),
     ])
 
+    @unless ($hasResolution)
+        <div class="mb-4 rounded-md bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+            {{ __('There is no active quotation numbering resolution.') }}
+            <a href="{{ route('dian.resolutions.index') }}" class="font-medium underline">{{ __('Create one from Resolutions') }}</a>
+            {{ __('before issuing a quotation or sharing a public catalog link.') }}
+        </div>
+    @endunless
+
     <div class="flex flex-col gap-6">
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center gap-4">
@@ -11,9 +19,9 @@
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Public catalog links') }}</h3>
                     <p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Share these links with your clients so they can browse the catalog and build their own quotation, no account needed.') }}</p>
                 </div>
-                <button type="button" id="catalog-link-add-btn"
-                    class="shrink-0 size-8 inline-flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-accent dark:text-neutral-400 dark:hover:bg-neutral-700 focus:outline-hidden"
-                    aria-label="{{ __('New link') }}" title="{{ __('New link') }}">
+                <button type="button" id="catalog-link-add-btn" @disabled(! $hasResolution)
+                    class="shrink-0 size-8 inline-flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-accent dark:text-neutral-400 dark:hover:bg-neutral-700 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none"
+                    aria-label="{{ __('New link') }}" title="{{ $hasResolution ? __('New link') : __('There is no active quotation numbering resolution.') }}">
                     <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 </button>
             </div>
