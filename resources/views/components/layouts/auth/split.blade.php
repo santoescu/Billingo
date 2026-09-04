@@ -424,9 +424,24 @@
              * @returns {void}
              */
             window.toggleMobilePanel = function () {
+                const login = document.getElementById('auth-login-panel');
+                setMobilePanel(! login.classList.contains('flex'));
+            };
+
+            /**
+             * Fija (no alterna) cuál panel se ve en mobile -- a diferencia
+             * de toggleMobilePanel(), esta se puede llamar varias veces
+             * seguidas sin quedar en el estado contrario por error (pasa
+             * en /register, donde tanto el script en línea como el listener
+             * de "livewire:navigated" de más abajo pueden terminar
+             * corriendo los dos para la misma navegación).
+             * @param {boolean} showLogin
+             * @returns {void}
+             */
+            function setMobilePanel(showLogin) {
                 const promo = document.getElementById('auth-promo-panel');
                 const login = document.getElementById('auth-login-panel');
-                const showLogin = ! login.classList.contains('flex');
+                if (! promo || ! login) return;
 
                 promo.classList.toggle('hidden', showLogin);
                 promo.classList.toggle('flex', ! showLogin);
@@ -436,7 +451,7 @@
                 if (showLogin) {
                     promo.scrollTop = 0;
                 }
-            };
+            }
 
             /**
              * En la primera pintura, algunos navegadores calculan mal el
@@ -457,26 +472,51 @@
 
             requestAnimationFrame(forceAuthShellReflow);
 
-            @if ($errors->any())
-                {{-- Si el formulario "Contáctanos" volvió con errores, hay
-                     que dejar esa pestaña abierta (con los datos que ya
-                     había escrito) en vez de la de "Módulos" por defecto. --}}
-                window.showAuthPromoTab('contact');
-            @elseif (session('status') || request()->routeIs('register'))
-                {{-- El mensaje de éxito (u otro "status" de sesión, como el
-                     de restablecer contraseña) vive en el panel del
-                     formulario -- en mobile hay que revelarlo a mano, si no
-                     queda escondido detrás del panel de info. Lo mismo para
-                     "/register": si el usuario venía del login con el panel
-                     de info abierto y le da "Inscribirme", cada página es
-                     una recarga completa (no hay SPA) que reinicia el JS al
-                     estado por defecto -- sin esto, en mobile aterrizaba de
-                     nuevo en el panel de info en vez de seguir directo al
-                     formulario de registro que acababa de pedir. --}}
-                if (window.matchMedia('(max-width: 1023px)').matches) {
-                    window.toggleMobilePanel();
-                }
-            @endif
+            /**
+             * Decide con qué pestaña/panel debe arrancar la página --
+             * corre tanto en línea (primera carga real) como otra vez en
+             * "livewire:navigated" (wire:navigate no recarga la página,
+             * pero re-ejecuta este <script> igual; el listener de acá es
+             * un respaldo por si esa re-ejecución no alcanza a correr
+             * antes de que el usuario ya esté viendo la página -- usa
+             * setMobilePanel(), no toggleMobilePanel(), justamente para no
+             * quedar en el estado contrario si las dos formas terminan
+             * corriendo para la misma navegación).
+             * @returns {void}
+             */
+            function initAuthPanelState() {
+                @if ($errors->any())
+                    {{-- Si el formulario "Contáctanos" volvió con errores, hay
+                         que dejar esa pestaña abierta (con los datos que ya
+                         había escrito) en vez de la de "Módulos" por defecto. --}}
+                    window.showAuthPromoTab('contact');
+                @elseif (session('status') || request()->routeIs('register'))
+                    {{-- El mensaje de éxito (u otro "status" de sesión, como el
+                         de restablecer contraseña) vive en el panel del
+                         formulario -- en mobile hay que revelarlo a mano, si no
+                         queda escondido detrás del panel de info. Lo mismo para
+                         "/register": si el usuario venía del login con el panel
+                         de info abierto y le da "Inscribirme" (wire:navigate),
+                         sin esto aterrizaba de nuevo en el panel de info en vez
+                         de seguir directo al formulario que acababa de pedir. --}}
+                    if (window.matchMedia('(max-width: 1023px)').matches) {
+                        setMobilePanel(true);
+                    }
+                @endif
+            }
+
+            initAuthPanelState();
+
+            {{-- El propio <script> se re-ejecuta en cada wire:navigate (ver
+                 el comentario del inicio del IIFE), así que sin este guard
+                 se iría acumulando un listener de "livewire:navigated" por
+                 cada navegación dentro de esta pantalla (login <-> register
+                 <-> forgot-password...), ya que "document" no se reemplaza
+                 entre una navegación y otra. --}}
+            if (! window.__authPanelNavigateBound) {
+                window.__authPanelNavigateBound = true;
+                document.addEventListener('livewire:navigated', initAuthPanelState);
+            }
         })();
         </script>
         @fluxScripts
