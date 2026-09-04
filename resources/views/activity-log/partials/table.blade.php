@@ -77,9 +77,76 @@
 @push('scripts')
     <script>
         (function () {
+            // Nombres técnicos (snake_case, en inglés) -> etiqueta legible,
+            // para los campos de los modelos auditados (ver App\Models\Concerns\Auditable).
+            // Lo que no esté acá cae al prettify() de más abajo (snake_case
+            // -> "Snake case").
+            const FIELD_LABELS = {!! \Illuminate\Support\Js::from([
+                'code' => __('Code'),
+                'description' => __('Description'),
+                'barcode' => __('Barcode'),
+                'unit_price' => __('Unit price'),
+                'extra_prices' => __('Other prices'),
+                'unit_code' => __('Unit of measure'),
+                'tracks_inventory' => __('Tracks inventory'),
+                'stock' => __('Stock'),
+                'warehouse_stocks' => __('Stock by warehouse'),
+                'average_cost' => __('Average cost'),
+                'status' => __('Status'),
+                'identification_type' => __('ID type'),
+                'identificacion' => __('Identification'),
+                'dv' => __('Verification digit'),
+                'person_type' => __('Person type'),
+                'name' => __('Name'),
+                'fiscal_responsibilities' => __('Fiscal responsibilities'),
+                'address' => __('Address'),
+                'city_code' => __('City'),
+                'department_code' => __('Department'),
+                'phone' => __('Phone'),
+                'email' => __('Email'),
+                'roles' => __('Roles'),
+                'warehouse_id' => __('Warehouse'),
+                'label' => __('Label'),
+                'token' => __('Token'),
+                'primary_price_type_id' => __('Main price type'),
+                'visible_price_type_ids' => __('Other visible price types'),
+                'contract_warning_notified_at' => __('Contract warning notified at'),
+                'resolution_number' => __('Resolution number'),
+                'resolution_date' => __('Resolution date'),
+                'prefix' => __('Prefix'),
+                'range_from' => __('From'),
+                'range_to' => __('To'),
+                'current_number' => __('Current number'),
+                'valid_from' => __('Valid from'),
+                'valid_to' => __('Valid to'),
+                'technical_key' => __('Technical key'),
+                'environment' => __('Environment'),
+                'is_fixed_test' => __('Fixed test set'),
+                'document_type' => __('Document type'),
+                'is_manual' => __('Manual'),
+                'original_name' => __('File name'),
+                'subject_name' => __('Certificate holder'),
+                'user_id' => __('User'),
+                'role' => __('Role'),
+                'modules' => __('Modules'),
+                'dian_payment_means_code' => __('DIAN payment method code'),
+            ]) !!};
+
+            function prettifyField(field) {
+                return field.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+            }
+
+            function formatValue(value) {
+                if (value === null || value === undefined || value === '') return '—';
+                if (value === true) return "{{ __('Yes') }}";
+                if (value === false) return "{{ __('No') }}";
+                if (typeof value === 'object') return JSON.stringify(value);
+                return String(value);
+            }
+
             function escapeHtml(value) {
                 const div = document.createElement('div');
-                div.textContent = value === null || value === undefined ? '—' : String(value);
+                div.textContent = formatValue(value);
                 return div.innerHTML;
             }
 
@@ -102,12 +169,13 @@
 
                 Object.keys(changes || {}).forEach((field) => {
                     const value = changes[field];
+                    const fieldLabel = FIELD_LABELS[field] || prettifyField(field);
                     const row = document.createElement('div');
                     row.className = 'flex flex-col gap-1 py-2 border-b border-gray-100 dark:border-neutral-700 last:border-0';
 
-                    if (action === 'updated' && value && typeof value === 'object') {
+                    if (action === 'updated' && value && typeof value === 'object' && ('from' in value) && ('to' in value)) {
                         row.innerHTML = `
-                            <span class="text-xs font-medium text-gray-500 dark:text-neutral-400">${escapeHtml(field)}</span>
+                            <span class="text-xs font-medium text-gray-500 dark:text-neutral-400">${escapeHtml(fieldLabel)}</span>
                             <div class="flex flex-wrap items-center gap-2 text-sm">
                                 <span class="text-red-600 line-through dark:text-red-400">${escapeHtml(value.from)}</span>
                                 <span class="text-gray-400 dark:text-neutral-500">&rarr;</span>
@@ -116,8 +184,8 @@
                         `;
                     } else {
                         row.innerHTML = `
-                            <span class="text-xs font-medium text-gray-500 dark:text-neutral-400">${escapeHtml(field)}</span>
-                            <div class="text-sm text-gray-700 dark:text-neutral-300">${escapeHtml(typeof value === 'object' ? JSON.stringify(value) : value)}</div>
+                            <span class="text-xs font-medium text-gray-500 dark:text-neutral-400">${escapeHtml(fieldLabel)}</span>
+                            <div class="text-sm text-gray-700 dark:text-neutral-300">${escapeHtml(value)}</div>
                         `;
                     }
 

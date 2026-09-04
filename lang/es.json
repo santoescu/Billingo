@@ -1673,5 +1673,22 @@
     "Changes": "Cambios",
     "Filter": "Filtrar",
     "Date range": "Rango de fechas",
-    "activity": "actividad"
+    "activity": "actividad",
+    "Other prices": "Otros precios",
+    "Unit of measure": "Unidad de medida",
+    "Tracks inventory": "Controla inventario",
+    "Average cost": "Costo promedio",
+    "ID type": "Tipo de identificación",
+    "Roles": "Roles",
+    "Token": "Token",
+    "Contract warning notified at": "Aviso de vencimiento de contrato enviado",
+    "Current number": "Numeración actual",
+    "Valid from": "Válido desde",
+    "Valid to": "Válido hasta",
+    "Technical key": "Clave técnica",
+    "Environment": "Ambiente",
+    "Fixed test set": "Set de pruebas fijo",
+    "File name": "Nombre del archivo",
+    "Certificate holder": "Titular del certificado",
+    "DIAN payment method code": "Código de medio de pago DIAN"
 }

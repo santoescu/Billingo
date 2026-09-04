@@ -32,11 +32,18 @@ trait Auditable
      * touch() suelto), no crea nada -- un cambio "vacío" no le sirve a
      * nadie. Nunca guarda campos marcados como $hidden en el modelo (ej.
      * el password/content de un certificado), mismo criterio que ya se
-     * usa para no exponerlos en JSON.
+     * usa para no exponerlos en JSON. Tampoco guarda "company_id": ya se
+     * guarda aparte en la columna "company_id" del propio ActivityLog, y
+     * en el detalle solo era ruido (siempre la misma empresa).
      */
     protected function recordAudit(string $action): void
     {
-        $excluded = array_merge($this->getHidden(), ['updated_at', 'created_at', 'id', '_id']);
+        $excluded = array_merge($this->getHidden(), [
+            'updated_at', 'created_at', 'id', '_id', 'company_id',
+            // Blobs binarios (ej. Product::image_data) -- no aportan nada
+            // como texto en el detalle de antes/después.
+            'image_data', 'image_mime',
+        ]);
 
         if ($action === ActivityLog::ACTION_UPDATED) {
             $dirty = Arr::except($this->getChanges(), $excluded);
