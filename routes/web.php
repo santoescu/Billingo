@@ -269,6 +269,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('tickets/dashboard', [AdminSupportTicketController::class, 'dashboard'])->name('tickets.dashboard');
         Route::get('tickets', [AdminSupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/data', [AdminSupportTicketController::class, 'data'])->name('tickets.data');
         Route::get('tickets/create', [AdminSupportTicketController::class, 'create'])->name('tickets.create');
         Route::post('tickets', [AdminSupportTicketController::class, 'store'])->name('tickets.store');
         Route::get('tickets/{supportTicket}', [AdminSupportTicketController::class, 'show'])->name('tickets.show');

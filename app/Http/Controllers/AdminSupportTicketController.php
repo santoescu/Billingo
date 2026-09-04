@@ -159,12 +159,32 @@ class AdminSupportTicketController extends Controller
     }
 
     /**
+     * $tickets vacío a propósito: la tabla se llena por AJAX (ver data())
+     * apenas termina de cargar la página, en vez de bloquear el primer
+     * render con la consulta de todos los tickets del sistema (mismo
+     * patrón que DocumentoEmitidoController::index()/data()). Los filtros
+     * siguen siendo un GET normal (recarga la página con los query params
+     * en la URL); data() los vuelve a leer de ahí para pedir por AJAX
+     * exactamente lo que el formulario ya está mostrando.
+     */
+    public function index(Request $request)
+    {
+        return view('admin.tickets.index', [
+            'tickets' => collect(),
+            'companies' => Company::orderBy('name')->get(),
+            'staffUsers' => User::where('role', 'superadmin')->orderBy('name')->get(),
+            'modules' => config('modules'),
+            'filters' => $request->only(['status', 'module', 'company_id', 'assigned_to']),
+        ]);
+    }
+
+    /**
      * Todos los tickets del sistema, con filtros opcionales por estado,
      * módulo, empresa y asignado -- los abiertos primero (los que
      * necesitan atención), y dentro de cada grupo el de última actividad
      * más reciente primero.
      */
-    public function index(Request $request)
+    public function data(Request $request)
     {
         $query = SupportTicket::query();
 
@@ -204,13 +224,9 @@ class AdminSupportTicketController extends Controller
             ->sortBy(fn (SupportTicket $ticket) => $ticket->status === SupportTicket::STATUS_CLOSED ? 1 : 0)
             ->values();
 
-        return view('admin.tickets.index', [
-            'tickets' => $tickets,
-            'companies' => Company::orderBy('name')->get(),
-            'staffUsers' => User::where('role', 'superadmin')->orderBy('name')->get(),
-            'modules' => config('modules'),
-            'filters' => $request->only(['status', 'module', 'company_id', 'assigned_to']),
-        ]);
+        $rowsHtml = view('admin.tickets.partials.rows', compact('tickets'))->render();
+
+        return response()->json(['rows_html' => $rowsHtml]);
     }
 
     public function show(string $supportTicket)
