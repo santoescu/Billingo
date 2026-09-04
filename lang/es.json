@@ -1691,5 +1691,6 @@
     "File name": "Nombre del archivo",
     "Certificate holder": "Titular del certificado",
     "DIAN payment method code": "Código de medio de pago DIAN",
-    "Testing environment": "Ambiente de pruebas"
+    "Testing environment": "Ambiente de pruebas",
+    "Sales invoices issued from the point of sale.": "Facturas de venta emitidas desde el punto de venta."
 }

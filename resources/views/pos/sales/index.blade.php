@@ -1,7 +1,7 @@
 <x-layouts.app :title="__('Sales')">
     @include('partials.tittle', [
         'title' => __('Sales'),
-        'subheading' => __('Sales made through the point of sale, electronic or not.'),
+        'subheading' => __('Sales invoices issued from the point of sale.'),
     ])
 
     <div class="flex flex-col gap-6">
