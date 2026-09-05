@@ -796,6 +796,151 @@ class IssueDocumentService
     }
 
     /**
+     * Importa a la plataforma un documento que la DIAN ya tiene autorizado, a partir de
+     * su UUID/CUFE técnico, sin necesidad de haberlo emitido desde acá -- mismo mecanismo
+     * que syncWithAlreadyProcessedDocument() (regla 90): trae el XML real con
+     * GetXmlByDocumentKey y arma el registro completo (cliente, líneas, totales, payload)
+     * a partir de ese XML. Si ya existe un DocumentoEmitido con ese UUID para la empresa,
+     * lo actualiza con lo que la DIAN tenga ahora mismo, en vez de crear uno nuevo.
+     *
+     * Solo un documento realmente nuevo ("imported") consume cupo del contrato de la
+     * empresa (módulo "invoicing") -- actualizar uno que ya existía no cuenta como una
+     * emisión nueva.
+     *
+     * @param  Company  $company  Empresa dueña del certificado usado para consultar a la DIAN.
+     * @param  string  $uuid  UUID/CUFE técnico del documento a importar.
+     * @return array{status: string, documento: ?DocumentoEmitido, message: ?string} "status" es "imported", "updated", "not_found", "mismatch" o "quota_exceeded".
+     */
+    public function importByUuid(Company $company, string $uuid): array
+    {
+        $uuid = trim($uuid);
+
+        $existente = DocumentoEmitido::where('company_id', (string) $company->_id)
+            ->where('uuid', $uuid)
+            ->first();
+
+        try {
+            $xmlInfo = $this->client->getXmlByDocumentKey($company, $uuid);
+        } catch (RuntimeException $e) {
+            return ['status' => 'not_found', 'documento' => null, 'message' => $e->getMessage()];
+        }
+
+        if (empty($xmlInfo['response_xml'])) {
+            return [
+                'status' => 'not_found',
+                'documento' => null,
+                'message' => $xmlInfo['message'] ?? __('The DIAN did not return a document for this UUID.'),
+            ];
+        }
+
+        $parsedXml = $this->parseSignedXml($xmlInfo['response_xml']);
+        $supplierId = (string) ($parsedXml->xpath('.//*[local-name()="AccountingSupplierParty"]//*[local-name()="CompanyID"]')[0] ?? '');
+
+        // El certificado de la empresa ya debería impedir que la DIAN devuelva documentos de
+        // otro NIT (getXmlByDocumentKey usa mutual TLS con ese certificado), pero se valida
+        // igual acá como red de seguridad: si por lo que sea el emisor del XML no coincide,
+        // no se crea ni se actualiza nada.
+        if ($supplierId !== '' && $supplierId !== $company->identificacion) {
+            return [
+                'status' => 'mismatch',
+                'documento' => null,
+                'message' => __('This document belongs to a different company (issuer NIT :nit).', ['nit' => $supplierId]),
+            ];
+        }
+
+        $fields = $this->buildDocumentoFieldsFromDianXml($company, $xmlInfo, $parsedXml);
+
+        if ($existente) {
+            $existente->update($fields);
+
+            return ['status' => 'updated', 'documento' => $existente->fresh(), 'message' => null];
+        }
+
+        // Solo lo que de verdad se importa de nuevo consume cupo del contrato -- una
+        // actualización de algo que ya existía, o un UUID que no se pudo traer, no es un
+        // documento nuevo, así que no debe descontar nada.
+        try {
+            $this->consumeContractQuota($company, 'invoicing');
+        } catch (RuntimeException $e) {
+            return ['status' => 'quota_exceeded', 'documento' => null, 'message' => $e->getMessage()];
+        }
+
+        $documento = DocumentoEmitido::create(array_merge(['company_id' => (string) $company->_id], $fields));
+
+        return ['status' => 'imported', 'documento' => $documento, 'message' => null];
+    }
+
+    /**
+     * Arma el array de campos de un DocumentoEmitido (tipo, resolución, numeral, cliente,
+     * payload, totales, xml, etc.) a partir de la respuesta ya exitosa de
+     * GetXmlByDocumentKey -- compartido entre importByUuid() al crear y al actualizar un
+     * documento existente, para no repetir el mapeo dos veces.
+     *
+     * @param  Company  $company  Empresa emisora.
+     * @param  array  $xmlInfo  Resultado de DianSoapClient::getXmlByDocumentKey() (con "response_xml" ya validado como no vacío).
+     * @param  SimpleXMLElement  $parsedXml  Mismo XML ya parseado por el caller (ver parseSignedXml()), para no volver a parsearlo.
+     * @return array Campos listos para DocumentoEmitido::create()/update().
+     */
+    private function buildDocumentoFieldsFromDianXml(Company $company, array $xmlInfo, SimpleXMLElement $parsedXml): array
+    {
+        $totales = $this->extractTotals($parsedXml);
+        $dianPayload = $this->buildPayloadFromDianXml($parsedXml);
+        $clienteId = $this->resolveClienteIdFromDianPayload($company, $dianPayload['accounting_customer_party']);
+
+        $this->syncProducts($company, $dianPayload['lineas']);
+
+        $numeral = (string) $parsedXml->ID;
+        $tipoDocumento = match ($parsedXml->getName()) {
+            'CreditNote' => self::NOTA_CREDITO_CODE,
+            'DebitNote' => self::NOTA_DEBITO_CODE,
+            default => (string) ($parsedXml->InvoiceTypeCode ?? self::FACTURA_CODES[0]),
+        };
+
+        $authorizationNumber = (string) ($parsedXml->xpath('.//*[local-name()="InvoiceAuthorization"]')[0] ?? '');
+        $resolution = $authorizationNumber !== ''
+            ? Resolution::where('company_id', (string) $company->_id)->where('resolution_number', $authorizationNumber)->first()
+            : null;
+
+        $prefix = $resolution?->prefix ?? (string) ($parsedXml->xpath('.//*[local-name()="Prefix"]')[0] ?? '');
+        $secuencial = $prefix !== '' && str_starts_with($numeral, $prefix)
+            ? preg_replace('/\D/', '', substr($numeral, strlen($prefix)))
+            : preg_replace('/\D/', '', $numeral);
+
+        $payload = $dianPayload;
+        $payload['tipo_documento'] = $tipoDocumento;
+        $payload['cliente_id'] = $clienteId;
+
+        return [
+            'tipo_documento' => $tipoDocumento,
+            'resolution_id' => $resolution ? (string) $resolution->_id : null,
+            'prefix' => $prefix ?: null,
+            'numeral' => $numeral,
+            'secuencial' => $secuencial,
+            'cliente_id' => $clienteId,
+            'payload' => $payload,
+            'xml' => $xmlInfo['response_xml'],
+            'uuid' => (string) $parsedXml->UUID,
+            'status' => DocumentoEmitido::STATUS_ACCEPTED,
+            'status_message' => ['resumen' => $xmlInfo['message'] ?? null, 'reglas' => []],
+            'ambiente' => $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS,
+            'issue_date' => $dianPayload['issue_date']
+                ? new DateTimeImmutable($dianPayload['issue_date'] . ' ' . ($dianPayload['issue_time'] ?? '00:00:00'), new DateTimeZone('America/Bogota'))
+                : new DateTimeImmutable('now', new DateTimeZone('America/Bogota')),
+            'fecha_expedicion' => new DateTimeImmutable('now', new DateTimeZone('America/Bogota')),
+            'due_date' => ! empty($dianPayload['payment_means']['fecha_vencimiento'])
+                ? new DateTimeImmutable($dianPayload['payment_means']['fecha_vencimiento'], new DateTimeZone('America/Bogota'))
+                : null,
+            'subtotal' => $totales['subtotal'],
+            'tax_total' => $totales['tax_total'],
+            'total' => $totales['total'],
+            'currency' => $dianPayload['moneda'],
+            'payment_means_id' => $dianPayload['payment_means']['id'] ?? null,
+            'payment_means_code' => $dianPayload['payment_means']['codigo'] ?? null,
+            'notes' => $dianPayload['notas'],
+        ];
+    }
+
+    /**
      * Reconstruye el shape interno de "payload" (moneda, fechas, cliente, líneas,
      * notas, medio de pago) a partir del XML real que la DIAN tiene autorizado,
      * para sincronizar el documento con lo que quedó vigente del lado de ellos.
