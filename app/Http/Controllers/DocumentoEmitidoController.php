@@ -51,23 +51,67 @@ class DocumentoEmitidoController extends Controller
         return view('documents.index', compact('company', 'documentos'));
     }
 
+    private const DOCUMENT_TYPE_LABELS_KEYS = [
+        '01' => 'Electronic sales invoice',
+        '02' => 'Electronic sales invoice (export)',
+        '03' => 'Electronic transmission instrument (type 03)',
+        '04' => 'Electronic sales invoice (type 04)',
+        '91' => 'Credit note',
+        '92' => 'Debit note',
+    ];
+
     /**
      * Lista los documentos emitidos por la empresa activa en su ambiente
-     * DIAN actual (habilitación o producción), más recientes primero.
+     * DIAN actual (habilitación o producción), más recientes primero. Devuelve
+     * los datos crudos en JSON -- el frontend arma las celdas (ver
+     * documents/index.blade.php), el backend no arma HTML.
      */
     public function data(Request $request)
     {
         $company = $this->currentCompany($request);
         $environment = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
+        $nitIdentificationType = '31';
 
         $documentos = $company->documentosEmitidos()
             ->where('ambiente', $environment)
             ->orderByDesc('created_at')
             ->get();
 
-        $rowsHtml = view('documents.partials.rows', compact('documentos'))->render();
+        $rows = $documentos->map(function (DocumentoEmitido $documento) use ($nitIdentificationType) {
+            $customerParty = $documento->payload['accounting_customer_party'] ?? [];
+            $customerName = $documento->cliente?->name ?? ($customerParty['razon_social'] ?? null);
+            $customerIdentification = $customerParty['identificacion'] ?? null;
+            $customerDv = $customerParty['tipo_identificacion'] === $nitIdentificationType ? ($customerParty['dv'] ?? null) : null;
 
-        return response()->json(['rows_html' => $rowsHtml]);
+            return [
+                'id' => (string) $documento->_id,
+                'emi' => $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'exp' => $documento->fecha_expedicion?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'numeral' => $documento->numeral,
+                'tipo_documento' => $documento->tipo_documento,
+                'customer_name' => $customerName,
+                'customer_identification' => $customerIdentification,
+                'customer_dv' => $customerDv,
+                'total_formatted' => $documento->total_formatted,
+                'status' => $documento->status,
+                'status_label' => $documento->status_label,
+                'status_badge_classes' => $documento->status_badge_classes,
+                'has_uuid' => (bool) $documento->uuid,
+                'can_retry' => in_array($documento->status, [DocumentoEmitido::STATUS_PENDING, DocumentoEmitido::STATUS_REJECTED], true),
+                'is_rejected' => $documento->status === DocumentoEmitido::STATUS_REJECTED,
+                'urls' => [
+                    'preview' => route('documents.invoice-preview', $documento->_id),
+                    'show' => route('documents.show', $documento->_id),
+                    'retry' => route('documents.retry', $documento->_id),
+                    'edit' => route('documents.create', ['edit_document_id' => $documento->_id]),
+                ],
+            ];
+        });
+
+        return response()->json([
+            'rows' => $rows,
+            'document_type_labels' => collect(self::DOCUMENT_TYPE_LABELS_KEYS)->mapWithKeys(fn ($labelKey, $code) => [$code => __($labelKey)]),
+        ]);
     }
 
     /**

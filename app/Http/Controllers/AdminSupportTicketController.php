@@ -214,19 +214,30 @@ class AdminSupportTicketController extends Controller
             ->get()
             ->keyBy(fn ($user) => (string) $user->_id);
 
-        $tickets = $tickets
+        $rows = $tickets
             ->map(function (SupportTicket $ticket) use ($companyNames, $assigneeNames) {
-                $ticket->company_name = $companyNames->get((string) $ticket->company_id)?->name ?? $ticket->contact_name;
-                $ticket->assignee_name = $ticket->assigned_to ? $assigneeNames->get((string) $ticket->assigned_to)?->name : null;
-
-                return $ticket;
+                return [
+                    'id' => (string) $ticket->_id,
+                    'created_at' => $ticket->created_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                    'is_unread_for_staff' => $ticket->is_unread_for_staff,
+                    'company_name' => $companyNames->get((string) $ticket->company_id)?->name ?? $ticket->contact_name,
+                    'is_lead' => $ticket->is_lead,
+                    'module' => $ticket->module,
+                    'subject' => $ticket->subject,
+                    'priority_label' => $ticket->priority_label,
+                    'priority_badge_classes' => $ticket->priority_badge_classes,
+                    'status' => $ticket->status,
+                    'status_label' => $ticket->status_label,
+                    'status_badge_classes' => $ticket->status_badge_classes,
+                    'assignee_name' => $ticket->assigned_to ? $assigneeNames->get((string) $ticket->assigned_to)?->name : null,
+                    'url' => route('admin.tickets.show', $ticket->_id),
+                    '_sort_closed_last' => $ticket->status === SupportTicket::STATUS_CLOSED ? 1 : 0,
+                ];
             })
-            ->sortBy(fn (SupportTicket $ticket) => $ticket->status === SupportTicket::STATUS_CLOSED ? 1 : 0)
+            ->sortBy('_sort_closed_last')
             ->values();
 
-        $rowsHtml = view('admin.tickets.partials.rows', compact('tickets'))->render();
-
-        return response()->json(['rows_html' => $rowsHtml]);
+        return response()->json(['rows' => $rows]);
     }
 
     public function show(string $supportTicket)

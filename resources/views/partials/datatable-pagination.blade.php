@@ -23,7 +23,7 @@
      *
      * @param {string} selector Selector de la tabla.
      * @param {string} searchSelector Selector del input de búsqueda.
-     * @param {object} [options={}] pageLength, zeroRecords, emptyTable, columnDefs.
+     * @param {object} [options={}] pageLength, zeroRecords, emptyTable, columns, columnDefs.
      * @returns {object} Instancia de DataTable.
      */
     window.initWorkflowDataTable = function(selector, searchSelector, options = {}) {
@@ -47,6 +47,7 @@
                 zeroRecords: emptyStateHtml(zeroRecordsText),
                 emptyTable: emptyStateHtml(options.emptyTable || zeroRecordsText),
             },
+            ...(options.columns ? { columns: options.columns } : {}),
             columnDefs: options.columnDefs || [],
             drawCallback: function(settings) {
                 renderWorkflowDataTablePagination(this.api(), settings);

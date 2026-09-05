@@ -81,50 +81,44 @@
     </div>
 
     <div id="tab-products">
-        <div class="-m-1.5 overflow-x-auto">
-            <div class="p-1.5 min-w-full inline-block align-middle">
-                <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-                    <div class="py-3 px-4 flex justify-between items-center gap-4">
-                        <div class="relative max-w-xs">
-                            <label class="sr-only">{{ __('Search') }}</label>
-                            <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
-                        </div>
-
-                        <div class="flex gap-2">
-                            <button type="button" id="products-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadProductsTable()">
-                                <svg id="products-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                            </button>
-
-                            <flux:button id="products-export-btn" variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
-                                {{ __('Export to Excel') }}
-                            </flux:button>
-                            <flux:button id="products-import-btn" variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
-                                {{ __('Import from Excel') }}
-                            </flux:button>
-                            <flux:button id="new-product-btn" variant="primary" icon="plus" onclick="openProductPanel()">
-                                {{ __('New product') }}
-                            </flux:button>
-                        </div>
-                    </div>
-
-                    <div class="overflow-hidden">
-                        <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="productsTable">
-                            <thead class="bg-gray-50 dark:bg-neutral-700">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Product') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Price') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Stock') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Warehouse') }}</th>
-                                    <th scope="col" class="px-6 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @include('products.partials.rows')
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <div class="py-3 px-4 flex justify-between items-center gap-4">
+                <div class="relative max-w-xs">
+                    <label class="sr-only">{{ __('Search') }}</label>
+                    <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                 </div>
+
+                <div class="flex gap-2">
+                    <button type="button" id="products-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadProductsTable()">
+                        <svg id="products-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    </button>
+
+                    <flux:button id="products-export-btn" variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
+                        {{ __('Export to Excel') }}
+                    </flux:button>
+                    <flux:button id="products-import-btn" variant="filled" icon="arrow-up-tray" onclick="openImportModal()">
+                        {{ __('Import from Excel') }}
+                    </flux:button>
+                    <flux:button id="new-product-btn" variant="primary" icon="plus" onclick="openProductPanel()">
+                        {{ __('New product') }}
+                    </flux:button>
+                </div>
+            </div>
+
+            <div class="overflow-hidden rounded-b-lg">
+            <table class="w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="productsTable">
+                <thead class="bg-gray-50 dark:bg-neutral-700">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Product') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Description') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Price') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Stock') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Warehouse') }}</th>
+                        <th scope="col" class="px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+            </table>
             </div>
         </div>
     </div>
@@ -178,58 +172,52 @@
     </div>
 
     <div id="tab-price-types" class="hidden">
-        <div class="-m-1.5 overflow-x-auto">
-            <div class="p-1.5 min-w-full inline-block align-middle">
-                <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-                    <div class="py-3 px-4 flex justify-end items-center gap-4">
-                        <flux:button id="new-price-type-btn" variant="primary" icon="plus" onclick="openPriceTypePanel()">
-                            {{ __('New price type') }}
-                        </flux:button>
-                    </div>
-
-                    @if ($priceTypes->isEmpty())
-                        <div class="p-10 text-center">
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('You have no registered price types yet.') }}</p>
-                        </div>
-                    @else
-                        <div class="overflow-hidden">
-                            <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
-                                <thead class="bg-gray-50 dark:bg-neutral-700">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Name') }}</th>
-                                        <th scope="col" class="px-6 py-3"></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                    @foreach ($priceTypes as $priceType)
-                                        <tr>
-                                            <td class="px-4 py-4 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ $priceType->name }}</td>
-                                            <td class="px-4 py-4 text-right">
-                                                <div class="flex justify-end gap-1">
-                                                    <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openPriceTypePanel({!! Illuminate\Support\Js::from($priceType) !!})">
-                                                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                                                            <path d="m15 5 4 4"></path>
-                                                        </svg>
-                                                    </button>
-
-                                                    <form action="{{ route('price-types.destroy', $priceType->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('Products will lose the price associated with this price type.') }}');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}">
-                                                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
+        <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <div class="py-3 px-4 flex justify-end items-center gap-4">
+                <flux:button id="new-price-type-btn" variant="primary" icon="plus" onclick="openPriceTypePanel()">
+                    {{ __('New price type') }}
+                </flux:button>
             </div>
+
+            @if ($priceTypes->isEmpty())
+                <div class="p-10 text-center">
+                    <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('You have no registered price types yet.') }}</p>
+                </div>
+            @else
+                <table class="w-full table-fixed rounded-b-lg divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Name') }}</th>
+                            <th scope="col" class="px-6 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                        @foreach ($priceTypes as $priceType)
+                            <tr>
+                                <td class="px-4 py-4 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ $priceType->name }}</td>
+                                <td class="px-4 py-4 text-right">
+                                    <div class="flex justify-end gap-1">
+                                        <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="openPriceTypePanel({!! Illuminate\Support\Js::from($priceType) !!})">
+                                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                                <path d="m15 5 4 4"></path>
+                                            </svg>
+                                        </button>
+
+                                        <form action="{{ route('price-types.destroy', $priceType->_id) }}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('Products will lose the price associated with this price type.') }}');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}">
+                                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </div>
     </div>
 
@@ -870,6 +858,17 @@
                 const searchableSelectConfigJson = @json($searchableSelectConfig);
                 let productPricesMap = {};
                 let productWarehousesMap = {};
+                // Producto completo (para openProductPanel) por id -- las filas ya no
+                // vienen como HTML armado en el backend, así que el botón de editar no
+                // puede llevar el objeto embebido en un onclick (rompería con
+                // apóstrofes en la descripción); en vez de eso, delegación de eventos
+                // busca el producto acá por su id (ver initProductRowActions()).
+                let productsById = {};
+                // Instancia viva de la tabla -- se crea una sola vez en loadProductsTable() y
+                // de ahí en adelante cada refresh solo le reemplaza las filas (clear/rows.add)
+                // en vez de destruirla y reconstruirla (ver documents/index.blade.php para el
+                // porqué: destroy() restaura el <tbody> al contenido del primer init).
+                let productsTable = null;
                 const inventoryTabs = ['products', 'warehouses', 'price-types'];
 
                 window.showInventoryTab = function (tab) {
@@ -1932,6 +1931,180 @@
                     return template.replace(/^\d+/, String(count));
                 }
 
+                const productBoxIcon = '<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
+
+                function renderProductCell(row) {
+                    const thumb = row.image_url
+                        ? `<img src="${row.image_url}" alt="" class="shrink-0 size-9 rounded-lg object-cover zoomable-thumb cursor-zoom-in">`
+                        : `<span class="flex items-center justify-center shrink-0 size-9 rounded-lg bg-accent/10 text-accent">${productBoxIcon}</span>`;
+
+                    return `<div class="flex items-center gap-3">
+                        ${thumb}
+                        <div class="min-w-0">
+                            <span class="block text-sm text-gray-600 dark:text-neutral-400 truncate">${escapeHtml(row.barcode) || '—'}</span>
+                            <span class="block text-xs text-neutral-400 dark:text-neutral-500 truncate">${escapeHtml(row.code) || '—'}</span>
+                        </div>
+                    </div>`;
+                }
+
+                function renderPriceCell(row) {
+                    return `${escapeHtml(row.unit_price_formatted)}
+                        <button type="button" class="product-view-prices-btn block text-xs text-accent hover:underline" data-product-id="${row.id}" data-description="${escapeHtml(row.description)}">
+                            {{ __('View all prices') }}
+                        </button>`;
+                }
+
+                function renderStockCell(row) {
+                    if (! row.tracks_inventory) {
+                        return `<span class="text-xs text-neutral-400">{{ __('Not tracked') }}</span>`;
+                    }
+
+                    const formatted = (Math.round(row.stock * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+                    return escapeHtml(formatted);
+                }
+
+                function renderWarehouseCell(row) {
+                    let html = escapeHtml(row.warehouse_names) || '—';
+
+                    if (row.tracks_inventory) {
+                        html += `<button type="button" class="product-view-warehouses-btn block text-xs text-accent hover:underline" data-product-id="${row.id}" data-description="${escapeHtml(row.description)}">
+                            {{ __('View all warehouses') }}
+                        </button>`;
+                    }
+
+                    return html;
+                }
+
+                function renderActionsCell(row) {
+                    let html = `<div class="flex justify-end gap-1">
+                        <a href="${row.urls.show}" class="product-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                        </a>
+
+                        <button type="button" class="product-edit-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" data-product-id="${row.id}">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                <path d="m15 5 4 4"></path>
+                            </svg>
+                        </button>
+
+                        <div class="hs-dropdown [--auto-close:true] relative inline-flex">
+                            <button type="button" class="product-more-actions-btn hs-dropdown-toggle flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('More actions') }}">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                            </button>
+                            <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 flex items-center gap-1 dark:bg-neutral-800 dark:border-neutral-700">`;
+
+                    if (row.tracks_inventory) {
+                        html += `<button type="button" class="product-register-entry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Register entry') }}" title="{{ __('Register entry') }}" data-product-id="${row.id}" data-description="${escapeHtml(row.description)}">
+                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            </button>
+                            <button type="button" class="product-fix-cost-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Fix cost') }}" title="{{ __('Fix cost') }}" data-product-id="${row.id}" data-description="${escapeHtml(row.description)}" data-average-cost="${row.average_cost}">
+                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                            </button>`;
+                    }
+
+                    html += `<form action="${row.urls.destroy}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('This action cannot be undone.') }}');">
+                            <input type="hidden" name="_token" value="${document.querySelector('meta[name="csrf-token"]').content}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="product-delete-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400" aria-label="{{ __('Delete') }}" title="{{ __('Delete') }}">
+                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                            </button>
+                        </form>
+                        </div>
+                    </div>`;
+
+                    return html;
+                }
+
+                /**
+                 * Delegación de eventos sobre los botones de la fila de un
+                 * producto (armados en JS por renderActionsCell/renderPriceCell/
+                 * renderWarehouseCell) -- las filas se reemplazan en cada
+                 * refresh, así que no se puede bindear un listener por fila.
+                 * @returns {void}
+                 */
+                function closeProductDropdown(wrapper) {
+                    wrapper.classList.remove('open');
+                    wrapper.querySelector(':scope > .hs-dropdown-menu')?.classList.add('hidden');
+                }
+
+                function initProductRowActions() {
+                    if (document.body.dataset.productRowActionsBound === 'true') return;
+                    document.body.dataset.productRowActionsBound = 'true';
+
+                    window.addEventListener('scroll', function () {
+                        document.querySelectorAll('#productsTable .hs-dropdown.open').forEach(closeProductDropdown);
+                    }, true);
+
+                    document.addEventListener('click', function (event) {
+                        /**
+                         * El botón de "más acciones" (⋮) se arma en JS (ver
+                         * renderActionsCell()) apenas llega la respuesta AJAX --
+                         * Preline inicializa sus ".hs-dropdown" recorriendo el
+                         * documento una sola vez al cargar la página, así que se
+                         * abre/cierra a mano en vez de depender de HSDropdown
+                         * para nodos creados por DataTables (mismo ajuste que
+                         * documents/index.blade.php). "position: fixed" con
+                         * top/left calculados a mano: el contenedor de la
+                         * tabla tiene overflow-hidden (recorte de esquinas
+                         * redondeadas) y un menú "absolute" quedaría cortado
+                         * por ese mismo overflow.
+                         */
+                        const toggle = event.target.closest('#productsTable .hs-dropdown-toggle');
+
+                        document.querySelectorAll('#productsTable .hs-dropdown.open').forEach((wrapper) => {
+                            if (! toggle || wrapper !== toggle.closest('.hs-dropdown')) {
+                                closeProductDropdown(wrapper);
+                            }
+                        });
+
+                        if (toggle) {
+                            const wrapper = toggle.closest('.hs-dropdown');
+                            const menu = wrapper.querySelector(':scope > .hs-dropdown-menu');
+                            if (menu) {
+                                const isOpen = wrapper.classList.toggle('open');
+                                menu.classList.toggle('hidden', ! isOpen);
+
+                                if (isOpen) {
+                                    const rect = toggle.getBoundingClientRect();
+                                    menu.style.top = `${rect.bottom + 8}px`;
+                                    menu.style.left = `${Math.max(8, rect.right - menu.offsetWidth)}px`;
+                                }
+                            }
+                            return;
+                        }
+
+                        const pricesBtn = event.target.closest('.product-view-prices-btn');
+                        if (pricesBtn) {
+                            window.showProductPrices(pricesBtn.dataset.productId, pricesBtn.dataset.description);
+                            return;
+                        }
+
+                        const warehousesBtn = event.target.closest('.product-view-warehouses-btn');
+                        if (warehousesBtn) {
+                            window.showProductWarehouses(warehousesBtn.dataset.productId, warehousesBtn.dataset.description);
+                            return;
+                        }
+
+                        const editBtn = event.target.closest('.product-edit-btn');
+                        if (editBtn) {
+                            window.openProductPanel(productsById[editBtn.dataset.productId]);
+                            return;
+                        }
+
+                        const entryBtn = event.target.closest('.product-register-entry-btn');
+                        if (entryBtn) {
+                            window.openStockEntryPanel(entryBtn.dataset.productId, entryBtn.dataset.description);
+                            return;
+                        }
+
+                        const costBtn = event.target.closest('.product-fix-cost-btn');
+                        if (costBtn) {
+                            window.openAverageCostPanel(costBtn.dataset.productId, costBtn.dataset.description, Number(costBtn.dataset.averageCost));
+                        }
+                    });
+                }
+
                 /**
                  * La tabla de productos ya no viene lista en el HTML inicial
                  * (ver ProductController::index()) -- se pide por AJAX apenas
@@ -1940,7 +2113,9 @@
                  * como los mapas de precios/bodegas que usan
                  * showProductPrices()/showProductWarehouses()/showWarehouseProducts(),
                  * y recién ahí inicializa la DataTable (no puede pasar antes,
-                 * las filas todavía no existen en el DOM).
+                 * las filas todavía no existen en el DOM). El backend manda el
+                 * JSON crudo (data.rows) -- las funciones render*() de arriba
+                 * arman cada celda.
                  * @returns {void}
                  */
                 function loadProductsTable() {
@@ -1955,21 +2130,34 @@
                     fetch('{{ route('products.data') }}', { headers: { Accept: 'application/json' } })
                         .then((response) => response.json())
                         .then((data) => {
-                            tbody.innerHTML = data.rows_html;
                             productPricesMap = data.product_prices_map;
                             productWarehousesMap = data.product_warehouses_map;
                             warehouseProductsMap = data.warehouse_products_map;
+                            productsById = {};
+                            data.rows.forEach((row) => { productsById[row.id] = row.edit_data; });
 
                             Object.keys(warehouseProductsMap).forEach((warehouseId) => {
                                 const badge = document.getElementById(`warehouse-count-${warehouseId}`);
                                 if (badge) badge.textContent = warehouseCountLabel(warehouseProductsMap[warehouseId].length);
                             });
 
-                            initWorkflowDataTable('#productsTable', '#hs-table-with-pagination-search', {
-                                columnDefs: [{ targets: -1, orderable: false }],
-                            });
+                            if (! productsTable) {
+                                productsTable = initWorkflowDataTable('#productsTable', '#hs-table-with-pagination-search', {
+                                    columns: [
+                                        { data: null, className: 'px-4 py-4', render: (data, type, row) => renderProductCell(row) },
+                                        { data: 'description', className: 'px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200' },
+                                        { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => (type === 'sort' || type === 'type' ? row.unit_price : renderPriceCell(row)) },
+                                        { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => (type === 'sort' || type === 'type' ? (row.tracks_inventory ? row.stock : -1) : renderStockCell(row)) },
+                                        { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderWarehouseCell(row) },
+                                        { data: null, orderable: false, className: 'px-4 py-4 text-right', render: (data, type, row) => renderActionsCell(row) },
+                                    ],
+                                });
+                            }
 
-                            if (window.HSDropdown) HSDropdown.autoInit();
+                            productsTable.clear();
+                            productsTable.rows.add(data.rows);
+                            productsTable.draw();
+
                             if (window.HSOverlay) HSOverlay.autoInit();
                         })
                         .finally(() => {
@@ -1977,6 +2165,8 @@
                             if (refreshIcon) refreshIcon.classList.remove('animate-spin');
                         });
                 }
+
+                initProductRowActions();
 
                 window.loadProductsTable = loadProductsTable;
 

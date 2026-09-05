@@ -54,40 +54,34 @@
             @endif
         </form>
 
-        <div class="-m-1.5 overflow-x-auto">
-            <div class="p-1.5 min-w-full inline-block align-middle">
-                <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-                    <div class="py-3 px-4 flex justify-between items-center gap-4">
-                        <div class="relative max-w-xs">
-                            <label class="sr-only">{{ __('Search') }}</label>
-                            <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
-                        </div>
-
-                        <a href="{{ route('admin.tickets.create') }}">
-                            <flux:button type="button" variant="primary" icon="plus">{{ __('New ticket') }}</flux:button>
-                        </a>
-                    </div>
-
-                    <div class="overflow-hidden">
-                        <table class="w-full min-w-[960px] table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="ticketsTable">
-                            <thead class="bg-gray-50 dark:bg-neutral-700">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Date') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Company') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Module') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Subject') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Priority') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Status') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Assigned to') }}</th>
-                                    <th scope="col" class="px-6 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @include('admin.tickets.partials.rows')
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <div class="py-3 px-4 flex justify-between items-center gap-4">
+                <div class="relative max-w-xs">
+                    <label class="sr-only">{{ __('Search') }}</label>
+                    <flux:input type="text" name="hs-table-with-pagination-search" id="hs-table-with-pagination-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
                 </div>
+
+                <a href="{{ route('admin.tickets.create') }}">
+                    <flux:button type="button" variant="primary" icon="plus">{{ __('New ticket') }}</flux:button>
+                </a>
+            </div>
+
+            <div class="overflow-hidden rounded-b-lg">
+            <table class="w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="ticketsTable">
+                <thead class="bg-gray-50 dark:bg-neutral-700">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Date') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Company') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Module') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Subject') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Priority') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Status') }}</th>
+                        <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Assigned to') }}</th>
+                        <th scope="col" class="px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+            </table>
             </div>
         </div>
     </div>
@@ -96,6 +90,64 @@
 
     @push('scripts')
         <script>
+            // Instancia viva de la tabla -- se crea una sola vez en loadAdminTicketsTable() y
+            // de ahí en adelante cada refresh solo le reemplaza las filas (clear/rows.add) en
+            // vez de destruirla y reconstruirla (ver documents/index.blade.php para el porqué:
+            // destroy() restaura el <tbody> al contenido del primer init).
+            let ticketsTable = null;
+
+            const moduleBadges = @json(
+                collect($modules)->mapWithKeys(fn ($module, $key) => [
+                    $key => ['name' => $module['name'], 'badge_classes' => $module['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200'],
+                ])
+            );
+
+            function escapeHtmlTicketRow(value) {
+                return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+                })[char]);
+            }
+
+            function renderTicketDate(row) {
+                const dot = row.is_unread_for_staff
+                    ? `<span class="size-1.5 shrink-0 rounded-full bg-accent" title="{{ __('Unread') }}"></span>`
+                    : '';
+                return `<span class="inline-flex items-center gap-1.5">${dot}${escapeHtmlTicketRow(row.created_at)}</span>`;
+            }
+
+            function renderTicketCompany(row) {
+                const leadBadge = row.is_lead
+                    ? `<span class="ms-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">{{ __('Lead') }}</span>`
+                    : '';
+                return `${escapeHtmlTicketRow(row.company_name ?? '—')}${leadBadge}`;
+            }
+
+            function renderTicketModule(row) {
+                if (row.module && row.module !== 'general' && moduleBadges[row.module]) {
+                    const module = moduleBadges[row.module];
+                    return `<span class="shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${module.badge_classes}">${escapeHtmlTicketRow(module.name)}</span>`;
+                }
+
+                return `<span class="shrink-0 rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-neutral-700 dark:text-neutral-300">{{ __('General') }}</span>`;
+            }
+
+            function renderTicketSubject(row) {
+                const classes = row.is_unread_for_staff
+                    ? 'px-4 py-4 text-sm break-words dark:text-neutral-200 font-semibold text-gray-900'
+                    : 'px-4 py-4 text-sm break-words dark:text-neutral-200 font-medium text-gray-800';
+                return { classes, html: escapeHtmlTicketRow(row.subject) };
+            }
+
+            function renderTicketBadge(label, classes) {
+                return `<span class="rounded-md px-2 py-0.5 text-xs font-medium ${classes}">${escapeHtmlTicketRow(label)}</span>`;
+            }
+
+            function renderTicketActions(row) {
+                return `<a href="${row.url}" class="inline-flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}" title="{{ __('View') }}">
+                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                </a>`;
+            }
+
             /**
              * La tabla de tickets ya no viene lista en el HTML inicial (ver
              * AdminSupportTicketController::index()) -- se pide por AJAX
@@ -105,7 +157,9 @@
              * "window.location.search" reenvía los mismos filtros que ya
              * están en la URL (los selects siguen recargando la página vía
              * GET normal), así data() aplica exactamente el mismo filtro
-             * que el formulario está mostrando.
+             * que el formulario está mostrando. El backend manda el JSON
+             * crudo (data.rows) y las funciones render*() de arriba arman
+             * cada celda.
              * @returns {void}
              */
             function loadAdminTicketsTable() {
@@ -115,12 +169,29 @@
                 fetch('{{ route('admin.tickets.data') }}' + window.location.search, { headers: { Accept: 'application/json' } })
                     .then((response) => response.json())
                     .then((data) => {
-                        tbody.innerHTML = data.rows_html;
+                        if (! ticketsTable) {
+                            ticketsTable = initWorkflowDataTable('#ticketsTable', '#hs-table-with-pagination-search', {
+                                emptyTable: "{{ __('There are no registered :name.', ['name' => __('requests')]) }}",
+                                columns: [
+                                    { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderTicketDate(row) },
+                                    { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderTicketCompany(row) },
+                                    { data: null, className: 'px-4 py-4 text-sm', render: (data, type, row) => renderTicketModule(row) },
+                                    {
+                                        data: null,
+                                        render: (data, type, row) => (type === 'display' ? renderTicketSubject(row).html : row.subject),
+                                        createdCell: (cell, cellData, row) => { cell.className = renderTicketSubject(row).classes; },
+                                    },
+                                    { data: null, className: 'px-4 py-4 text-sm', render: (data, type, row) => renderTicketBadge(row.priority_label, row.priority_badge_classes) },
+                                    { data: null, className: 'px-4 py-4 text-sm', render: (data, type, row) => renderTicketBadge(row.status_label, row.status_badge_classes) },
+                                    { data: null, className: 'px-4 py-4 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => escapeHtmlTicketRow(row.assignee_name ?? @json(__('Unassigned'))) },
+                                    { data: null, orderable: false, className: 'px-4 py-4 text-end text-sm', render: (data, type, row) => renderTicketActions(row) },
+                                ],
+                            });
+                        }
 
-                        const table = initWorkflowDataTable('#ticketsTable', '#hs-table-with-pagination-search', {
-                            emptyTable: "{{ __('There are no registered :name.', ['name' => __('requests')]) }}",
-                        });
-                        table.order([]).draw();
+                        ticketsTable.clear();
+                        ticketsTable.rows.add(data.rows);
+                        ticketsTable.order([]).draw();
                     });
             }
 

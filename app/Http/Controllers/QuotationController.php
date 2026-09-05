@@ -114,16 +114,40 @@ class QuotationController extends Controller
 
     /**
      * Lista las cotizaciones de la empresa activa, más recientes primero.
+     * Devuelve los datos crudos en JSON -- el frontend arma las celdas (ver
+     * quotations/index.blade.php).
      */
     public function data(Request $request)
     {
         $company = $this->currentCompany($request);
+        $nitIdentificationType = '31';
 
         $quotations = $company->quotations()->orderByDesc('created_at')->get();
 
-        $rowsHtml = view('quotations.partials.rows', compact('quotations'))->render();
+        $rows = $quotations->map(function (Quotation $quotation) use ($nitIdentificationType) {
+            $customerParty = $quotation->payload['accounting_customer_party'] ?? [];
+            $customerName = $quotation->cliente?->name ?? ($customerParty['razon_social'] ?? null);
+            $customerIdentification = $customerParty['identificacion'] ?? null;
+            $customerDv = $customerParty['tipo_identificacion'] === $nitIdentificationType ? ($customerParty['dv'] ?? null) : null;
 
-        return response()->json(['rows_html' => $rowsHtml]);
+            return [
+                'id' => (string) $quotation->_id,
+                'issue_date' => $quotation->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'numeral' => $quotation->numeral,
+                'customer_name' => $customerName,
+                'customer_identification' => $customerIdentification,
+                'customer_dv' => $customerDv,
+                'total_formatted' => $quotation->total_formatted,
+                'status_label' => $quotation->status_label,
+                'status_badge_classes' => $quotation->status_badge_classes,
+                'urls' => [
+                    'preview' => route('quotations.preview', $quotation->_id),
+                    'show' => route('quotations.show', $quotation->_id),
+                ],
+            ];
+        });
+
+        return response()->json(['rows' => $rows]);
     }
 
     /**

@@ -437,14 +437,36 @@ class PosController extends Controller
     public function salesData(Request $request)
     {
         $company = $this->currentCompany($request);
+        $nitIdentificationType = '31';
 
         $documentos = $company->documentosPos()
             ->orderByDesc('created_at')
             ->get();
 
-        $rowsHtml = view('pos.sales.partials.rows', compact('documentos'))->render();
+        $rows = $documentos->map(function (DocumentoPos $documento) use ($nitIdentificationType) {
+            $customerParty = $documento->payload['accounting_customer_party'] ?? [];
+            $customerName = $documento->cliente?->name ?? ($customerParty['razon_social'] ?? null);
+            $customerIdentification = $customerParty['identificacion'] ?? null;
+            $customerDv = $customerParty['tipo_identificacion'] === $nitIdentificationType ? ($customerParty['dv'] ?? null) : null;
 
-        return response()->json(['rows_html' => $rowsHtml]);
+            return [
+                'id' => (string) $documento->_id,
+                'issue_date' => $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'numeral' => $documento->numeral,
+                'customer_name' => $customerName,
+                'customer_identification' => $customerIdentification,
+                'customer_dv' => $customerDv,
+                'total_formatted' => $documento->total_formatted,
+                'status_label' => $documento->status_label,
+                'status_badge_classes' => $documento->status_badge_classes,
+                'urls' => [
+                    'preview' => route('pos.sales.receipt-preview', $documento->_id),
+                    'show' => route('pos.sales.show', $documento->_id),
+                ],
+            ];
+        });
+
+        return response()->json(['rows' => $rows]);
     }
 
     public function showSale(Request $request, string $sale)

@@ -105,10 +105,29 @@ class ProductController extends Controller
             return [$warehouseId => $items];
         });
 
-        $rowsHtml = view('products.partials.rows', compact('products', 'warehouseNamesFor'))->render();
+        $rows = $products->map(function (Product $product) use ($warehouseNamesFor) {
+            return [
+                'id' => (string) $product->_id,
+                'image_url' => $product->image_url,
+                'barcode' => $product->barcode,
+                'code' => $product->code,
+                'description' => $product->description,
+                'unit_price' => (float) $product->unit_price,
+                'unit_price_formatted' => $product->unit_price_formatted,
+                'tracks_inventory' => (bool) $product->tracks_inventory,
+                'stock' => (float) $product->stock,
+                'average_cost' => (float) ($product->average_cost ?? 0),
+                'warehouse_names' => $warehouseNamesFor($product) ?: null,
+                'urls' => [
+                    'show' => route('products.show', $product->_id),
+                    'destroy' => route('products.destroy', $product->_id),
+                ],
+                'edit_data' => $product->makeHidden('image_data'),
+            ];
+        });
 
         return response()->json([
-            'rows_html' => $rowsHtml,
+            'rows' => $rows,
             'product_prices_map' => $productPricesMap,
             'product_warehouses_map' => $productWarehousesMap,
             'warehouse_products_map' => $warehouseProductsMap,
