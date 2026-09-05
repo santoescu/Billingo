@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureCompanyRoleAny;
 use App\Http\Middleware\EnsureCompanyOwner;
 use App\Http\Middleware\EnsureSuperadmin;
 use App\Http\Middleware\AuthenticateCompanyApiToken;
+use App\Http\Middleware\EnsureCompanyApiFeature;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -30,9 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'company.owner' => EnsureCompanyOwner::class,
             'superadmin' => EnsureSuperadmin::class,
             'company.api_token' => AuthenticateCompanyApiToken::class,
+            'company.api_feature' => EnsureCompanyApiFeature::class,
         ]);
         $middleware->web(LoadAppearanceFromUser::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        
+        $exceptions->shouldRenderJsonWhen(fn ($request) => $request->is('api/*'));
     })->create();

@@ -109,6 +109,31 @@ class SuperadminController extends Controller
     }
 
     /**
+     * Actualizar qué features puntuales de la API (ver config/api_features.php) tiene
+     * habilitadas una empresa -- independiente de si el módulo del que depende cada una
+     * está activo (ver Company::hasApiFeature()): acá solo se guarda la lista marcada, la
+     * validación de "módulo + feature" pasa en EnsureCompanyApiFeature al usarla de verdad.
+     */
+    public function updateApiFeatures(Request $request, string $companyId)
+    {
+        $company = Company::findOrFail($companyId);
+
+        $data = $request->validate([
+            'api_features' => 'nullable|array',
+            'api_features.*' => 'string|in:' . implode(',', array_keys(config('api_features'))),
+        ]);
+
+        $company->update(['api_features' => array_values($data['api_features'] ?? [])]);
+
+        session()->flash('toast', [
+            'type' => 'success',
+            'message' => __('Updated :name', ['name' => __('Company')]),
+        ]);
+
+        return redirect()->route('admin.companies.edit', $companyId);
+    }
+
+    /**
      * Crear un nuevo contrato para la empresa (no reemplaza los anteriores: quedan como
      * histórico). El vigente lo decide Company::activeContract() según las fechas.
      */

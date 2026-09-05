@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\ApiDocsController;
 use App\Http\Controllers\CannedResponseController;
 use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CatalogLinkController;
@@ -54,6 +55,11 @@ Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
 // cuenta), llega al mismo panel de soporte del admin como un ticket sin
 // empresa.
 Route::post('contacto', [PublicContactController::class, 'store'])->name('public.contact.store');
+
+// Documentación pública de la API (OpenAPI 3.1 + Scalar) -- sin auth, para que quien se
+// vaya a integrar (o su desarrollador) la consulte sin necesitar cuenta en Billingo.
+Route::get('api-docs', [ApiDocsController::class, 'index'])->name('api-docs.index');
+Route::get('api-docs/openapi.yaml', [ApiDocsController::class, 'openapi'])->name('api-docs.openapi');
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('panel', [DashboardController::class, 'panel'])->middleware(['auth', 'verified'])->name('panel');
@@ -253,6 +259,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('companies', [SuperadminController::class, 'companies'])->name('companies');
         Route::get('companies/{companyId}/edit', [SuperadminController::class, 'editCompany'])->name('companies.edit');
         Route::put('companies/{companyId}/modules', [SuperadminController::class, 'updateModules'])->name('companies.modules.update');
+        Route::put('companies/{companyId}/api-features', [SuperadminController::class, 'updateApiFeatures'])->name('companies.api-features.update');
         Route::post('companies/{companyId}/members', [SuperadminController::class, 'storeMember'])->name('companies.members.store');
         Route::put('companies/{companyId}/members/{userId}', [SuperadminController::class, 'updateMember'])->name('companies.members.update');
         Route::delete('companies/{companyId}/members/{userId}', [SuperadminController::class, 'destroyMember'])->name('companies.members.destroy');

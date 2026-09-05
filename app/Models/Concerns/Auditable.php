@@ -63,7 +63,7 @@ trait Auditable
         $user = auth()->user();
 
         ActivityLog::create([
-            'company_id' => $this->company_id ?? null,
+            'company_id' => $this->company_id ?? ($this instanceof \App\Models\Company ? (string) $this->getKey() : null),
             'user_id' => $user ? (string) $user->_id : null,
             'action' => $action,
             'model' => class_basename($this),

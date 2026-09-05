@@ -53,6 +53,17 @@
             >
                 {{ __('Contracts') }}
             </button>
+            <button
+                type="button"
+                class="hs-tab-active:font-semibold hs-tab-active:text-accent hs-tab-active:after:bg-accent relative py-4 px-1 inline-flex items-center gap-x-2 text-sm whitespace-nowrap text-gray-500 after:absolute after:-bottom-px after:inset-x-0 after:w-full after:h-0.5 after:bg-transparent hover:text-gray-700 focus:outline-hidden dark:text-neutral-400 dark:hover:text-neutral-300"
+                id="tab-api-item"
+                aria-selected="false"
+                data-hs-tab="#tab-api"
+                aria-controls="tab-api"
+                role="tab"
+            >
+                {{ __('API') }}
+            </button>
         </nav>
     </div>
     <!-- End Tab Nav -->
@@ -353,8 +364,166 @@
                 </section>
             @endif
         </div>
+
+        <div id="tab-api" class="hidden" role="tabpanel" aria-labelledby="tab-api-item">
+            @php
+                $enabledApiFeatures = $company->api_features ?? [];
+
+                // Agrupadas por módulo (en vez de una lista plana) para que, a medida que se
+                // vayan agregando APIs de otros módulos (pos, cotizaciones, etc.), quede claro
+                // a cuál pertenece cada una en vez de mezclarlas todas juntas.
+                $apiFeaturesByModule = collect(config('api_features'))
+                    ->map(fn ($feature, $key) => array_merge($feature, ['key' => $key]))
+                    ->groupBy(fn ($feature) => $feature['module'] ?? '');
+            @endphp
+
+            <div class="flex flex-col gap-6">
+                {{-- Arriba, lado a lado: acciones puntuales (link de docs, token) --
+                     no necesitan tanto ancho como la lista de endpoints (abajo). --}}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                        <div class="flex items-center gap-2">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+                            </span>
+                            <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API documentation') }}</h3>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
+                            {{ __('Share this link with whoever builds the integration -- it explains every endpoint, no login needed to view it.') }}
+                        </p>
+
+                        <div class="mt-3 flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
+                            <input type="text" readonly id="api-docs-url" value="{{ route('api-docs.index') }}"
+                                class="flex-1 min-w-0 bg-transparent border-0 text-zinc-700 dark:text-zinc-300 text-sm h-9 px-3 focus:outline-hidden focus:ring-0">
+                            <button type="button" class="js-clipboard relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                                data-clipboard-target="#api-docs-url"
+                                data-clipboard-action="copy"
+                                aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
+                                <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                                <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                        <div class="flex items-center gap-2">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                            </span>
+                            <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API token') }}</h3>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
+                            {{ __('Used by companies that integrate directly with the API (POST /api/documentos), instead of using this dashboard. Send it once, out of band, to whoever builds the integration -- it is never shown again after this.') }}
+                        </p>
+
+                        <div class="mt-3 flex items-center gap-2">
+                            <span id="api-token-status-badge" class="rounded-md px-2 py-0.5 text-xs font-medium {{ $company->api_token ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300' }}">
+                                {{ $company->api_token ? __('Token generated') : __('No token generated yet') }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3">
+                            <flux:button type="button" variant="{{ $company->api_token ? 'filled' : 'primary' }}" id="api-token-generate-btn" data-has-token="{{ $company->api_token ? '1' : '0' }}" onclick="window.generateApiToken()">
+                                <span id="api-token-generate-label">{{ $company->api_token ? __('Regenerate token') : __('Generate token') }}</span>
+                            </flux:button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Abajo, ancho completo: entre más espacio horizontal tenga, más
+                     columnas de features caben por módulo sin tener que scrollear,
+                     a medida que se agreguen más APIs a futuro. --}}
+                <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                    <div class="flex items-center gap-2">
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V7a2 2 0 0 1 2-2h6l2 2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M2 9h20"/></svg>
+                        </span>
+                        <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API endpoints') }}</h3>
+                    </div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
+                        {{ __('Which of the API endpoints below this company can call. Having the module active is not enough by itself -- each one also needs to be turned on here.') }}
+                    </p>
+
+                    <form method="POST" action="{{ route('admin.companies.api-features.update', $company->_id) }}" class="mt-4 space-y-4">
+                        @csrf
+                        @method('PUT')
+
+                        @foreach ($apiFeaturesByModule as $moduleKey => $features)
+                            @php
+                                $moduleActive = ! $moduleKey || in_array($moduleKey, $activeModules, true);
+                                $moduleBadgeClasses = $moduleKey ? ($moduleCatalog[$moduleKey]['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200') : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200';
+                                $enabledCount = $features->filter(fn ($feature) => in_array($feature['key'], $enabledApiFeatures, true))->count();
+                            @endphp
+                            <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-700">
+                                <div class="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 dark:border-neutral-700 dark:bg-neutral-700/40">
+                                    <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $moduleBadgeClasses }}">
+                                        {{ $moduleKey ? ($moduleCatalog[$moduleKey]['name'] ?? $moduleKey) : __('General') }}
+                                    </span>
+                                    <span class="text-xs text-gray-400 dark:text-neutral-500">{{ $enabledCount }}/{{ $features->count() }}</span>
+                                </div>
+
+                                @unless ($moduleActive)
+                                    <p class="border-b border-gray-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-neutral-700 dark:bg-amber-900/10 dark:text-amber-400">
+                                        {{ __('This company does not have this module active -- marking any of these will have no effect until it does.') }}
+                                    </p>
+                                @endunless
+
+                                <div class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:divide-x sm:divide-y-0 dark:divide-neutral-700">
+                                    @foreach ($features as $feature)
+                                        <label for="api-feature-{{ $feature['key'] }}" class="flex cursor-pointer items-start gap-x-2 px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-neutral-700/30">
+                                            <div class="flex items-center h-5">
+                                                <input
+                                                    type="checkbox"
+                                                    id="api-feature-{{ $feature['key'] }}"
+                                                    name="api_features[]"
+                                                    value="{{ $feature['key'] }}"
+                                                    class="shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800 dark:focus:ring-offset-neutral-800"
+                                                    {{ in_array($feature['key'], $enabledApiFeatures, true) ? 'checked' : '' }}
+                                                >
+                                            </div>
+                                            <span class="block w-full text-gray-700 dark:text-neutral-300">
+                                                {{ $feature['name'] ?? $feature['key'] }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+
+                        <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
     <!-- End Tab Content -->
+
+    <div id="api-token-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="api-token-modal-label">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="p-4">
+                    <h3 id="api-token-modal-label" class="font-bold text-gray-800 dark:text-white mb-1">{{ __('API token generated') }}</h3>
+                    <p class="text-sm text-amber-700 dark:text-amber-400 mb-4">{{ __('Copy it now: it will not be shown again. The previous token, if any, stopped working.') }}</p>
+
+                    <div class="flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
+                        <input type="text" readonly id="api-token-value" value=""
+                            class="flex-1 min-w-0 bg-transparent border-0 text-zinc-700 dark:text-zinc-300 text-sm h-9 px-3 focus:outline-hidden focus:ring-0">
+                        <button type="button" class="js-clipboard relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                            data-clipboard-target="#api-token-value"
+                            data-clipboard-action="copy"
+                            aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
+                            <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="flex justify-end mt-4">
+                        <flux:button type="button" variant="primary" data-hs-overlay="#api-token-modal">{{ __('Done') }}</flux:button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Panel deslizante único: crear/editar contrato -->
     <div id="contract-panel" class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 end-0 transition-all duration-300 transform h-full max-w-md w-full z-80 bg-white border-e border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 flex flex-col" role="dialog" tabindex="-1" aria-labelledby="contract-panel-label">
@@ -602,6 +771,44 @@
 
     <script>
         (function () {
+            window.hsClipboardHelper?.('.js-clipboard');
+
+            window.generateApiToken = function () {
+                const hasToken = document.getElementById('api-token-generate-btn').dataset.hasToken === '1';
+                const message = hasToken
+                    ? '{{ __('This will invalidate the previous token immediately. Continue?') }}'
+                    : '{{ __('Are you sure?') }}';
+
+                window.appConfirmDialog.ask(message).then((ok) => {
+                    if (! ok) return;
+
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+                    fetch('{{ route('companies.api-token.regenerate', $company->_id) }}', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (! data.api_token) return;
+
+                            document.getElementById('api-token-value').value = data.api_token;
+                            document.getElementById('api-token-generate-btn').dataset.hasToken = '1';
+                            document.getElementById('api-token-generate-label').textContent = '{{ __('Regenerate token') }}';
+
+                            const badge = document.getElementById('api-token-status-badge');
+                            badge.textContent = '{{ __('Token generated') }}';
+                            badge.classList.remove('bg-gray-100', 'text-gray-700', 'dark:bg-neutral-700', 'dark:text-neutral-300');
+                            badge.classList.add('bg-green-100', 'text-green-800', 'dark:bg-green-900/30', 'dark:text-green-300');
+
+                            if (window.HSOverlay) {
+                                HSOverlay.autoInit();
+                                HSOverlay.open('#api-token-modal');
+                            }
+                        });
+                });
+            };
+
             function setSelectValue(selectId, value) {
                 const el = document.getElementById(selectId);
                 const instance = window.HSSelect && HSSelect.getInstance(el);

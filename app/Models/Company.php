@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use MongoDB\Laravel\Eloquent\Model;
 
 class Company extends Model
 {
+    use Auditable;
+
     protected $connection = 'mongodb';
     protected $table = 'companies';
 
@@ -33,6 +36,7 @@ class Company extends Model
         'dian_test_set_zip_key',
         'dian_habilitado',
         'api_token',
+        'api_features',
         'logo_data',
         'logo_mime',
     ];
@@ -65,12 +69,32 @@ class Company extends Model
      * Genera un nuevo token de API para la empresa (reemplaza el anterior, si existía)
      * y lo guarda ya hasheado. El valor en texto plano solo se puede ver esta vez.
      *
+     * "api_token" está en $hidden, así que Auditable::recordAudit() lo excluye del
+     * diff automático (por diseño, para no exponer ni siquiera el hash) -- por eso acá
+     * se deja un registro aparte, explícito, de que se regeneró (sin el valor), en vez
+     * de que este cambio quede completamente invisible en el historial de la empresa.
+     *
      * @return string Token en texto plano, para mostrárselo a la empresa una sola vez.
      */
     public function generateApiToken(): string
     {
+        $hadToken = ! empty($this->api_token);
         $plainTextToken = bin2hex(random_bytes(32));
         $this->update(['api_token' => hash('sha256', $plainTextToken)]);
+
+        $user = auth()->user();
+
+        ActivityLog::create([
+            'company_id' => (string) $this->_id,
+            'user_id' => $user ? (string) $user->_id : null,
+            'action' => ActivityLog::ACTION_UPDATED,
+            'model' => class_basename($this),
+            'model_id' => (string) $this->getKey(),
+            'label' => $this->name,
+            'changes' => [
+                'api_token' => ['from' => $hadToken ? __('Previous token') : null, 'to' => __('New token generated')],
+            ],
+        ]);
 
         return $plainTextToken;
     }
@@ -84,6 +108,25 @@ class Company extends Model
     public static function findByApiToken(string $plainTextToken): ?self
     {
         return self::where('api_token', hash('sha256', $plainTextToken))->first();
+    }
+
+    /**
+     * Indica si la empresa tiene habilitada una feature puntual de la API (ver
+     * config/api_features.php), además del módulo del que depende esa feature -- las dos
+     * cosas tienen que estar activas: puede tener el módulo (ej. "invoicing") activo pero
+     * esa API en concreto todavía no habilitada para ella (ver EnsureCompanyApiFeature).
+     *
+     * @param  string  $feature  Clave de config/api_features.php (ej. "documentos.import-uuid").
+     */
+    public function hasApiFeature(string $feature): bool
+    {
+        $module = config("api_features.{$feature}.module");
+
+        if ($module && ! in_array($module, $this->modules ?? [], true)) {
+            return false;
+        }
+
+        return in_array($feature, $this->api_features ?? [], true);
     }
 
     /**
