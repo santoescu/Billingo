@@ -861,16 +861,18 @@ components:
                 maxLength: 5000
               MultiplierFactorNumeric:
                 type: number
-                description: Porcentaje de 0 a 100 (no una fracción) que representa el cargo/descuento.
+                description: Porcentaje aplicado en decimales, debe corresponder a un valor entre 0 a 100.
                 minimum: 0
                 maximum: 100
               Amount:
                 type: number
-                description: Valor total del cargo o descuento en la moneda del documento.
+                description: >
+                  Valor total del cargo o descuento. Si es descuento, no puede ser superior al
+                  valor base.
                 minimum: 0
               BaseAmount:
                 type: number
-                description: Valor base sobre el que se calculó "MultiplierFactorNumeric".
+                description: Valor base para calcular el descuento o el cargo.
                 minimum: 0
         TaxTotal:
           type: object
