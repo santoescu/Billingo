@@ -27,12 +27,60 @@ paths:
     post:
       operationId: emitirDocumento
       summary: Emitir un documento electrónico
-      description: >
+      description: |
         Arma, firma y envía a la DIAN una factura electrónica, nota crédito o nota
         débito para la empresa dueña del token usado en la petición, y guarda el
         resultado. Si ya existe un documento con el mismo tipo + numeral + ambiente:
         si quedó aceptado, se devuelve tal cual (no se vuelve a procesar); si quedó
         rechazado o pendiente, se reintenta con los datos nuevos.
+
+        Ejemplo de JSON a enviar (factura electrónica simple, un producto):
+
+        ```json
+        {
+          "document": {
+            "DocumentType": "01",
+            "PREFIX": "FES",
+            "secuencial": "1",
+            "IssueDate": "2026-09-06",
+            "DocumentCurrencyCode": "COP",
+            "AccountingSupplierParty": {
+              "CompanyID": "900123456"
+            },
+            "AccountingCustomerParty": {
+              "PartyName": "Cliente de Ejemplo",
+              "direccion": "Calle 123 # 45-67",
+              "cityCode": "11001",
+              "CountrySubentityCode": "11",
+              "CompanyID": "900654321",
+              "TypeCompanyID": "31",
+              "email": "cliente@ejemplo.com"
+            },
+            "PaymentMeans": [
+              { "PaymentMeansCode": "10" }
+            ],
+            "InvoiceLine": [
+              {
+                "InvoicedQuantity": 1,
+                "unitCode": "EA",
+                "Item": {
+                  "SellersItemIdentification": { "ID": "producto_1" },
+                  "Description": "Producto de prueba"
+                },
+                "Price": { "PriceAmount": 100000 },
+                "TaxTotal": {
+                  "TaxSubtotal": {
+                    "TaxCategory": {
+                      "TaxScheme": { "ID": "01", "Name": "IVA" },
+                      "Percent": 19
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+        ```
       tags: [Documentos]
       requestBody:
         required: true
@@ -44,22 +92,22 @@ paths:
               factura:
                 summary: Factura electrónica simple, un producto
                 value:
-                  tipo_documento: "01"
                   document:
-                    PREFIX: "SETP"
-                    secuencial: "990000113"
-                    IssueDate: "2026-09-05"
+                    DocumentType: "01"
+                    PREFIX: "FES"
+                    secuencial: "1"
+                    IssueDate: "2026-09-06"
                     DocumentCurrencyCode: "COP"
                     AccountingSupplierParty:
-                      CompanyID: "900984424"
+                      CompanyID: "900123456"
                     AccountingCustomerParty:
-                      CompanyID: "900984425"
-                      TypeCompanyID: "31"
-                      PartyName: "David Lima"
-                      direccion: "Santa Monica"
+                      PartyName: "Cliente de Ejemplo"
+                      direccion: "Calle 123 # 45-67"
                       cityCode: "11001"
                       CountrySubentityCode: "11"
-                      email: "david_lima7@hotmail.com"
+                      CompanyID: "900654321"
+                      TypeCompanyID: "31"
+                      email: "cliente@ejemplo.com"
                     PaymentMeans:
                       - PaymentMeansCode: "10"
                     InvoiceLine:
@@ -110,16 +158,34 @@ paths:
     post:
       operationId: importarPorUuid
       summary: Importar uno o varios documentos por UUID/CUFE
-      description: >
+      description: |
         Trae de la DIAN, con el certificado de la empresa, uno o varios documentos ya
         autorizados a partir de su UUID/CUFE técnico, y los guarda en la plataforma. Si
         el UUID ya existía localmente, actualiza ese mismo registro con lo que la DIAN
         tenga en este momento en vez de duplicarlo. No consume cupo del contrato (no
         cuenta como una emisión nueva).
 
-
         Máximo 35 UUID por petición: cada uno hace una llamada en vivo a la DIAN, una
         tras otra, dentro del mismo request.
+
+        Ejemplo de JSON a enviar (un solo UUID):
+
+        ```json
+        {
+          "uuid": "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+        }
+        ```
+
+        Ejemplo de JSON a enviar (varios UUID en un solo lote):
+
+        ```json
+        {
+          "uuids": [
+            "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8",
+            "c188508ca575f91c1d8c830fb2c40d938e406353804b96fa1f4c845d5bfe14f62cc7f7766d2601d62bf9ed067d120738"
+          ]
+        }
+        ```
       tags: [Documentos]
       requestBody:
         required: true
@@ -131,13 +197,13 @@ paths:
               uno:
                 summary: Un solo UUID
                 value:
-                  uuid: "c1c86adceababf01e57df7d1caae5cb6101ab12515f19c71c1bd0f3c4309eb58020e9e84c7268d01848b382d79cb4c69"
+                  uuid: "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
               varios:
                 summary: Varios UUID en un solo lote
                 value:
                   uuids:
-                    - "c1c86adceababf01e57df7d1caae5cb6101ab12515f19c71c1bd0f3c4309eb58020e9e84c7268d01848b382d79cb4c69"
-                    - "879dd0b5521eee7305f46d4b1fd987a4f164c3142c08313a3d11441e6e3a01cb4046ff95165b2b6cdd171233c94ac7c4"
+                    - "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+                    - "c188508ca575f91c1d8c830fb2c40d938e406353804b96fa1f4c845d5bfe14f62cc7f7766d2601d62bf9ed067d120738"
       responses:
         '200':
           description: >
@@ -197,92 +263,309 @@ components:
       type: object
       required: [document]
       properties:
-        tipo_documento:
-          type: string
-          description: Código DIAN del tipo de documento. También se puede mandar como "document.DocumentType".
-          enum: ["01", "02", "03", "04", "05", "91", "92", "95"]
         document:
           type: object
-          required: [AccountingSupplierParty, AccountingCustomerParty, InvoiceLine]
+          required: [DocumentType, PREFIX, secuencial, AccountingSupplierParty, AccountingCustomerParty, InvoiceLine]
           properties:
             DocumentType:
               type: string
-              description: Alternativa a "tipo_documento" a nivel raíz.
+              description: >
+                Código DIAN del tipo de documento.
+
+
+                Valores permitidos:
+
+                - `01`: Factura electrónica de venta
+
+                - `02`: Factura electrónica de venta -- exportación
+
+                - `03`: Factura electrónica de venta -- contingencia tipo 03
+
+                - `04`: Factura electrónica de venta -- contingencia tipo 04
+
+                - `91`: Nota crédito
+
+                - `92`: Nota débito
+              enum: ["01", "02", "03", "04", "91", "92"]
+              minLength: 2
+              maxLength: 2
             CustomizationID:
               type: string
+              description: >
+                Indicador del tipo de operación.
+
+
+                Factura (`01`, `02`, `03`, `04`):
+
+                - `09`: AIU
+
+                - `10`: Estándar
+
+                - `11`: Mandatos
+
+                - `12`: Transporte
+
+                - `14`: Notarios
+
+                - `15`: Compra Divisas
+
+                - `16`: Venta Divisas
+
+
+                Nota crédito (`91`):
+
+                - `20`: Nota Crédito que referencia una factura electrónica
+
+                - `22`: Nota Crédito sin referencia a una factura electrónica
+
+
+                Nota débito (`92`):
+
+                - `30`: Nota Débito que referencia una factura electrónica
+
+                - `32`: Nota Débito sin referencia a una factura electrónica
+              enum: ["09", "10", "11", "12", "14", "15", "16", "20", "22", "30", "32"]
+              minLength: 2
+              maxLength: 2
             DocumentCurrencyCode:
               type: string
+              description: >
+                Divisa del documento. Opcional -- si no se manda, el sistema pone "COP". La DIAN
+                solo acepta "COP" (rechaza cualquier otro valor).
+              enum: ["COP"]
               default: COP
+              minLength: 3
+              maxLength: 3
             IssueDate:
               type: string
               format: date
+              description: >
+                Fecha de emisión, formato `AAAA-MM-DD`. Opcional -- si no se manda, el sistema
+                pone la fecha actual en zona horaria de Colombia (UTC-05:00).
+
+
+                Ejemplos válidos: `2026-09-06`
+              minLength: 10
+              maxLength: 10
             IssueTime:
               type: string
+              description: >
+                Hora de emisión en formato `HH:MM:SS`, más el offset de zona horaria (siempre
+                "-05:00", la hora oficial de Colombia). Opcional -- si no se manda, el sistema
+                pone la hora actual en esa misma zona horaria; si se manda sin el offset (ej.
+                "14:32:00"), el sistema se lo agrega automáticamente.
+
+
+                Ejemplos válidos: `14:32:00-05:00`, `14:32:00`
+              minLength: 8
+              maxLength: 14
             DueDate:
               type: string
               format: date
+              description: >
+                Fecha de vencimiento, formato `AAAA-MM-DD`. Opcional -- si no se manda, el
+                sistema la toma de "PaymentMeans[0].PaymentDueDate" (el primer medio de pago);
+                si tampoco viene ahí, el documento queda sin fecha de vencimiento.
+
+
+                Ejemplos válidos: `2026-09-06`
+              minLength: 10
+              maxLength: 10
             Note:
               type: array
+              description: >
+                Notas o texto libre adicional del documento (se muestran en la representación
+                gráfica). Opcional, puede traer ninguna, una o varias.
               items:
                 type: string
+                maxLength: 500
             PREFIX:
               type: string
-              description: Prefijo de la resolución (para desambiguar si hay varias activas).
-            Numeral:
-              type: string
-              description: Número completo (prefijo + consecutivo). Alternativa a "secuencial".
+              description: >
+                Prefijo de la resolución de numeración autorizada por la DIAN (ej. "FES").
+                Obligatorio -- le indica al sistema cuál resolución activa usar (si la empresa
+                tiene varias del mismo tipo de documento) y se combina con "secuencial" para
+                armar el número completo del documento.
+              maxLength: 4
             secuencial:
               type: string
-              description: Solo el consecutivo -- se combina con "PREFIX" para armar el numeral completo.
+              description: >
+                Consecutivo del documento (sin el prefijo). Obligatorio -- se combina con
+                "PREFIX" para armar el número completo del documento (ej. "FES" + "1" = "FES1").
             AccountingSupplierParty:
               type: object
               required: [CompanyID]
+              description: >
+                Datos del emisor. Solo "CompanyID" es obligatorio, y debe coincidir con el NIT
+                configurado en la empresa dueña del token -- el resto de los datos del emisor
+                (nombre, dirección, ciudad, teléfono, etc.) que exige la DIAN se toman de lo que
+                la empresa ya tiene configurado en Billingo. Los demás campos de este objeto son
+                opcionales y solo sirven para reemplazar ese dato puntualmente en este documento
+                (no modifican la configuración de la empresa).
               properties:
+                PartyName:
+                  type: string
+                  description: Reemplaza el nombre/razón social del emisor solo en este documento.
+                  maxLength: 450
+                direccion:
+                  type: string
+                  description: Reemplaza la dirección (texto libre) del emisor solo en este documento.
+                  maxLength: 300
+                cityCode:
+                  type: string
+                  description: >
+                    Código DIAN del municipio del emisor para este documento. Va junto con
+                    "CountrySubentityCode" (los dos o ninguno).
+                  minLength: 5
+                  maxLength: 5
+                CountrySubentityCode:
+                  type: string
+                  description: >
+                    Código DIAN del departamento del emisor para este documento. Va junto con
+                    "cityCode" (los dos o ninguno).
+                  minLength: 2
+                  maxLength: 2
                 CompanyID:
                   type: string
                   description: NIT de la empresa emisora -- debe coincidir con el de la empresa dueña del token.
-                PartyName:
-                  type: string
+                  minLength: 3
+                  maxLength: 13
                 TaxLevelCode:
                   type: string
-                direccion:
-                  type: string
-                cityCode:
-                  type: string
-                CountrySubentityCode:
-                  type: string
+                  description: >
+                    Reemplaza las responsabilidades fiscales del emisor solo en este documento.
+                    Puede traer una o varias separadas por ";" (ej. "O-13;O-15"). Si no aplica
+                    ninguna de las cuatro, usar el comodín "R-99-PN".
+
+
+                    Valores permitidos:
+
+                    - `O-13`: Gran contribuyente
+
+                    - `O-15`: Autorretenedor
+
+                    - `O-23`: Agente de retención IVA
+
+                    - `O-47`: Régimen simple de tributación
+
+                    - `R-99-PN`: No aplica -- ninguna de las anteriores
+                  enum: ["O-13", "O-15", "O-23", "O-47", "R-99-PN"]
+                  maxLength: 30
                 telefono:
                   type: string
+                  description: Reemplaza el teléfono del emisor solo en este documento.
                 email:
                   type: string
+                  description: Reemplaza el correo del emisor solo en este documento.
             AccountingCustomerParty:
               type: object
               required: [CompanyID]
+              description: >
+                Datos del receptor (cliente). Solo "CompanyID" es obligatorio: si ya existe un
+                cliente con esa identificación, se usa tal cual y el resto de los campos de este
+                objeto son opcionales (sirven para actualizarlo puntualmente en este documento).
+                Si el cliente no existe todavía, se crea automáticamente -- pero en ese caso
+                "PartyName", "direccion", "cityCode" y "CountrySubentityCode" pasan a ser
+                obligatorios (son los datos mínimos que exige la DIAN para el receptor).
               properties:
-                CompanyID:
+                AdditionalAccountID:
                   type: string
-                  description: Identificación del receptor. Si ya existe como cliente, con esto solo basta.
-                TypeCompanyID:
-                  type: string
-                  description: Tipo de identificación DIAN (ej. "13" cédula, "31" NIT).
+                  description: >
+                    Tipo de persona del receptor.
+
+
+                    Valores permitidos:
+
+                    - `1`: Persona jurídica
+
+                    - `2`: Persona natural
+                  enum: ["1", "2"]
                 PartyName:
                   type: string
                   description: Obligatorio junto con los demás campos si el cliente todavía no existe.
-                AdditionalAccountID:
-                  type: string
-                  description: "\"1\" persona jurídica, cualquier otro valor persona natural."
-                TaxLevelCode:
-                  type: string
+                  maxLength: 450
                 direccion:
                   type: string
+                  description: Dirección del receptor (texto libre).
+                  maxLength: 300
                 cityCode:
                   type: string
+                  description: >
+                    Código DIAN del municipio del receptor. Va junto con "CountrySubentityCode"
+                    (los dos o ninguno).
+                  minLength: 5
+                  maxLength: 5
                 CountrySubentityCode:
                   type: string
+                  description: >
+                    Código DIAN del departamento del receptor. Va junto con "cityCode"
+                    (los dos o ninguno).
+                  minLength: 2
+                  maxLength: 2
+                CompanyID:
+                  type: string
+                  description: Identificación del receptor. Si ya existe como cliente, con esto solo basta.
+                  minLength: 3
+                  maxLength: 30
+                TypeCompanyID:
+                  type: string
+                  description: >
+                    Tipo de identificación DIAN del receptor.
+
+
+                    Valores permitidos:
+
+                    - `11`: Registro civil
+
+                    - `12`: Tarjeta de identidad
+
+                    - `13`: Cédula de ciudadanía
+
+                    - `21`: Tarjeta de extranjería
+
+                    - `22`: Cédula de extranjería
+
+                    - `31`: NIT
+
+                    - `41`: Pasaporte
+
+                    - `42`: Documento de identificación extranjero
+
+                    - `47`: PEP (Permiso Especial de Permanencia)
+
+                    - `48`: PPT (Permiso por Protección Temporal)
+
+                    - `50`: NIT de otro país
+
+                    - `91`: NUIP
+                  enum: ["11", "12", "13", "21", "22", "31", "41", "42", "47", "48", "50", "91"]
+                TaxLevelCode:
+                  type: string
+                  description: >
+                    Responsabilidades fiscales del cliente. Puede traer una o varias separadas
+                    por ";" (ej. "O-13;O-15"). Si no aplica ninguna de las cuatro, usar el
+                    comodín "R-99-PN".
+
+
+                    Valores permitidos:
+
+                    - `O-13`: Gran contribuyente
+
+                    - `O-15`: Autorretenedor
+
+                    - `O-23`: Agente de retención IVA
+
+                    - `O-47`: Régimen simple de tributación
+
+                    - `R-99-PN`: No aplica -- ninguna de las anteriores
+                  enum: ["O-13", "O-15", "O-23", "O-47", "R-99-PN"]
+                  maxLength: 30
                 telefono:
                   type: string
+                  description: Teléfono del receptor.
                 email:
                   type: string
+                  description: Correo del receptor.
             PaymentMeans:
               type: array
               items:
@@ -298,6 +581,13 @@ components:
                   PaymentDueDate:
                     type: string
                     format: date
+                    description: >
+                      Fecha de vencimiento del pago, formato `AAAA-MM-DD`.
+
+
+                      Ejemplos válidos: `2026-09-06`
+                    minLength: 10
+                    maxLength: 10
                   PaymentID:
                     type: string
             AllowanceCharge:
@@ -312,25 +602,64 @@ components:
                 $ref: '#/components/schemas/InvoiceLine'
             BillingReference:
               type: object
-              description: Solo para notas crédito/débito -- factura a la que hacen referencia.
+              description: >
+                Obligatorio si "document.DocumentType" es "91" (nota crédito) o "92" (nota
+                débito) -- identifica la factura electrónica a la que corrige/afecta la nota. No
+                aplica (se ignora) si "document.DocumentType" es "01" (factura).
               properties:
                 InvoiceDocumentReference:
                   type: object
+                  required: [ID, UUID, IssueDate]
                   properties:
                     ID:
                       type: string
+                      description: Prefijo + número de la factura referenciada.
                     UUID:
                       type: string
+                      description: CUFE de la factura referenciada.
                     IssueDate:
                       type: string
                       format: date
+                      description: Fecha de emisión de la factura referenciada.
             DiscrepancyResponse:
               type: object
-              description: Solo para notas crédito/débito.
+              description: >
+                Obligatorio si "document.DocumentType" es "91" (nota crédito) o "92" (nota
+                débito) -- motivo de la nota. No aplica (se ignora) si "document.DocumentType" es
+                "01" (factura). No hace falta mandar "Description": el sistema pone
+                automáticamente el texto oficial de la DIAN que corresponde al código.
               properties:
                 ResponseCode:
                   type: string
-                  description: Código del concepto de la nota.
+                  description: >
+                    Código del concepto de la nota -- el catálogo depende de si
+                    "document.DocumentType" es "91" o "92".
+
+
+                    Nota crédito ("91"):
+
+                    - `1`: Devolución parcial de los bienes y/o no aceptación parcial del servicio
+
+                    - `2`: Anulación de factura electrónica
+
+                    - `3`: Rebaja o descuento parcial o total
+
+                    - `4`: Ajuste de precio
+
+                    - `5`: Descuento comercial por pronto pago
+
+                    - `6`: Descuento comercial por volumen de ventas
+
+
+                    Nota débito ("92"):
+
+                    - `1`: Intereses
+
+                    - `2`: Gastos por cobrar
+
+                    - `3`: Cambio del valor
+
+                    - `4`: Otros
             InvoicePeriod:
               type: object
               description: Solo para notas crédito/débito con período de facturación.
