@@ -31,7 +31,7 @@ class DocumentTotalsCalculator
             ]];
         }
 
-        $cargos = $this->buildCargosCalculados($cargosPayload, $lineExtensionAmount);
+        $cargos = $this->buildCargosCalculados($cargosPayload);
         $totales = $this->calcularTotales($lineExtensionAmount, $impuestos, $cargos);
 
         return [
@@ -61,20 +61,28 @@ class DocumentTotalsCalculator
             $precioUnitario = (float) ($linea['precio_unitario'] ?? 0);
             $baseAmount = round($cantidad * $precioUnitario, 2);
 
-            $descuentoAmount = 0.0;
-            $descuentoPorcentaje = null;
-            $descuentoMotivo = null;
-            if (! empty($linea['descuento'])) {
-                $esPorcentaje = ($linea['descuento']['valor_tipo'] ?? 'porcentaje') === 'porcentaje';
-                $descuentoMotivo = $linea['descuento']['motivo'] ?? 'Descuento';
-                
-                $descuentoPorcentaje = $esPorcentaje ? min((float) $linea['descuento']['valor'], 100) : null;
-                $descuentoAmount = $esPorcentaje
-                    ? round($baseAmount * ($descuentoPorcentaje / 100), 2)
-                    : round(min((float) $linea['descuento']['valor'], $baseAmount), 2);
-            }
+            $cargosDescuentos = array_map(function (array $cargo) {
+                return [
+                    'es_descuento' => ($cargo['tipo'] ?? 'descuento') !== 'cargo',
+                    'motivo' => $cargo['motivo'] ?: (($cargo['tipo'] ?? 'descuento') !== 'cargo' ? 'Descuento' : 'Cargo'),
+                    'porcentaje' => $cargo['porcentaje'],
+                    'base_amount' => $cargo['base_amount'],
+                    'amount' => $cargo['amount'],
+                ];
+            }, $linea['cargos_descuentos'] ?? []);
 
-            $lineExtensionAmount = round($baseAmount - $descuentoAmount, 2);
+            $descuentoAmount = round(array_sum(array_column(array_filter($cargosDescuentos, fn (array $c) => $c['es_descuento']), 'amount')), 2);
+            $cargoAmount = round(array_sum(array_column(array_filter($cargosDescuentos, fn (array $c) => ! $c['es_descuento']), 'amount')), 2);
+
+            $lineExtensionAmount = round($baseAmount - $descuentoAmount + $cargoAmount, 2);
+
+            if (isset($linea['line_extension_amount_expected'])) {
+                $this->assertLineExtensionAmountMatches(
+                    (float) $linea['line_extension_amount_expected'],
+                    $lineExtensionAmount,
+                    $linea['codigo'] ?? $linea['descripcion'] ?? '(sin código)'
+                );
+            }
 
             $impuestosLinea = [];
             foreach ($linea['impuestos'] ?? [] as $impuesto) {
@@ -108,13 +116,32 @@ class DocumentTotalsCalculator
                 'unidad_medida' => $linea['unidad_medida'] ?? 'EA',
                 'precio_unitario' => $precioUnitario,
                 'base_amount' => $baseAmount,
-                'descuento_amount' => $descuentoAmount,
-                'descuento_porcentaje' => $descuentoPorcentaje,
-                'descuento_motivo' => $descuentoMotivo,
+                'cargos_descuentos' => $cargosDescuentos,
                 'line_extension_amount' => $lineExtensionAmount,
                 'impuestos' => $impuestosLinea,
             ];
         }, $lineasPayload);
+    }
+
+    /**
+     * Si el caller mandó "InvoiceLine.LineExtensionAmount" para una línea, lo compara contra
+     * lo que Billingo calculó (cantidad x precio, menos el descuento de línea) y rechaza el
+     * documento explicando la diferencia si no coincide, en vez de emitirlo con un valor que
+     * el caller no esperaba.
+     *
+     * @param  float  $esperado  "LineExtensionAmount" tal como lo mandó el caller.
+     * @param  float  $calculado  Valor calculado por Billingo para esa línea.
+     * @param  string  $identificadorLinea  Código o descripción de la línea, para el mensaje de error.
+     *
+     * @throws InvalidArgumentException Si no coincide (tolerancia de 1 centavo).
+     */
+    private function assertLineExtensionAmountMatches(float $esperado, float $calculado, string $identificadorLinea): void
+    {
+        if (abs($esperado - $calculado) > 0.01) {
+            throw new InvalidArgumentException(
+                "InvoiceLine.LineExtensionAmount de la línea \"{$identificadorLinea}\" ({$esperado}) no coincide con el valor calculado por Billingo a partir de cantidad, precio y descuento ({$calculado})."
+            );
+        }
     }
 
     /**
@@ -146,29 +173,26 @@ class DocumentTotalsCalculator
     }
 
     /**
-     * Calcula los cargos/descuentos a nivel documento (opcionales, cac:AllowanceCharge),
-     * resolviendo el monto de cada uno (fijo, o porcentaje sobre el subtotal de líneas).
+     * Traduce los cargos/descuentos a nivel documento (opcionales, cac:AllowanceCharge) al
+     * shape que espera UblDocumentBuilder -- no calcula nada, "amount"/"base_amount" vienen
+     * tal cual del caller (ver DocumentJsonMapper::mapCargosDescuentos(), que ya los exige) y
+     * se mandan así a la DIAN.
      *
-     * @param  array  $cargosPayload  Bloque "cargos_descuentos" del payload (tipo, motivo, valor_tipo, valor).
-     * @param  float  $baseAmount  Subtotal de líneas (LineExtensionAmount), base para los que son porcentaje.
-     * @return array Cargos/descuentos con el monto ya calculado.
+     * @param  array  $cargosPayload  Bloque "cargos_descuentos" del payload (tipo, motivo, codigo_razon, porcentaje, amount, base_amount).
+     * @return array Cargos/descuentos en el shape que espera UblDocumentBuilder.
      */
-    public function buildCargosCalculados(array $cargosPayload, float $baseAmount): array
+    public function buildCargosCalculados(array $cargosPayload): array
     {
-        return array_map(function (array $cargo) use ($baseAmount) {
+        return array_map(function (array $cargo) {
             $esDescuento = ($cargo['tipo'] ?? 'descuento') !== 'cargo';
-            $esPorcentaje = ($cargo['valor_tipo'] ?? 'fijo') === 'porcentaje';
-            $porcentaje = $esPorcentaje ? (float) $cargo['valor'] : null;
-            $amount = $esPorcentaje
-                ? round($baseAmount * ($porcentaje / 100), 2)
-                : round((float) $cargo['valor'], 2);
 
             return [
                 'es_descuento' => $esDescuento,
                 'motivo' => $cargo['motivo'] ?: ($esDescuento ? 'Descuento' : 'Cargo'),
-                'porcentaje' => $porcentaje,
-                'base_amount' => $baseAmount,
-                'amount' => $amount,
+                'codigo_razon' => $cargo['codigo_razon'],
+                'porcentaje' => $cargo['porcentaje'],
+                'base_amount' => $cargo['base_amount'],
+                'amount' => $cargo['amount'],
             ];
         }, $cargosPayload);
     }
@@ -188,14 +212,23 @@ class DocumentTotalsCalculator
         $allowanceTotalAmount = round(array_sum(array_column(array_filter($cargos, fn (array $c) => $c['es_descuento']), 'amount')), 2);
         $chargeTotalAmount = round(array_sum(array_column(array_filter($cargos, fn (array $c) => ! $c['es_descuento']), 'amount')), 2);
 
-        $taxExclusiveAmount = round($lineExtensionAmount - $allowanceTotalAmount + $chargeTotalAmount, 2);
-        $taxInclusiveAmount = round($taxExclusiveAmount + $taxAmount, 2);
+        // TaxExclusiveAmount = suma de las bases gravables de las líneas (anexo técnico, regla
+        // CAU04/FAJ..: no resta descuentos ni suma cargos a nivel de documento -- esos no
+        // afectan bases gravables, solo el PayableAmount final).
+        $taxExclusiveAmount = round(array_sum(array_column($impuestos, 'taxable_amount')), 2);
+
+        // TaxInclusiveAmount = LineExtensionAmount + tributos a nivel de documento (anexo
+        // técnico: no se deriva de TaxExclusiveAmount).
+        $taxInclusiveAmount = round($lineExtensionAmount + $taxAmount, 2);
+
+        // PayableAmount = TaxInclusiveAmount - descuentos + cargos a nivel de documento.
+        $payableAmount = round($taxInclusiveAmount - $allowanceTotalAmount + $chargeTotalAmount, 2);
 
         return [
             'line_extension_amount' => $lineExtensionAmount,
             'tax_exclusive_amount' => $taxExclusiveAmount,
             'tax_inclusive_amount' => $taxInclusiveAmount,
-            'payable_amount' => $taxInclusiveAmount,
+            'payable_amount' => $payableAmount,
             'allowance_total_amount' => $allowanceTotalAmount,
             'charge_total_amount' => $chargeTotalAmount,
         ];

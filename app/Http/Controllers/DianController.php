@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Resolution;
 use App\Services\Dian\DianSoapClient;
+use App\Services\Dian\DocumentTotalsCalculator;
 use App\Services\Dian\UblDocumentBuilder;
 use App\Services\Dian\UblDocumentSigner;
 use Illuminate\Http\Request;
@@ -329,6 +330,16 @@ class DianController extends Controller
             'impuestos' => [['tipo' => '01', 'porcentaje' => 19]],
         ]];
 
+        $totales = (new DocumentTotalsCalculator())->calcularTotalesDocumento($lineas, [])['totales'];
+        $legalMonetaryTotalExpected = [
+            'LineExtensionAmount' => $totales['line_extension_amount'],
+            'TaxExclusiveAmount' => $totales['tax_exclusive_amount'],
+            'TaxInclusiveAmount' => $totales['tax_inclusive_amount'],
+            'AllowanceTotalAmount' => $totales['allowance_total_amount'],
+            'ChargeTotalAmount' => $totales['charge_total_amount'],
+            'PayableAmount' => $totales['payable_amount'],
+        ];
+
         $facturaNumero = $resolution->nextInvoiceNumber();
 
         $facturaXml = $signer->sign($company, $builder->build($company, [
@@ -348,6 +359,7 @@ class DianController extends Controller
                 'valido_hasta' => $resolution->valid_to?->format('Y-m-d'),
             ],
             'lineas' => $lineas,
+            'legal_monetary_total_expected' => $legalMonetaryTotalExpected,
         ]));
 
         $facturaCufe = $this->extractCufe($facturaXml);
@@ -374,6 +386,7 @@ class DianController extends Controller
             'referencias' => $referencias,
             'prefijo' => $notaCreditoResolution->prefix,
             'lineas' => $lineas,
+            'legal_monetary_total_expected' => $legalMonetaryTotalExpected,
         ]));
 
         $notaDebitoResolution = $this->ensureNoteTestResolution($company, '92', 'NDPRUEBA');
@@ -389,6 +402,7 @@ class DianController extends Controller
             'referencias' => $referencias,
             'prefijo' => $notaDebitoResolution->prefix,
             'lineas' => $lineas,
+            'legal_monetary_total_expected' => $legalMonetaryTotalExpected,
         ]));
 
         return [

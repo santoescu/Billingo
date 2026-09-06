@@ -40,10 +40,11 @@ class DocumentJsonMapper
             'payment_means' => $paymentMeans,
             'payment_means_list' => $paymentMeansList,
             'cargos_descuentos' => $this->mapCargosDescuentos($document['AllowanceCharge'] ?? []),
-            'lineas' => $this->mapLines($document['InvoiceLine'] ?? []),
+            'lineas' => $this->mapLines($document['Lines'] ?? []),
             'prefix' => $document['PREFIX'] ?? throw new InvalidArgumentException('El campo "document.PREFIX" es obligatorio.'),
             'numero_solicitado' => $this->buildNumeral($document),
             'supplier_overrides' => $this->extractSupplierOverrides($document['AccountingSupplierParty'] ?? []),
+            'legal_monetary_total_expected' => $document['LegalMonetaryTotal'] ?? throw new InvalidArgumentException('El campo "document.LegalMonetaryTotal" es obligatorio.'),
         ];
 
         if (! empty($document['BillingReference']) || ! empty($document['DiscrepancyResponse']) || ! empty($document['InvoicePeriod'])) {
@@ -285,26 +286,44 @@ class DocumentJsonMapper
      * @param  array  $allowanceChargeList  Bloque "AllowanceCharge" de la petición.
      * @return array Lista de cargos/descuentos en el shape interno (vacía si no vino ninguno).
      */
-    private function mapCargosDescuentos(array $allowanceChargeList): array
+    public function mapCargosDescuentos(array $allowanceChargeList): array
     {
-        return array_values(array_map(fn (array $item) => [
-            'tipo' => ($item['ChargeIndicator'] ?? false) ? 'cargo' : 'descuento',
-            'motivo' => $item['AllowanceChargeReason'] ?? null,
-            'valor_tipo' => isset($item['MultiplierFactorNumeric']) ? 'porcentaje' : 'fijo',
-            'valor' => $item['MultiplierFactorNumeric'] ?? $item['Amount'] ?? 0,
-        ], $allowanceChargeList));
+        return array_values(array_map(function (array $item) {
+            $esCargo = (bool) ($item['ChargeIndicator'] ?? false);
+
+            foreach (['AllowanceChargeReasonCode', 'MultiplierFactorNumeric', 'Amount', 'BaseAmount'] as $campo) {
+                if (! isset($item[$campo])) {
+                    throw new InvalidArgumentException("document.AllowanceCharge: \"{$campo}\" es obligatorio.");
+                }
+            }
+
+            return [
+                'tipo' => $esCargo ? 'cargo' : 'descuento',
+                'motivo' => $item['AllowanceChargeReason'] ?? null,
+                'codigo_razon' => $item['AllowanceChargeReasonCode'],
+                'porcentaje' => (float) $item['MultiplierFactorNumeric'],
+                'amount' => (float) $item['Amount'],
+                'base_amount' => (float) $item['BaseAmount'],
+            ];
+        }, $allowanceChargeList));
     }
 
     /**
-     * Traduce el bloque "InvoiceLine" al shape interno "lineas" que espera UblDocumentBuilder.
-     * Los montos (LineExtensionAmount, TaxableAmount, TaxAmount) del JSON se ignoran a
-     * propósito: siempre se recalculan desde cantidad/precio_unitario/impuestos para
-     * garantizar que coincidan con lo que exige la fórmula del CUFE/CUDE.
+     * Traduce el bloque "Lines" al shape interno "lineas" que espera UblDocumentBuilder. Se
+     * llama "Lines"/"Quantity" en el JSON (no "InvoiceLine"/"InvoicedQuantity") porque el mismo
+     * nombre aplica sin importar el tipo de documento -- Billingo lo traduce internamente al
+     * elemento UBL que corresponde ("InvoiceLine"/"CreditNoteLine"/"DebitNoteLine" y
+     * "InvoicedQuantity"/"CreditedQuantity"/"DebitedQuantity", ver
+     * UblDocumentBuilder::LINE_ELEMENT/QUANTITY_ELEMENT).
+     * "LineExtensionAmount" del JSON no se usa tal cual: Billingo siempre calcula el suyo desde
+     * cantidad/precio_unitario/"AllowanceCharge" de la línea (necesario para que coincida con lo
+     * que exige la fórmula del CUFE/CUDE) y lo compara contra el del caller, rechazando el
+     * documento si no coincide -- ver DocumentTotalsCalculator::assertLineExtensionAmountMatches().
      *
-     * @param  array  $invoiceLines  Bloque "InvoiceLine" de la petición.
+     * @param  array  $lines  Bloque "Lines" de la petición.
      * @return array Líneas en el shape interno de UblDocumentBuilder.
      */
-    private function mapLines(array $invoiceLines): array
+    public function mapLines(array $lines): array
     {
         return array_map(function (array $line) {
             $item = $line['Item'] ?? [];
@@ -312,36 +331,48 @@ class DocumentJsonMapper
             return [
                 'codigo' => $item['SellersItemIdentification']['ID'] ?? null,
                 'codigo_barras' => $item['StandardItemIdentification']['ID'] ?? null,
-                'descripcion' => $item['Description'] ?? '',
-                'cantidad' => $line['InvoicedQuantity'] ?? 1,
+                'descripcion' => $item['Description'] ?? throw new InvalidArgumentException('Lines.Item.Description es obligatorio.'),
+                'cantidad' => $line['Quantity'] ?? 1,
                 'unidad_medida' => $line['unitCode'] ?? 'EA',
                 'precio_unitario' => $line['Price']['PriceAmount'] ?? 0,
                 'bodega_id' => $line['bodega_id'] ?? null,
-                'descuento' => $this->mapLineDiscount($line['AllowanceCharge'] ?? null),
+                'cargos_descuentos' => $this->mapLineAllowanceCharges($line['AllowanceCharge'] ?? []),
                 'impuestos' => $this->mapLineTaxes($line['TaxTotal'] ?? []),
+                'line_extension_amount_expected' => $line['LineExtensionAmount'] ?? throw new InvalidArgumentException('Lines.LineExtensionAmount es obligatorio.'),
             ];
-        }, $invoiceLines);
+        }, $lines);
     }
 
     /**
-     * Traduce el "AllowanceCharge" de una línea (a lo sumo uno: un descuento
-     * por línea) al shape interno "descuento" (valor_tipo, valor, motivo)
-     * que espera UblDocumentBuilder::buildLineasCalculadas().
+     * Traduce el "AllowanceCharge" de una línea (puede traer varios cargos/descuentos, el
+     * anexo técnico permite 0..N) al shape interno que espera
+     * DocumentTotalsCalculator::buildLineasCalculadas(). Igual que a nivel de documento,
+     * Billingo no calcula nada acá: "MultiplierFactorNumeric", "Amount" y "BaseAmount" se
+     * exigen y se mandan tal cual al XML. No existe "AllowanceChargeReasonCode" a nivel de
+     * línea (ese campo es solo de "document.AllowanceCharge").
      *
-     * @param  array|null  $allowanceCharge  Bloque "AllowanceCharge" de la línea, si vino.
-     * @return array|null Descuento en el shape interno, o null si la línea no tiene.
+     * @param  array  $allowanceChargeList  Bloque "AllowanceCharge" de la línea (arreglo).
+     * @return array Cargos/descuentos de la línea en el shape interno (vacío si no vino ninguno).
      */
-    private function mapLineDiscount(?array $allowanceCharge): ?array
+    private function mapLineAllowanceCharges(array $allowanceChargeList): array
     {
-        if (empty($allowanceCharge)) {
-            return null;
-        }
+        return array_values(array_map(function (array $item) {
+            foreach (['ChargeIndicator', 'MultiplierFactorNumeric', 'Amount', 'BaseAmount'] as $campo) {
+                if (! isset($item[$campo])) {
+                    throw new InvalidArgumentException("Lines.AllowanceCharge: \"{$campo}\" es obligatorio.");
+                }
+            }
 
-        return [
-            'valor_tipo' => isset($allowanceCharge['MultiplierFactorNumeric']) ? 'porcentaje' : 'fijo',
-            'valor' => $allowanceCharge['MultiplierFactorNumeric'] ?? $allowanceCharge['Amount'] ?? 0,
-            'motivo' => $allowanceCharge['AllowanceChargeReason'] ?? null,
-        ];
+            $esCargo = (bool) $item['ChargeIndicator'];
+
+            return [
+                'tipo' => $esCargo ? 'cargo' : 'descuento',
+                'motivo' => $item['AllowanceChargeReason'] ?? null,
+                'porcentaje' => (float) $item['MultiplierFactorNumeric'],
+                'amount' => (float) $item['Amount'],
+                'base_amount' => (float) $item['BaseAmount'],
+            ];
+        }, $allowanceChargeList));
     }
 
     /**

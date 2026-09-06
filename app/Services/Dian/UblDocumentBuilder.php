@@ -113,6 +113,11 @@ class UblDocumentBuilder
         $cargos = $calculo['cargos'];
         $totales = $calculo['totales'];
 
+        $this->assertLegalMonetaryTotalMatches(
+            $payload['legal_monetary_total_expected'] ?? throw new InvalidArgumentException('El campo "legal_monetary_total_expected" es obligatorio.'),
+            $totales
+        );
+
         $numero = $payload['number'] ?? throw new InvalidArgumentException('El campo "number" es obligatorio.');
         $moneda = $payload['moneda'] ?? 'COP';
         $ahoraColombia = new DateTimeImmutable('now', new DateTimeZone('America/Bogota'));
@@ -237,6 +242,44 @@ class UblDocumentBuilder
         }
 
         return preg_match('/[+-]\d{2}:?\d{2}$|Z$/', $issueTime) === 1 ? $issueTime : $issueTime . '-05:00';
+    }
+
+    /**
+     * "document.LegalMonetaryTotal" es obligatorio -- Billingo no lo calcula, lo calcula quien
+     * manda la petición. Billingo lo valida contra lo que da a partir de las líneas del
+     * documento y rechaza la petición explicando el campo que no cuadra, en vez de emitir el
+     * documento con una diferencia que el caller no esperaba.
+     *
+     * @param  array  $esperado  Bloque "LegalMonetaryTotal" de la petición.
+     * @param  array  $calculado  Totales que dan las líneas del documento (ver DocumentTotalsCalculator::calcularTotales()).
+     *
+     * @throws InvalidArgumentException Si falta algún campo, o si no coincide (tolerancia de 1 centavo).
+     */
+    private function assertLegalMonetaryTotalMatches(array $esperado, array $calculado): void
+    {
+        $campos = [
+            'LineExtensionAmount' => 'line_extension_amount',
+            'TaxExclusiveAmount' => 'tax_exclusive_amount',
+            'TaxInclusiveAmount' => 'tax_inclusive_amount',
+            'AllowanceTotalAmount' => 'allowance_total_amount',
+            'ChargeTotalAmount' => 'charge_total_amount',
+            'PayableAmount' => 'payable_amount',
+        ];
+
+        foreach ($campos as $campoJson => $campoCalculado) {
+            if (! isset($esperado[$campoJson])) {
+                throw new InvalidArgumentException("document.LegalMonetaryTotal.{$campoJson} es obligatorio.");
+            }
+
+            $valorEsperado = (float) $esperado[$campoJson];
+            $valorCalculado = (float) $calculado[$campoCalculado];
+
+            if (abs($valorEsperado - $valorCalculado) > 0.01) {
+                throw new InvalidArgumentException(
+                    "document.LegalMonetaryTotal.{$campoJson} ({$valorEsperado}) no coincide con el valor que dan las líneas del documento ({$valorCalculado})."
+                );
+            }
+        }
     }
 
     /**
@@ -836,9 +879,12 @@ class UblDocumentBuilder
 
     /**
      * Construye cac:AllowanceCharge a nivel documento (cargo/descuento global, opcional).
+     * "MultiplierFactorNumeric", "Amount" y "BaseAmount" se mandan tal cual llegaron del
+     * caller -- Billingo no calcula nada acá (ver DocumentJsonMapper::mapCargosDescuentos(),
+     * que ya exige los tres).
      *
      * @param  int  $id  Consecutivo (1-indexed) entre los cargos/descuentos del documento.
-     * @param  array  $cargo  Cargo/descuento ya calculado (ver buildCargosCalculados()).
+     * @param  array  $cargo  Cargo/descuento tal como vino del caller (ver buildCargosCalculados()).
      * @param  string  $moneda  Código de moneda.
      * @return DOMElement Nodo cac:AllowanceCharge construido (aún no adjunto al árbol).
      */
@@ -847,14 +893,11 @@ class UblDocumentBuilder
         $node = $this->doc->createElementNS(self::CAC_NS, 'cac:AllowanceCharge');
         $this->appendCbc($node, 'ID', (string) $id);
         $this->appendCbc($node, 'ChargeIndicator', $cargo['es_descuento'] ? 'false' : 'true');
+        $this->appendCbc($node, 'AllowanceChargeReasonCode', $cargo['codigo_razon']);
         $this->appendCbc($node, 'AllowanceChargeReason', $cargo['motivo']);
-        if ($cargo['porcentaje'] !== null) {
-            $this->appendCbc($node, 'MultiplierFactorNumeric', number_format($cargo['porcentaje'], 2, '.', ''));
-        }
+        $this->appendCbc($node, 'MultiplierFactorNumeric', number_format($cargo['porcentaje'], 2, '.', ''));
         $this->appendMoney($node, 'Amount', $cargo['amount'], $moneda);
-        if ($cargo['porcentaje'] !== null) {
-            $this->appendMoney($node, 'BaseAmount', $cargo['base_amount'], $moneda);
-        }
+        $this->appendMoney($node, 'BaseAmount', $cargo['base_amount'], $moneda);
 
         return $node;
     }
@@ -918,22 +961,16 @@ class UblDocumentBuilder
      */
     private function appendLineAllowanceCharge(DOMElement $node, array $linea, string $moneda): void
     {
-        if ($linea['descuento_amount'] <= 0) {
-            return;
+        foreach ($linea['cargos_descuentos'] ?? [] as $id => $cargo) {
+            $allowance = $this->doc->createElementNS(self::CAC_NS, 'cac:AllowanceCharge');
+            $this->appendCbc($allowance, 'ID', (string) ($id + 1));
+            $this->appendCbc($allowance, 'ChargeIndicator', $cargo['es_descuento'] ? 'false' : 'true');
+            $this->appendCbc($allowance, 'AllowanceChargeReason', $cargo['motivo']);
+            $this->appendCbc($allowance, 'MultiplierFactorNumeric', number_format($cargo['porcentaje'], 2, '.', ''));
+            $this->appendMoney($allowance, 'Amount', $cargo['amount'], $moneda);
+            $this->appendMoney($allowance, 'BaseAmount', $cargo['base_amount'], $moneda);
+            $node->appendChild($allowance);
         }
-
-        $allowance = $this->doc->createElementNS(self::CAC_NS, 'cac:AllowanceCharge');
-        $this->appendCbc($allowance, 'ID', '1');
-        $this->appendCbc($allowance, 'ChargeIndicator', 'false');
-        $this->appendCbc($allowance, 'AllowanceChargeReason', $linea['descuento_motivo']);
-        if ($linea['descuento_porcentaje'] !== null) {
-            $this->appendCbc($allowance, 'MultiplierFactorNumeric', number_format($linea['descuento_porcentaje'], 2, '.', ''));
-        }
-        $this->appendMoney($allowance, 'Amount', $linea['descuento_amount'], $moneda);
-        if ($linea['descuento_porcentaje'] !== null) {
-            $this->appendMoney($allowance, 'BaseAmount', $linea['base_amount'], $moneda);
-        }
-        $node->appendChild($allowance);
     }
 
     /**

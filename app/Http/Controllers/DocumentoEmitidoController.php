@@ -18,6 +18,8 @@ use App\Models\Resolution;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
+use App\Services\Dian\DocumentJsonMapper;
+use App\Services\Dian\DocumentTotalsCalculator;
 use App\Services\Dian\IssueDocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
@@ -190,6 +192,31 @@ class DocumentoEmitidoController extends Controller
      *
      * @return array{client: array, lines: array, tipo_operacion: string, payment_means: array}
      */
+    /**
+     * Toma el primer descuento de "cargos_descuentos" (si hay) y lo arma en el shape
+     * "valor_tipo"/"valor" que espera el JS de la pantalla de edición
+     * (documents/create.blade.php) -- esa pantalla solo edita un descuento por línea, aunque
+     * la API ya soporte varios cargos/descuentos por línea.
+     *
+     * @param  array  $cargosDescuentos  Bloque "cargos_descuentos" de la línea guardada.
+     * @return array|null Descuento en el shape que espera el JS, o null si la línea no tiene.
+     */
+    private function firstLineDiscountForEditing(array $cargosDescuentos): ?array
+    {
+        $descuento = collect($cargosDescuentos)->firstWhere('tipo', 'descuento');
+
+        if (! $descuento) {
+            return null;
+        }
+
+        $esPorcentaje = (float) ($descuento['porcentaje'] ?? 0) > 0;
+
+        return [
+            'valor_tipo' => $esPorcentaje ? 'porcentaje' : 'fijo',
+            'valor' => $esPorcentaje ? $descuento['porcentaje'] : $descuento['amount'],
+        ];
+    }
+
     private function mapEditPrefillForJs(DocumentoEmitido $documento): array
     {
         $payload = $documento->payload ?? [];
@@ -237,7 +264,7 @@ class DocumentoEmitidoController extends Controller
                 'qty' => (float) ($linea['cantidad'] ?? 1),
                 'warehouse_id' => $linea['bodega_id'] ?? null,
                 'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
-                'descuento' => $linea['descuento'] ?? null,
+                'descuento' => $this->firstLineDiscountForEditing($linea['cargos_descuentos'] ?? []),
                 'impuestos' => $linea['impuestos'] ?? [],
             ];
         })->values()->all();
@@ -1106,7 +1133,7 @@ class DocumentoEmitidoController extends Controller
                 'telefono' => $data['cliente_telefono'] ?? null,
                 'email' => $data['cliente_email'] ?? null,
             ],
-            'InvoiceLine' => array_map(
+            'Lines' => array_map(
                 fn (array $item, int $index) => $this->buildInvoiceLine($item, $index),
                 $data['items'],
                 array_keys($data['items']),
@@ -1174,26 +1201,91 @@ class DocumentoEmitidoController extends Controller
         $cargoRowCount = max(count($cargoTipos), count($cargoMotivos), count($cargoValorTipos), count($cargoValores));
 
         $cargos = [];
-        for ($i = 0; $i < $cargoRowCount; $i++) {
-            if (empty($cargoMotivos[$i]) || ! isset($cargoValores[$i]) || $cargoValores[$i] === '') {
-                continue;
+        if ($cargoRowCount > 0) {
+            $baseAmount = $this->calculateLineExtensionSubtotal($data['items']);
+
+            for ($i = 0; $i < $cargoRowCount; $i++) {
+                if (empty($cargoMotivos[$i]) || ! isset($cargoValores[$i]) || $cargoValores[$i] === '') {
+                    continue;
+                }
+
+                $esCargo = ($cargoTipos[$i] ?? 'descuento') === 'cargo';
+                $esPorcentaje = ($cargoValorTipos[$i] ?? 'fijo') === 'porcentaje';
+                $porcentaje = $esPorcentaje ? (float) $cargoValores[$i] : 0.0;
+                $amount = $esPorcentaje ? round($baseAmount * ($porcentaje / 100), 2) : (float) $cargoValores[$i];
+
+                $cargos[] = [
+                    'ChargeIndicator' => $esCargo,
+                    'AllowanceChargeReasonCode' => $esCargo ? '02' : '00',
+                    'AllowanceChargeReason' => $cargoMotivos[$i],
+                    'MultiplierFactorNumeric' => $porcentaje,
+                    'Amount' => $amount,
+                    'BaseAmount' => $baseAmount,
+                ];
             }
-
-            $esPorcentaje = ($cargoValorTipos[$i] ?? 'fijo') === 'porcentaje';
-
-            $cargos[] = [
-                'ChargeIndicator' => ($cargoTipos[$i] ?? 'descuento') === 'cargo',
-                'AllowanceChargeReason' => $cargoMotivos[$i],
-                'MultiplierFactorNumeric' => $esPorcentaje ? (float) $cargoValores[$i] : null,
-                'Amount' => $esPorcentaje ? null : (float) $cargoValores[$i],
-            ];
         }
 
         if (! empty($cargos)) {
             $document['AllowanceCharge'] = $cargos;
         }
 
+        $document['LegalMonetaryTotal'] = $this->calculateLegalMonetaryTotal($document);
+
         return $document;
+    }
+
+    /**
+     * Subtotal de las líneas (cantidad x precio, menos el descuento de línea si tiene) --
+     * mismo cálculo que hace DocumentTotalsCalculator::buildLineasCalculadas(), reproducido
+     * acá porque hace falta antes de llamar a DocumentJsonMapper (para armar el "BaseAmount"
+     * de "document.AllowanceCharge", que ahora es obligatorio).
+     *
+     * @param  array  $items  Líneas ya validadas ("items.*").
+     * @return float Subtotal de todas las líneas.
+     */
+    private function calculateLineExtensionSubtotal(array $items): float
+    {
+        return round(array_sum(array_map(function (array $item) {
+            $baseAmount = (float) $item['cantidad'] * (float) $item['precio_unitario'];
+
+            if (empty($item['descuento_valor']) || (float) $item['descuento_valor'] <= 0) {
+                return $baseAmount;
+            }
+
+            $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
+            $descuentoAmount = $esPorcentaje
+                ? $baseAmount * (min((float) $item['descuento_valor'], 100) / 100)
+                : min((float) $item['descuento_valor'], $baseAmount);
+
+            return $baseAmount - $descuentoAmount;
+        }, $items)), 2);
+    }
+
+    /**
+     * Arma "document.LegalMonetaryTotal" a partir de las líneas y cargos/descuentos que ya se
+     * armaron en $document -- ahora es obligatorio en el shape que espera DocumentJsonMapper,
+     * así que hay que calcularlo acá antes de llamar al mapper (reusa la misma traducción y
+     * cálculo que usa la API, para no duplicar la lógica).
+     *
+     * @param  array  $document  Bloque "document" ya armado (con "InvoiceLine" y "AllowanceCharge").
+     * @return array Bloque "LegalMonetaryTotal" en el shape que espera la API.
+     */
+    private function calculateLegalMonetaryTotal(array $document): array
+    {
+        $mapper = new DocumentJsonMapper();
+        $lineas = $mapper->mapLines($document['Lines'] ?? []);
+        $cargosDescuentos = $mapper->mapCargosDescuentos($document['AllowanceCharge'] ?? []);
+
+        $totales = (new DocumentTotalsCalculator())->calcularTotalesDocumento($lineas, $cargosDescuentos)['totales'];
+
+        return [
+            'LineExtensionAmount' => $totales['line_extension_amount'],
+            'TaxExclusiveAmount' => $totales['tax_exclusive_amount'],
+            'TaxInclusiveAmount' => $totales['tax_inclusive_amount'],
+            'AllowanceTotalAmount' => $totales['allowance_total_amount'],
+            'ChargeTotalAmount' => $totales['charge_total_amount'],
+            'PayableAmount' => $totales['payable_amount'],
+        ];
     }
 
     /**
@@ -1268,7 +1360,7 @@ class DocumentoEmitidoController extends Controller
         $line = [
             'ID' => (string) ($index + 1),
             'unitCode' => $item['unidad_medida'] ?? 'EA',
-            'InvoicedQuantity' => $cantidad,
+            'Quantity' => $cantidad,
             'bodega_id' => $item['bodega_id'] ?? null,
             'Item' => array_filter([
                 'Description' => $item['descripcion'],
@@ -1293,20 +1385,26 @@ class DocumentoEmitidoController extends Controller
             ];
         }
 
+        $descuentoAmount = 0.0;
         if (! empty($item['descuento_valor']) && (float) $item['descuento_valor'] > 0) {
             $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
-            
+
             $descuentoValor = $esPorcentaje
                 ? min((float) $item['descuento_valor'], 100)
                 : min((float) $item['descuento_valor'], $baseAmount);
 
-            $line['AllowanceCharge'] = [
+            $descuentoAmount = $esPorcentaje ? round($baseAmount * ($descuentoValor / 100), 2) : $descuentoValor;
+
+            $line['AllowanceCharge'] = [[
                 'ChargeIndicator' => false,
                 'AllowanceChargeReason' => $item['descuento_motivo'] ?? __('Discount'),
-                'MultiplierFactorNumeric' => $esPorcentaje ? $descuentoValor : null,
-                'Amount' => $esPorcentaje ? null : $descuentoValor,
-            ];
+                'MultiplierFactorNumeric' => $esPorcentaje ? $descuentoValor : 0,
+                'Amount' => $descuentoAmount,
+                'BaseAmount' => $baseAmount,
+            ]];
         }
+
+        $line['LineExtensionAmount'] = round($baseAmount - $descuentoAmount, 2);
 
         return $line;
     }

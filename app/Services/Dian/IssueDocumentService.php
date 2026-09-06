@@ -176,11 +176,37 @@ class IssueDocumentService
 
         $payload = $editedRequest ? $this->mapper->map($company, $editedRequest) : ($documento->payload ?? []);
 
+        if (empty($payload['legal_monetary_total_expected'])) {
+            $payload['legal_monetary_total_expected'] = $this->legacyLegalMonetaryTotal($payload);
+        }
+
         return $this->buildSignSubmitAndPersist(
             $company, $payload, $documento->tipo_documento, $resolution,
             $documento->numeral, $documento->secuencial, $documento->ambiente, $documento,
             userId: $userId,
         );
+    }
+
+    /**
+     * "legal_monetary_total_expected" solo existe en payloads guardados desde que ese campo
+     * se volvió obligatorio -- para poder reintentar un documento rechazado más viejo (guardado
+     * antes de este cambio), se calcula acá igual que lo haría UblDocumentBuilder::build().
+     *
+     * @param  array  $payload  Payload guardado del documento (sin "legal_monetary_total_expected").
+     * @return array Bloque "LegalMonetaryTotal" en el shape que espera la API.
+     */
+    private function legacyLegalMonetaryTotal(array $payload): array
+    {
+        $totales = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? [])['totales'];
+
+        return [
+            'LineExtensionAmount' => $totales['line_extension_amount'],
+            'TaxExclusiveAmount' => $totales['tax_exclusive_amount'],
+            'TaxInclusiveAmount' => $totales['tax_inclusive_amount'],
+            'AllowanceTotalAmount' => $totales['allowance_total_amount'],
+            'ChargeTotalAmount' => $totales['charge_total_amount'],
+            'PayableAmount' => $totales['payable_amount'],
+        ];
     }
 
     /**
@@ -319,25 +345,44 @@ class IssueDocumentService
      */
     private function mapItemsToLineas(array $items): array
     {
-        return collect($items)->map(fn (array $item) => [
-            'codigo' => $item['codigo'],
-            'codigo_barras' => $item['codigo_barras'] ?? null,
-            'descripcion' => $item['descripcion'],
-            'cantidad' => (float) $item['cantidad'],
-            'unidad_medida' => $item['unidad_medida'] ?? 'EA',
-            'precio_unitario' => (float) $item['precio_unitario'],
-            'bodega_id' => $item['bodega_id'] ?? null,
-            'descuento' => ! empty($item['descuento_valor']) ? [
-                'valor_tipo' => $item['descuento_valor_tipo'] ?? 'porcentaje',
-                'valor' => (float) $item['descuento_valor'],
-                'motivo' => $item['descuento_motivo'] ?? null,
-            ] : null,
-            'impuestos' => collect($item['impuestos'] ?? [])->map(fn (array $impuesto) => [
-                'tipo' => $impuesto['tipo'],
-                'porcentaje' => (float) $impuesto['porcentaje'],
-                'base_gravable' => $impuesto['base_gravable'] ?? null,
-            ])->values()->all(),
-        ])->values()->all();
+        return collect($items)->map(function (array $item) {
+            $cantidad = (float) $item['cantidad'];
+            $precioUnitario = (float) $item['precio_unitario'];
+            $baseAmount = round($cantidad * $precioUnitario, 2);
+
+            $cargosDescuentos = [];
+            if (! empty($item['descuento_valor'])) {
+                $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
+                $porcentaje = $esPorcentaje ? min((float) $item['descuento_valor'], 100) : 0.0;
+                $amount = $esPorcentaje
+                    ? round($baseAmount * ($porcentaje / 100), 2)
+                    : min((float) $item['descuento_valor'], $baseAmount);
+
+                $cargosDescuentos[] = [
+                    'tipo' => 'descuento',
+                    'motivo' => $item['descuento_motivo'] ?? null,
+                    'porcentaje' => $porcentaje,
+                    'amount' => $amount,
+                    'base_amount' => $baseAmount,
+                ];
+            }
+
+            return [
+                'codigo' => $item['codigo'],
+                'codigo_barras' => $item['codigo_barras'] ?? null,
+                'descripcion' => $item['descripcion'],
+                'cantidad' => $cantidad,
+                'unidad_medida' => $item['unidad_medida'] ?? 'EA',
+                'precio_unitario' => $precioUnitario,
+                'bodega_id' => $item['bodega_id'] ?? null,
+                'cargos_descuentos' => $cargosDescuentos,
+                'impuestos' => collect($item['impuestos'] ?? [])->map(fn (array $impuesto) => [
+                    'tipo' => $impuesto['tipo'],
+                    'porcentaje' => (float) $impuesto['porcentaje'],
+                    'base_gravable' => $impuesto['base_gravable'] ?? null,
+                ])->values()->all(),
+            ];
+        })->values()->all();
     }
 
     /**
