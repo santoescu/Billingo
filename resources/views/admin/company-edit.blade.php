@@ -380,31 +380,7 @@
             <div class="flex flex-col gap-6">
                 {{-- Arriba, lado a lado: acciones puntuales (link de docs, token) --
                      no necesitan tanto ancho como la lista de endpoints (abajo). --}}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
-                        <div class="flex items-center gap-2">
-                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
-                            </span>
-                            <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API documentation') }}</h3>
-                        </div>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
-                            {{ __('Share this link with whoever builds the integration -- it explains every endpoint, no login needed to view it.') }}
-                        </p>
-
-                        <div class="mt-3 flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
-                            <input type="text" readonly id="api-docs-url" value="{{ route('api-docs.index') }}"
-                                class="flex-1 min-w-0 bg-transparent border-0 text-zinc-700 dark:text-zinc-300 text-sm h-9 px-3 focus:outline-hidden focus:ring-0">
-                            <button type="button" class="js-clipboard relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
-                                data-clipboard-target="#api-docs-url"
-                                data-clipboard-action="copy"
-                                aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
-                                <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                                <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                            </button>
-                        </div>
-                    </div>
-
+                <div class="grid grid-cols-2 gap-6">
                     <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
                         <div class="flex items-center gap-2">
                             <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
@@ -426,6 +402,30 @@
                             <flux:button type="button" variant="{{ $company->api_token ? 'filled' : 'primary' }}" id="api-token-generate-btn" data-has-token="{{ $company->api_token ? '1' : '0' }}" onclick="window.generateApiToken()">
                                 <span id="api-token-generate-label">{{ $company->api_token ? __('Regenerate token') : __('Generate token') }}</span>
                             </flux:button>
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
+                        <div class="flex items-center gap-2">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+                            </span>
+                            <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API documentation') }}</h3>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
+                            {{ __('Share this link with whoever builds the integration -- it explains every endpoint, no login needed to view it.') }}
+                        </p>
+
+                        <div class="mt-3 flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
+                            <input type="text" readonly id="api-docs-url" value="{{ route('api-docs.index') }}"
+                                class="flex-1 min-w-0 bg-transparent border-0 text-zinc-700 dark:text-zinc-300 text-sm h-9 px-3 focus:outline-hidden focus:ring-0">
+                            <button type="button" class="js-clipboard relative shrink-0 inline-flex items-center justify-center px-3 border-s border-zinc-200 dark:border-white/10 text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                                data-clipboard-target="#api-docs-url"
+                                data-clipboard-action="copy"
+                                aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
+                                <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                                <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
