@@ -59,15 +59,11 @@ paths:
             "PaymentMeans": [
               { "PaymentMeansCode": "10" }
             ],
-            "InvoiceLine": [
+            "Lines": [
               {
-                "InvoicedQuantity": 1,
+                "Quantity": 1,
                 "unitCode": "EA",
-                "Item": {
-                  "SellersItemIdentification": { "ID": "producto_1" },
-                  "Description": "Producto de prueba"
-                },
-                "Price": { "PriceAmount": 100000 },
+                "LineExtensionAmount": 100000,
                 "TaxTotal": {
                   "TaxSubtotal": {
                     "TaxCategory": {
@@ -75,9 +71,22 @@ paths:
                       "Percent": 19
                     }
                   }
-                }
+                },
+                "Item": {
+                  "SellersItemIdentification": { "ID": "producto_1" },
+                  "Description": "Producto de prueba"
+                },
+                "Price": { "PriceAmount": 100000 }
               }
-            ]
+            ],
+            "LegalMonetaryTotal": {
+              "LineExtensionAmount": 100000,
+              "TaxExclusiveAmount": 100000,
+              "TaxInclusiveAmount": 119000,
+              "AllowanceTotalAmount": 0,
+              "ChargeTotalAmount": 0,
+              "PayableAmount": 119000
+            }
           }
         }
         ```
@@ -110,15 +119,10 @@ paths:
                       email: "cliente@ejemplo.com"
                     PaymentMeans:
                       - PaymentMeansCode: "10"
-                    InvoiceLine:
-                      - InvoicedQuantity: 1
+                    Lines:
+                      - Quantity: 1
                         unitCode: "EA"
-                        Item:
-                          SellersItemIdentification:
-                            ID: "producto_1"
-                          Description: "Producto de prueba"
-                        Price:
-                          PriceAmount: 100000
+                        LineExtensionAmount: 100000
                         TaxTotal:
                           TaxSubtotal:
                             TaxCategory:
@@ -126,6 +130,19 @@ paths:
                                 ID: "01"
                                 Name: "IVA"
                               Percent: 19
+                        Item:
+                          SellersItemIdentification:
+                            ID: "producto_1"
+                          Description: "Producto de prueba"
+                        Price:
+                          PriceAmount: 100000
+                    LegalMonetaryTotal:
+                      LineExtensionAmount: 100000
+                      TaxExclusiveAmount: 100000
+                      TaxInclusiveAmount: 119000
+                      AllowanceTotalAmount: 0
+                      ChargeTotalAmount: 0
+                      PayableAmount: 119000
       responses:
         '201':
           description: Documento aceptado por la DIAN.
@@ -265,7 +282,7 @@ components:
       properties:
         document:
           type: object
-          required: [DocumentType, PREFIX, secuencial, AccountingSupplierParty, AccountingCustomerParty, InvoiceLine]
+          required: [DocumentType, PREFIX, secuencial, AccountingSupplierParty, AccountingCustomerParty, PaymentMeans, Lines, LegalMonetaryTotal]
           properties:
             DocumentType:
               type: string
@@ -568,21 +585,61 @@ components:
                   description: Correo del receptor.
             PaymentMeans:
               type: array
+              description: >
+                Medio(s) de pago del documento. La DIAN sí lo exige, pero en la petición es
+                opcional -- si no se manda, el sistema lo completa solo con un pago de contado en
+                efectivo (equivalente a mandar `[{"ID": "1", "PaymentMeansCode": "10"}]`) para
+                que el documento no se rechace por este campo. Se puede mandar más de uno si el
+                documento se paga con varios medios.
               items:
                 type: object
+                required: [ID, PaymentMeansCode]
                 properties:
                   ID:
                     type: string
+                    description: >
+                      Forma de pago (no confundir con "PaymentMeansCode", que es el medio con el
+                      que se paga). La DIAN lo exige siempre -- si no se manda, el sistema lo
+                      completa con "1" (contado).
+
+                      - `1`: Contado
+
+                      - `2`: Crédito
+                    enum: ["1", "2"]
                     default: "1"
+                    minLength: 1
+                    maxLength: 1
                   PaymentMeansCode:
                     type: string
-                    description: Código DIAN del medio de pago (ej. "10" efectivo, "1" a crédito).
+                    description: >
+                      Medio de pago, catálogo UNTDID 4461. La DIAN lo exige siempre -- si no se
+                      manda, el sistema lo completa con "10" (efectivo). El catálogo completo
+                      tiene demasiados códigos para listarlos todos acá; estos son los más usados:
+
+                      - `10`: Efectivo
+
+                      - `20`: Cheque
+
+                      - `42`: Consignación bancaria
+
+                      - `47`: Transferencia débito bancaria
+
+                      - `48`: Tarjeta crédito
+
+                      - `49`: Tarjeta débito
+
+                      - `71`: Bonos
+
+                      - `ZZZ`: Acuerdo mutuo (otro medio no listado en el catálogo)
                     default: "10"
+                    minLength: 1
+                    maxLength: 3
                   PaymentDueDate:
                     type: string
                     format: date
                     description: >
-                      Fecha de vencimiento del pago, formato `AAAA-MM-DD`.
+                      Fecha de vencimiento del pago (solo aplica si "ID" es "2", crédito),
+                      formato `AAAA-MM-DD`.
 
 
                       Ejemplos válidos: `2026-09-06`
@@ -590,16 +647,49 @@ components:
                     maxLength: 10
                   PaymentID:
                     type: string
+                    description: >
+                      Referencia libre del pago (ej. número de transacción, de cheque, de
+                      consignación). Opcional.
+                    maxLength: 30
             AllowanceCharge:
               type: array
-              description: Cargos/descuentos globales del documento (opcional).
               items:
                 $ref: '#/components/schemas/AllowanceCharge'
-            InvoiceLine:
+            LegalMonetaryTotal:
+              type: object
+              required: [LineExtensionAmount, TaxExclusiveAmount, TaxInclusiveAmount, AllowanceTotalAmount, ChargeTotalAmount, PayableAmount]
+              description: >
+                Grupo de campos para información relacionadas con los valores totales
+                aplicables al documento.
+              properties:
+                LineExtensionAmount:
+                  type: number
+                  description: Suma de "LineExtensionAmount" de todas las líneas (subtotal antes de impuestos, después de descuentos de línea).
+                TaxExclusiveAmount:
+                  type: number
+                  description: >
+                    Total valor base imponible: la base sobre la que se calculan los impuestos,
+                    es decir la suma de las bases gravables de todas las líneas. No se ve
+                    afectado por descuentos/cargos a nivel de documento.
+                TaxInclusiveAmount:
+                  type: number
+                  description: Total del documento con impuestos incluidos.
+                AllowanceTotalAmount:
+                  type: number
+                  description: Suma de los descuentos globales del documento ("document.AllowanceCharge" con "ChargeIndicator" en `false`).
+                ChargeTotalAmount:
+                  type: number
+                  description: Suma de los cargos globales del documento ("document.AllowanceCharge" con "ChargeIndicator" en `true`).
+                PayableAmount:
+                  type: number
+                  description: Valor final a pagar (igual a "TaxInclusiveAmount" en los documentos que emite Billingo).
+            Lines:
               type: array
               minItems: 1
+              description: >
+                Grupo de campos para información relacionadas con una línea del documento.
               items:
-                $ref: '#/components/schemas/InvoiceLine'
+                $ref: '#/components/schemas/DocumentLine'
             BillingReference:
               type: object
               description: >
@@ -673,58 +763,115 @@ components:
 
     AllowanceCharge:
       type: object
+      required: [ChargeIndicator, AllowanceChargeReasonCode, AllowanceChargeReason, MultiplierFactorNumeric, Amount, BaseAmount]
+      description: >
+        Descuentos o cargos a nivel de factura, es decir descuentos o cargos que no afectan las
+        bases gravables. Los descuentos o cargos que afectan bases gravables se informan a
+        nivel de ítem.
       properties:
         ChargeIndicator:
           type: boolean
-          description: true = cargo, false/ausente = descuento.
+          description: >
+            Solo puede tener uno de los dos valores, la DIAN rechaza el documento si viene
+            cualquier cosa distinta de "true" o "false".
+
+            - `true`: cargo (un débito) -- aumenta el valor de la factura, se reporta en el
+            total legal
+
+            - `false`: descuento (un crédito) -- descuenta el valor de la factura antes de
+            tributos, también se reporta en el total legal
+          enum: [true, false]
+        AllowanceChargeReasonCode:
+          type: string
+          description: >
+            Código que categoriza el cargo/descuento.
+
+            - `00`: Descuento no condicionado
+
+            - `01`: Descuento condicionado
+
+            - `02`: Recargo no condicionado
+
+            - `03`: Recargo condicionado (se usa para informar propinas)
+          enum: ["00", "01", "02", "03"]
+          minLength: 2
+          maxLength: 2
         AllowanceChargeReason:
           type: string
+          description: Motivo del cargo/descuento.
+          minLength: 1
+          maxLength: 5000
         MultiplierFactorNumeric:
           type: number
-          description: Porcentaje (0-1) -- si viene, tiene prioridad sobre "Amount".
+          description: >
+            Porcentaje aplicado en decimales, debe corresponder a un valor entre 0 a 100.
+          minimum: 0
+          maximum: 100
         Amount:
           type: number
-          description: Valor fijo -- se usa solo si no vino "MultiplierFactorNumeric".
-
-    InvoiceLine:
-      type: object
-      required: [Item, Price]
-      properties:
-        InvoicedQuantity:
+          description: >
+            Valor total del cargo o descuento. Si es descuento, no puede ser superior al valor
+            base.
+          minimum: 0
+        BaseAmount:
           type: number
+          description: >
+            Valor base para calcular el descuento o el cargo.
+          minimum: 0
+
+    DocumentLine:
+      type: object
+      required: [Item, Price, Quantity, unitCode, LineExtensionAmount]
+      properties:
+        Quantity:
+          type: number
+          description: Cantidad del producto o servicio. La DIAN rechaza el documento si es negativa.
           default: 1
+          minimum: 0
         unitCode:
           type: string
+          description: >
+            Unidad de medida (catálogo de unidades de medida de la DIAN, ej. "EA" unidad,
+            "KGM" kilogramo).
           default: EA
-        bodega_id:
-          type: string
-          description: Id de la bodega de la que se descuenta inventario (opcional).
-        Item:
-          type: object
-          properties:
-            SellersItemIdentification:
-              type: object
-              properties:
-                ID:
-                  type: string
-                  description: Código interno del producto -- si no existe en el catálogo, se crea.
-            StandardItemIdentification:
-              type: object
-              properties:
-                ID:
-                  type: string
-                  description: Código de barras.
-            Description:
-              type: string
-        Price:
-          type: object
-          required: [PriceAmount]
-          properties:
-            PriceAmount:
-              type: number
+        LineExtensionAmount:
+          type: number
+          description: >
+            Valor total de la línea. Cantidad x Precio Unidad menos descuentos más recargos que
+            apliquen para la línea.
         AllowanceCharge:
-          $ref: '#/components/schemas/AllowanceCharge'
-          description: A lo sumo un descuento/cargo por línea.
+          type: array
+          description: >
+            Grupo de campos para información relacionadas con un cargo o un descuento a nivel
+            de línea.
+          items:
+            type: object
+            required: [ChargeIndicator, MultiplierFactorNumeric, Amount, BaseAmount]
+            properties:
+              ChargeIndicator:
+                type: boolean
+                description: >
+                  - `true`: cargo (recargo) -- aumenta el valor de la línea
+
+                  - `false`: descuento -- disminuye el valor de la línea
+                enum: [true, false]
+              AllowanceChargeReason:
+                type: string
+                description: Motivo del cargo/descuento. Opcional.
+                maxLength: 5000
+              MultiplierFactorNumeric:
+                type: number
+                description: Porcentaje de 0 a 100 (no una fracción) que representa el cargo/descuento.
+                minimum: 0
+                maximum: 100
+              Amount:
+                type: number
+                description: Valor total del cargo o descuento en la moneda del documento.
+                minimum: 0
+              BaseAmount:
+                type: number
+                description: Valor base sobre el que se calculó "MultiplierFactorNumeric".
+                minimum: 0
         TaxTotal:
           type: object
           properties:
@@ -735,6 +882,34 @@ components:
                 - type: array
                   items:
                     $ref: '#/components/schemas/TaxSubtotal'
+        Item:
+          type: object
+          required: [Description]
+          properties:
+            SellersItemIdentification:
+              type: object
+              properties:
+                ID:
+                  type: string
+                  description: Código interno del producto -- si no existe en el catálogo, se crea.
+                  maxLength: 50
+            StandardItemIdentification:
+              type: object
+              required: [ID]
+              properties:
+                ID:
+                  type: string
+                  description: Código de barras.
+            Description:
+              type: string
+              description: Descripción del artículo o servicio al que se refiere la línea.
+              maxLength: 300
+        Price:
+          type: object
+          required: [PriceAmount]
+          properties:
+            PriceAmount:
+              type: number
 
     TaxSubtotal:
       type: object
