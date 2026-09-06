@@ -55,7 +55,7 @@ class DianController extends Controller
 
         $data = $request->validate([
             'document_type' => ['required', 'in:91,92,FV,COT'],
-            'prefix' => ['required', 'string', 'max:10'],
+            'prefix' => ['required', 'string', 'max:4'],
             'range_from' => ['required', 'integer', 'min:1'],
         ]);
 

@@ -20,7 +20,7 @@ class DocumentJsonMapper
     public function map(Company $company, array $request): array
     {
         $document = $request['document'] ?? throw new InvalidArgumentException('El campo "document" es obligatorio.');
-        $tipoDocumento = $request['tipo_documento'] ?? $document['DocumentType'] ?? throw new InvalidArgumentException('Debe indicar el código DIAN del tipo de documento en "document.DocumentType" (01, 02, 03, 04, 05, 91, 92, 95).');
+        $tipoDocumento = $document['DocumentType'] ?? throw new InvalidArgumentException('El campo "document.DocumentType" es obligatorio (01, 02, 03, 04, 91, 92).');
 
         $this->assertSupplierMatchesCompany($company, $document['AccountingSupplierParty'] ?? []);
         $cliente = $this->resolveCustomerParty($company, $document['AccountingCustomerParty'] ?? []);
@@ -41,8 +41,8 @@ class DocumentJsonMapper
             'payment_means_list' => $paymentMeansList,
             'cargos_descuentos' => $this->mapCargosDescuentos($document['AllowanceCharge'] ?? []),
             'lineas' => $this->mapLines($document['InvoiceLine'] ?? []),
-            'prefix' => $document['PREFIX'] ?? null,
-            'numero_solicitado' => $document['Numeral'] ?? $this->buildNumeralFromSecuencial($document),
+            'prefix' => $document['PREFIX'] ?? throw new InvalidArgumentException('El campo "document.PREFIX" es obligatorio.'),
+            'numero_solicitado' => $this->buildNumeral($document),
             'supplier_overrides' => $this->extractSupplierOverrides($document['AccountingSupplierParty'] ?? []),
         ];
 
@@ -90,6 +90,8 @@ class DocumentJsonMapper
      */
     private function extractSupplierOverrides(array $accountingSupplierParty): array
     {
+        $this->assertSupplierLocationOverrideComplete($accountingSupplierParty);
+
         return array_filter([
             'name' => $accountingSupplierParty['PartyName'] ?? null,
             'fiscal_responsibilities' => $accountingSupplierParty['TaxLevelCode'] ?? null,
@@ -102,18 +104,39 @@ class DocumentJsonMapper
     }
 
     /**
-     * Combina PREFIX + secuencial en un número completo, si no vino "Numeral" directo.
+     * La DIAN exige municipio + departamento como un par consistente (ver anexo técnico,
+     * numeral de PhysicalLocation/Address). Como estos dos campos se combinan uno por uno
+     * con lo que ya tiene la Company guardada (ver UblDocumentBuilder::buildSupplierParty()),
+     * reemplazar solo uno de los dos dejaría el documento con un municipio nuevo pero
+     * departamento viejo (o viceversa) -- una combinación inconsistente que nunca debería
+     * armarse en silencio. "direccion" no entra en esta regla: es texto libre, no depende
+     * de los otros dos.
+     *
+     * @param  array  $accountingSupplierParty  Bloque "AccountingSupplierParty" de la petición.
+     */
+    private function assertSupplierLocationOverrideComplete(array $accountingSupplierParty): void
+    {
+        $campos = ['cityCode', 'CountrySubentityCode'];
+        $presentes = array_filter($campos, fn ($campo) => isset($accountingSupplierParty[$campo]));
+
+        if (count($presentes) > 0 && count($presentes) < count($campos)) {
+            throw new InvalidArgumentException('AccountingSupplierParty: "cityCode" y "CountrySubentityCode" deben venir los dos juntos, o ninguno.');
+        }
+    }
+
+    /**
+     * Combina "PREFIX" + "secuencial" en el número completo del documento.
      *
      * @param  array  $document  Bloque "document" de la petición.
-     * @return string|null Número completo, o null si no se indicó secuencial.
+     * @return string Número completo (prefijo + consecutivo).
      */
-    private function buildNumeralFromSecuencial(array $document): ?string
+    private function buildNumeral(array $document): string
     {
         if (empty($document['secuencial'])) {
-            return null;
+            throw new InvalidArgumentException('El campo "document.secuencial" es obligatorio.');
         }
 
-        return trim(($document['PREFIX'] ?? '') . $document['secuencial'], '-');
+        return trim($document['PREFIX'] . $document['secuencial'], '-');
     }
 
     /**
@@ -129,6 +152,8 @@ class DocumentJsonMapper
     {
         $identificacion = $accountingCustomerParty['CompanyID'] ?? throw new InvalidArgumentException('AccountingCustomerParty.CompanyID es obligatorio.');
         $tipoIdentificacion = $accountingCustomerParty['TypeCompanyID'] ?? null;
+
+        $this->assertCustomerLocationOverrideComplete($accountingCustomerParty);
 
         $otherFields = array_filter([
             'name' => $accountingCustomerParty['PartyName'] ?? null,
@@ -189,6 +214,25 @@ class DocumentJsonMapper
             ],
             'id' => (string) $cliente->_id,
         ];
+    }
+
+    /**
+     * Misma regla que assertSupplierLocationOverrideComplete(), pero para el cliente: si el
+     * cliente ya existe y la petición trae solo uno de los dos, el update lo dejaría con
+     * ciudad nueva y departamento viejo (o viceversa) sin que nadie se entere. Cuando el
+     * cliente es nuevo esto ya queda cubierto por assertRequiredFieldsForNewClient() (exige
+     * los dos, entre otros campos), pero no está de más chequearlo acá también.
+     *
+     * @param  array  $accountingCustomerParty  Bloque "AccountingCustomerParty" de la petición.
+     */
+    private function assertCustomerLocationOverrideComplete(array $accountingCustomerParty): void
+    {
+        $campos = ['cityCode', 'CountrySubentityCode'];
+        $presentes = array_filter($campos, fn ($campo) => isset($accountingCustomerParty[$campo]));
+
+        if (count($presentes) > 0 && count($presentes) < count($campos)) {
+            throw new InvalidArgumentException('AccountingCustomerParty: "cityCode" y "CountrySubentityCode" deben venir los dos juntos, o ninguno.');
+        }
     }
 
     /**

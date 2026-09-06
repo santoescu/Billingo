@@ -58,7 +58,7 @@ class IssueDocumentService
         $tipoDocumento = $payload['tipo_documento'];
         $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
         $resolution = $this->resolveResolution($company, $tipoDocumento, $ambiente, $payload['prefix'] ?? null);
-        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.Numeral" o "document.secuencial" (junto con "document.PREFIX") con el número del documento.');
+        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.PREFIX" y "document.secuencial" con el número del documento.');
 
         $existente = DocumentoEmitido::where('company_id', (string) $company->_id)
             ->where('tipo_documento', $tipoDocumento)
@@ -100,7 +100,7 @@ class IssueDocumentService
         $tipoDocumento = $payload['tipo_documento'];
         $ambiente = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
         $resolution = $this->resolveResolution($company, $tipoDocumento, $ambiente, $payload['prefix'] ?? null);
-        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.Numeral" o "document.secuencial" (junto con "document.PREFIX") con el número del documento.');
+        $numeral = $payload['numero_solicitado'] ?? throw new InvalidArgumentException('Debe indicar "document.PREFIX" y "document.secuencial" con el número del documento.');
 
         $calculo = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
         $payload['lineas'] = $calculo['lineas'];

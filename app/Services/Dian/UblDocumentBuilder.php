@@ -117,7 +117,7 @@ class UblDocumentBuilder
         $moneda = $payload['moneda'] ?? 'COP';
         $ahoraColombia = new DateTimeImmutable('now', new DateTimeZone('America/Bogota'));
         $fecha = $payload['issue_date'] ?? $ahoraColombia->format('Y-m-d');
-        $hora = $payload['issue_time'] ?? $ahoraColombia->format('H:i:sP');
+        $hora = $this->normalizeIssueTime($payload['issue_time'] ?? null) ?? $ahoraColombia->format('H:i:sP');
 
         $customerParty = $this->resolveCustomerParty($company, $payload);
 
@@ -217,6 +217,26 @@ class UblDocumentBuilder
         $this->doc->encoding = 'UTF-8';
 
         return $this->doc->saveXML();
+    }
+
+    /**
+     * La DIAN exige que la hora venga con el offset de zona horaria incluido
+     * (ej. "14:32:00-05:00", 14 caracteres) -- si quien llama la API manda
+     * solo "14:32:00" (sin offset), la DIAN termina rechazando el documento
+     * en vez de que Billingo avise antes de gastar la emisión. En vez de
+     * exigirlo estricto, se completa solo con "-05:00" (Colombia no tiene
+     * horario de verano, el offset es siempre ese) si no viene ya alguno.
+     *
+     * @param  string|null  $issueTime  Hora tal como vino en la petición (o null si no vino).
+     * @return string|null  Hora con el offset garantizado, o null si no vino ninguna (se usa la hora actual).
+     */
+    private function normalizeIssueTime(?string $issueTime): ?string
+    {
+        if ($issueTime === null || $issueTime === '') {
+            return null;
+        }
+
+        return preg_match('/[+-]\d{2}:?\d{2}$|Z$/', $issueTime) === 1 ? $issueTime : $issueTime . '-05:00';
     }
 
     /**
