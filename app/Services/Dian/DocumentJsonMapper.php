@@ -9,6 +9,16 @@ use InvalidArgumentException;
 class DocumentJsonMapper
 {
     /**
+     * Tributos que el anexo técnico exige informar de forma nominal (valor fijo por unidad,
+     * vía "PerUnitAmount"/"BaseUnitMeasure") en vez de porcentual (vía "Percent"):
+     * `21` Timbre, `22` INC Bolsas, `23` INCarbono, `24` INCombustibles (regla explícita del
+     * anexo, numeral FAX09-FAX11), más `33` INPP y `34` IBUA (confirmado en la tabla de
+     * tarifas 13.3.11 -- ambos se calculan con la misma fórmula PerUnitAmount x
+     * BaseUnitMeasure).
+     */
+    private const TRIBUTOS_NOMINALES = ['21', '22', '23', '24', '33', '34'];
+
+    /**
      * Traduce el JSON recibido al payload interno de UblDocumentBuilder,
      * más "prefix" y "numero_solicitado" para que el servicio resuelva la
      * numeración.
@@ -26,10 +36,13 @@ class DocumentJsonMapper
         $cliente = $this->resolveCustomerParty($company, $document['AccountingCustomerParty'] ?? []);
         $paymentMeansList = $this->mapPaymentMeansList($document['PaymentMeans'] ?? []);
         $paymentMeans = $paymentMeansList[0] ?? null;
+        $customizationId = $document['CustomizationID'] ?? null;
+        $lineas = $this->mapLines($document['Lines'] ?? []);
+        $this->assertMandanteInformadoSiEsMandato($customizationId, $lineas);
 
         $payload = [
             'tipo_documento' => $tipoDocumento,
-            'customization_id' => $document['CustomizationID'] ?? null,
+            'customization_id' => $customizationId,
             'moneda' => $document['DocumentCurrencyCode'] ?? 'COP',
             'issue_date' => $document['IssueDate'] ?? null,
             'issue_time' => $document['IssueTime'] ?? null,
@@ -40,18 +53,21 @@ class DocumentJsonMapper
             'payment_means' => $paymentMeans,
             'payment_means_list' => $paymentMeansList,
             'cargos_descuentos' => $this->mapCargosDescuentos($document['AllowanceCharge'] ?? []),
-            'lineas' => $this->mapLines($document['Lines'] ?? []),
+            'lineas' => $lineas,
             'prefix' => $document['PREFIX'] ?? throw new InvalidArgumentException('El campo "document.PREFIX" es obligatorio.'),
             'numero_solicitado' => $this->buildNumeral($document),
             'supplier_overrides' => $this->extractSupplierOverrides($document['AccountingSupplierParty'] ?? []),
             'legal_monetary_total_expected' => $document['LegalMonetaryTotal'] ?? throw new InvalidArgumentException('El campo "document.LegalMonetaryTotal" es obligatorio.'),
+            'orden_referencia' => $this->mapOrderReference($document['OrderReference'] ?? null),
         ];
 
         if (! empty($document['BillingReference']) || ! empty($document['DiscrepancyResponse']) || ! empty($document['InvoicePeriod'])) {
+            $billingReference = $document['BillingReference'] ?? [];
+
             $payload['referencias'] = [
-                'factura_id' => $document['BillingReference']['InvoiceDocumentReference']['ID'] ?? null,
-                'factura_cufe' => $document['BillingReference']['InvoiceDocumentReference']['UUID'] ?? null,
-                'factura_fecha' => $document['BillingReference']['InvoiceDocumentReference']['IssueDate'] ?? null,
+                'factura_id' => empty($billingReference) ? null : ($billingReference['ID'] ?? throw new InvalidArgumentException('document.BillingReference.ID es obligatorio.')),
+                'factura_cufe' => empty($billingReference) ? null : ($billingReference['UUID'] ?? throw new InvalidArgumentException('document.BillingReference.UUID es obligatorio.')),
+                'factura_fecha' => empty($billingReference) ? null : ($billingReference['IssueDate'] ?? throw new InvalidArgumentException('document.BillingReference.IssueDate es obligatorio.')),
                 'periodo_desde' => $document['InvoicePeriod']['StartDate'] ?? null,
                 'periodo_hasta' => $document['InvoicePeriod']['EndDate'] ?? null,
                 'concepto_codigo' => $document['DiscrepancyResponse']['ResponseCode'] ?? '1',
@@ -59,6 +75,25 @@ class DocumentJsonMapper
         }
 
         return $payload;
+    }
+
+    /**
+     * Traduce "document.OrderReference" -- referencia opcional a una orden de compra (no
+     * tributaria, de interés mercantil), disponible para factura, nota crédito y nota débito.
+     *
+     * @param  array|null  $orderReference  Bloque "document.OrderReference" de la petición.
+     * @return array|null Referencia en el shape interno (null si no se mandó).
+     */
+    private function mapOrderReference(?array $orderReference): ?array
+    {
+        if ($orderReference === null) {
+            return null;
+        }
+
+        return [
+            'id' => $orderReference['ID'] ?? throw new InvalidArgumentException('document.OrderReference.ID es obligatorio.'),
+            'issue_date' => $orderReference['IssueDate'] ?? null,
+        ];
     }
 
     /**
@@ -76,6 +111,29 @@ class DocumentJsonMapper
 
         if ($companyId !== $company->identificacion) {
             throw new InvalidArgumentException('AccountingSupplierParty.CompanyID no coincide con la empresa autenticada por el token.');
+        }
+    }
+
+    /**
+     * "CustomizationID" 11 (Mandatos) exige informar al mandante (dueño real de la operación,
+     * por cuenta de quien el emisor factura) en al menos una línea del documento -- anexo
+     * técnico, regla FBA05/FBA06. Billingo no calcula ni asume ningún mandante, solo valida
+     * que al menos una línea lo traiga cuando aplica.
+     *
+     * @param  string|null  $customizationId  "document.CustomizationID" tal como lo mandó el caller.
+     * @param  array  $lineas  Líneas ya mapeadas (ver mapLines()).
+     *
+     * @throws InvalidArgumentException Si "CustomizationID" es "11" y ninguna línea trae "mandante".
+     */
+    private function assertMandanteInformadoSiEsMandato(?string $customizationId, array $lineas): void
+    {
+        if ($customizationId !== '11') {
+            return;
+        }
+
+        $tieneMandante = ! empty(array_filter(array_column($lineas, 'mandante')));
+        if (! $tieneMandante) {
+            throw new InvalidArgumentException('document.CustomizationID es "11" (Mandatos): al menos una línea debe traer "Item.InformationContentProviderParty" con la identificación del mandante.');
         }
     }
 
@@ -331,16 +389,50 @@ class DocumentJsonMapper
             return [
                 'codigo' => $item['SellersItemIdentification']['ID'] ?? null,
                 'codigo_barras' => $item['StandardItemIdentification']['ID'] ?? null,
+                'codigo_barras_scheme_id' => $item['StandardItemIdentification']['SchemeID'] ?? '999',
                 'descripcion' => $item['Description'] ?? throw new InvalidArgumentException('Lines.Item.Description es obligatorio.'),
+                'marca' => $item['BrandName'] ?? [],
+                'modelo' => $item['ModelName'] ?? [],
+                'mandante' => $this->mapMandante($item['InformationContentProviderParty'] ?? null),
                 'cantidad' => $line['Quantity'] ?? 1,
                 'unidad_medida' => $line['unitCode'] ?? 'EA',
                 'precio_unitario' => $line['Price']['PriceAmount'] ?? 0,
+                'precio_base_quantity' => $line['Price']['BaseQuantity'] ?? 1,
                 'bodega_id' => $line['bodega_id'] ?? null,
                 'cargos_descuentos' => $this->mapLineAllowanceCharges($line['AllowanceCharge'] ?? []),
-                'impuestos' => $this->mapLineTaxes($line['TaxTotal'] ?? []),
+                'impuestos' => $this->mapLineTaxes($line['TaxTotal'] ?? [], $line['unitCode'] ?? 'EA'),
                 'line_extension_amount_expected' => $line['LineExtensionAmount'] ?? throw new InvalidArgumentException('Lines.LineExtensionAmount es obligatorio.'),
             ];
         }, $lines);
+    }
+
+    /**
+     * Traduce "Item.InformationContentProviderParty" -- solo aplica a operaciones de mandatos:
+     * identifica al mandante (el tercero por cuenta de quien el emisor está facturando). En el
+     * JSON va plano (sin la anidación "PowerOfAttorney.AgentParty.PartyIdentification" del XML,
+     * que siempre es 1..1 obligatoria y no aporta nada al caller); Billingo arma esa estructura
+     * al construir el XML. El dígito de verificación (solo aplica si "SchemeName" es "31", NIT)
+     * no se pide -- Billingo lo calcula igual que para el emisor/receptor, con
+     * Company::calculateVerificationDigit(). "@schemeAgencyID" siempre es el literal "195" fijo
+     * por el anexo, no se pide.
+     *
+     * @param  array|null  $informationContentProviderParty  Bloque "Item.InformationContentProviderParty" de la línea.
+     * @return array|null Mandante en el shape interno (null si la línea no aplica a mandatos).
+     */
+    private function mapMandante(?array $informationContentProviderParty): ?array
+    {
+        if ($informationContentProviderParty === null) {
+            return null;
+        }
+
+        $schemeName = $informationContentProviderParty['SchemeName'] ?? throw new InvalidArgumentException('Lines.Item.InformationContentProviderParty.SchemeName es obligatorio.');
+        $id = $informationContentProviderParty['ID'] ?? throw new InvalidArgumentException('Lines.Item.InformationContentProviderParty.ID es obligatorio.');
+
+        return [
+            'id' => $id,
+            'scheme_name' => $schemeName,
+            'scheme_id' => $schemeName === '31' ? Company::calculateVerificationDigit($id) : null,
+        ];
     }
 
     /**
@@ -376,23 +468,57 @@ class DocumentJsonMapper
     }
 
     /**
-     * Traduce el bloque "TaxTotal.TaxSubtotal" (uno o varios) de una línea al shape
-     * interno "impuestos" (tipo, porcentaje, base gravable).
+     * Traduce "TaxTotal" de una línea -- un arreglo de bloques, uno por cada tributo distinto
+     * (anexo técnico, regla FAX01/FAS01a/FAS01b: solo puede existir un TaxTotal por tributo;
+     * varias tarifas del mismo tributo van como varios "TaxSubtotal" dentro del mismo bloque) --
+     * al shape interno "impuestos" (tipo, porcentaje, base gravable). Cada bloque valida que su
+     * "TaxAmount" coincida con la suma de los "TaxAmount" de sus propios "TaxSubtotal".
      *
-     * @param  array  $taxTotal  Bloque "TaxTotal" de la línea.
+     * @param  array  $taxTotalList  Bloque "TaxTotal" de la línea (arreglo de bloques por tributo).
+     * @param  string  $unitCode  "unitCode" de la línea -- para tributos nominales, "BaseUnitMeasure"
+     *                            usa la misma unidad de medida del ítem, no se pide aparte.
      * @return array Impuestos en el shape interno de UblDocumentBuilder.
      */
-    private function mapLineTaxes(array $taxTotal): array
+    private function mapLineTaxes(array $taxTotalList, string $unitCode): array
     {
-        $subtotals = $taxTotal['TaxSubtotal'] ?? [];
-        $isSingle = isset($subtotals['TaxCategory']);
-        $subtotals = $isSingle ? [$subtotals] : $subtotals;
+        $impuestos = [];
 
-        return array_map(fn (array $subtotal) => [
-            'tipo' => $subtotal['TaxCategory']['TaxScheme']['ID'] ?? '01',
-            'nombre' => $subtotal['TaxCategory']['TaxScheme']['Name'] ?? null,
-            'porcentaje' => (float) ($subtotal['TaxCategory']['Percent'] ?? 0),
-            'base_gravable' => isset($subtotal['TaxableAmount']) ? (float) $subtotal['TaxableAmount'] : null,
-        ], $subtotals);
+        foreach ($taxTotalList as $bloque) {
+            $taxAmountBloque = (float) ($bloque['TaxAmount'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxAmount es obligatorio.'));
+            $subtotals = $bloque['TaxSubtotal'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal es obligatorio.');
+
+            $mapeados = array_map(function (array $subtotal) use ($unitCode) {
+                $tipo = $subtotal['TaxCategory']['TaxScheme']['ID'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal.TaxCategory.TaxScheme.ID es obligatorio.');
+                $esNominal = in_array($tipo, self::TRIBUTOS_NOMINALES, true);
+
+                $impuesto = [
+                    'tipo' => $tipo,
+                    'nombre' => $subtotal['TaxCategory']['TaxScheme']['Name'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal.TaxCategory.TaxScheme.Name es obligatorio.'),
+                    'porcentaje' => (float) ($subtotal['TaxCategory']['Percent'] ?? 0),
+                    'base_gravable' => (float) ($subtotal['TaxableAmount'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal.TaxableAmount es obligatorio.')),
+                    'tax_amount_expected' => (float) ($subtotal['TaxAmount'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal.TaxAmount es obligatorio.')),
+                    'per_unit_amount' => null,
+                    'base_unit_measure' => null,
+                    'base_unit_measure_unit_code' => null,
+                ];
+
+                if ($esNominal) {
+                    $impuesto['per_unit_amount'] = (float) ($subtotal['PerUnitAmount'] ?? throw new InvalidArgumentException("Lines.TaxTotal.TaxSubtotal.PerUnitAmount es obligatorio para el tributo \"{$tipo}\" (tributo nominal)."));
+                    $impuesto['base_unit_measure'] = (float) ($subtotal['BaseUnitMeasure'] ?? throw new InvalidArgumentException("Lines.TaxTotal.TaxSubtotal.BaseUnitMeasure es obligatorio para el tributo \"{$tipo}\" (tributo nominal)."));
+                    $impuesto['base_unit_measure_unit_code'] = $unitCode;
+                }
+
+                return $impuesto;
+            }, $subtotals);
+
+            $sumaSubtotales = round(array_sum(array_column($mapeados, 'tax_amount_expected')), 2);
+            if (abs($taxAmountBloque - $sumaSubtotales) > 0.01) {
+                throw new InvalidArgumentException("Lines.TaxTotal.TaxAmount ({$taxAmountBloque}) no coincide con la suma de sus \"TaxSubtotal\" ({$sumaSubtotales}).");
+            }
+
+            array_push($impuestos, ...$mapeados);
+        }
+
+        return $impuestos;
     }
 }

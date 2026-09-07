@@ -685,8 +685,8 @@ class DocumentoEmitidoController extends Controller
             'issue_time' => ['nullable', 'string', 'max:20'],
 
             'referencia_factura_id' => ['required_if:tipo_operacion,20,30', 'nullable', 'string', 'max:50'],
-            'referencia_factura_uuid' => ['nullable', 'string', 'max:100'],
-            'referencia_factura_fecha_emision' => ['nullable', 'date'],
+            'referencia_factura_uuid' => ['required_with:referencia_factura_id', 'nullable', 'string', 'max:100'],
+            'referencia_factura_fecha_emision' => ['required_with:referencia_factura_id', 'nullable', 'date'],
             'referencia_periodo_desde' => ['required_if:tipo_operacion,22,32', 'nullable', 'date'],
             'referencia_periodo_hasta' => ['required_if:tipo_operacion,22,32', 'nullable', 'date', 'after_or_equal:referencia_periodo_desde'],
             'referencia_concepto_codigo' => ['required_if:tipo_operacion,20,22,30,32', 'nullable', 'string', 'max:5'],
@@ -1151,11 +1151,9 @@ class DocumentoEmitidoController extends Controller
 
         if (! empty($data['referencia_factura_id'])) {
             $document['BillingReference'] = [
-                'InvoiceDocumentReference' => array_filter([
-                    'ID' => $data['referencia_factura_id'],
-                    'UUID' => $data['referencia_factura_uuid'] ?? null,
-                    'IssueDate' => $data['referencia_factura_fecha_emision'] ?? null,
-                ]),
+                'ID' => $data['referencia_factura_id'],
+                'UUID' => $data['referencia_factura_uuid'],
+                'IssueDate' => $data['referencia_factura_fecha_emision'],
             ];
         } elseif (! empty($data['referencia_periodo_desde']) && ! empty($data['referencia_periodo_hasta'])) {
             $document['InvoicePeriod'] = [
@@ -1373,18 +1371,6 @@ class DocumentoEmitidoController extends Controller
             ],
         ];
 
-        if (! empty($item['impuestos'])) {
-            $line['TaxTotal'] = [
-                'TaxSubtotal' => array_map(fn (array $impuesto) => array_filter([
-                    'TaxableAmount' => isset($impuesto['base_gravable']) && $impuesto['base_gravable'] !== '' ? (float) $impuesto['base_gravable'] : null,
-                    'TaxCategory' => [
-                        'Percent' => (float) $impuesto['porcentaje'],
-                        'TaxScheme' => ['ID' => $impuesto['tipo'], 'Name' => $impuesto['nombre'] ?? null],
-                    ],
-                ], fn ($value) => $value !== null), $item['impuestos']),
-            ];
-        }
-
         $descuentoAmount = 0.0;
         if (! empty($item['descuento_valor']) && (float) $item['descuento_valor'] > 0) {
             $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
@@ -1404,7 +1390,38 @@ class DocumentoEmitidoController extends Controller
             ]];
         }
 
-        $line['LineExtensionAmount'] = round($baseAmount - $descuentoAmount, 2);
+        $lineExtensionAmount = round($baseAmount - $descuentoAmount, 2);
+        $line['LineExtensionAmount'] = $lineExtensionAmount;
+
+        if (! empty($item['impuestos'])) {
+            $taxSubtotals = array_map(function (array $impuesto) use ($lineExtensionAmount) {
+                $taxableAmount = isset($impuesto['base_gravable']) && $impuesto['base_gravable'] !== ''
+                    ? (float) $impuesto['base_gravable']
+                    : $lineExtensionAmount;
+                $percent = (float) $impuesto['porcentaje'];
+
+                return [
+                    'codigo' => $impuesto['tipo'],
+                    'TaxableAmount' => $taxableAmount,
+                    'TaxAmount' => round($taxableAmount * ($percent / 100), 2),
+                    'TaxCategory' => [
+                        'Percent' => $percent,
+                        'TaxScheme' => ['ID' => $impuesto['tipo'], 'Name' => $impuesto['nombre'] ?? (new DocumentTotalsCalculator())->nombreImpuesto($impuesto['tipo'])],
+                    ],
+                ];
+            }, $item['impuestos']);
+
+            // Un bloque "TaxTotal" por cada tributo distinto (anexo técnico, regla
+            // FAX01/FAS01a/FAS01b: solo puede existir un TaxTotal por tributo).
+            $bloques = [];
+            foreach ($taxSubtotals as $subtotal) {
+                $codigo = $subtotal['codigo'];
+                $bloques[$codigo]['TaxAmount'] = round(($bloques[$codigo]['TaxAmount'] ?? 0) + $subtotal['TaxAmount'], 2);
+                $bloques[$codigo]['TaxSubtotal'][] = array_diff_key($subtotal, ['codigo' => null]);
+            }
+
+            $line['TaxTotal'] = array_values($bloques);
+        }
 
         return $line;
     }

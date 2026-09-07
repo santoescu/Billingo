@@ -46,6 +46,20 @@ class UblDocumentBuilder
         'nota_debito' => 'DebitedQuantity',
     ];
 
+    /**
+     * Catálogo DIAN (anexo técnico, tabla 13.3.5) de estándares de codificación para
+     * "cac:StandardItemIdentification/cbc:ID" -- cada uno trae su "@schemeName" y
+     * "@schemeAgencyID" fijos, salvo "999" (estándar propio del contribuyente) donde la tabla
+     * exige igual un "@schemeName" (aunque no lo valida contra catálogo) pero indica
+     * explícitamente que "@schemeAgencyID" no debe usarse (null).
+     */
+    private const ESTANDARES_ITEM = [
+        '001' => ['schemeName' => 'UNSPSC', 'schemeAgencyID' => '10'],
+        '010' => ['schemeName' => 'GTIN', 'schemeAgencyID' => '9'],
+        '020' => ['schemeName' => 'Partida Arancelarias', 'schemeAgencyID' => '195'],
+        '999' => ['schemeName' => 'Estándar de adopción del contribuyente', 'schemeAgencyID' => null],
+    ];
+
     private const MONETARY_TOTAL_ELEMENT = [
         'factura' => 'LegalMonetaryTotal',
         'nota_credito' => 'LegalMonetaryTotal',
@@ -182,13 +196,20 @@ class UblDocumentBuilder
 
         if ($this->tipo !== 'factura' && ! empty($payload['referencias'])) {
             $referencias = $payload['referencias'];
-            $root->appendChild($this->buildDiscrepancyResponse($referencias));
 
-            if (! empty($referencias['factura_id'])) {
-                $root->appendChild($this->buildBillingReference($referencias));
-            } elseif (! empty($referencias['periodo_desde']) && ! empty($referencias['periodo_hasta'])) {
+            if (! empty($referencias['periodo_desde']) && ! empty($referencias['periodo_hasta'])) {
                 $root->appendChild($this->buildInvoicePeriod($referencias));
             }
+
+            $root->appendChild($this->buildDiscrepancyResponse($referencias));
+        }
+
+        if (! empty($payload['orden_referencia'])) {
+            $root->appendChild($this->buildOrderReference($payload['orden_referencia']));
+        }
+
+        if ($this->tipo !== 'factura' && ! empty($payload['referencias']['factura_id'])) {
+            $root->appendChild($this->buildBillingReference($payload['referencias']));
         }
 
         $prefijoPuntoFacturacion = $payload['resolucion']['prefijo'] ?? $payload['prefijo'] ?? null;
@@ -206,7 +227,7 @@ class UblDocumentBuilder
         }
 
         foreach ($impuestos as $impuesto) {
-            $root->appendChild($this->buildTaxTotal($moneda, $impuesto['taxable_amount'], $impuesto['tax_amount'], $impuesto['codigo'], $impuesto['nombre'], $impuesto['porcentaje']));
+            $root->appendChild($this->buildTaxTotal($moneda, $impuesto['tax_amount'], $impuesto['codigo'], $impuesto['nombre'], $impuesto['subtotals']));
         }
 
         $root->appendChild($this->buildMonetaryTotal($moneda, $totales));
@@ -532,6 +553,24 @@ class UblDocumentBuilder
     }
 
     /**
+     * Construye cac:OrderReference -- referencia opcional a una orden de compra (no
+     * tributaria, de interés mercantil), disponible para factura, nota crédito y nota débito.
+     *
+     * @param  array  $ordenReferencia  Shape interno (ver DocumentJsonMapper::mapOrderReference()).
+     * @return DOMElement Nodo cac:OrderReference construido (aún no adjunto al árbol).
+     */
+    private function buildOrderReference(array $ordenReferencia): DOMElement
+    {
+        $node = $this->doc->createElementNS(self::CAC_NS, 'cac:OrderReference');
+        $this->appendCbc($node, 'ID', $ordenReferencia['id']);
+        if (! empty($ordenReferencia['issue_date'])) {
+            $this->appendCbc($node, 'IssueDate', $ordenReferencia['issue_date']);
+        }
+
+        return $node;
+    }
+
+    /**
      * Construye cac:AccountingSupplierParty (emisor del documento). Los datos salen de
      * la Company autenticada; si el payload trae "supplier_overrides" (campos enviados
      * en AccountingSupplierParty además de CompanyID), esos valores reemplazan a los de
@@ -822,33 +861,41 @@ class UblDocumentBuilder
     }
 
     /**
-     * Construye cac:TaxTotal a nivel de documento para un impuesto.
+     * Construye cac:TaxTotal a nivel de documento para un tributo -- el anexo técnico (regla
+     * FAS01a/FAS01b) exige un único TaxTotal por tributo, aunque tenga varias tarifas: cada
+     * tarifa distinta va como un cac:TaxSubtotal separado dentro de este mismo TaxTotal.
      *
      * @param  string  $moneda  Código de moneda.
-     * @param  float  $taxableAmount  Base gravable.
-     * @param  float  $taxAmount  Valor del impuesto.
-     * @param  string  $codigo  Código DIAN del impuesto.
-     * @param  string  $nombre  Nombre del impuesto.
-     * @param  float  $porcentaje  Porcentaje del impuesto.
+     * @param  float  $taxAmount  Suma del valor del tributo de todas sus tarifas.
+     * @param  string  $codigo  Código DIAN del tributo.
+     * @param  string  $nombre  Nombre del tributo.
+     * @param  array  $subtotals  Una entrada por tarifa distinta de este tributo (ver agruparImpuestos()).
      * @return DOMElement Nodo cac:TaxTotal construido (aún no adjunto al árbol).
      */
-    private function buildTaxTotal(string $moneda, float $taxableAmount, float $taxAmount, string $codigo, string $nombre, float $porcentaje): DOMElement
+    private function buildTaxTotal(string $moneda, float $taxAmount, string $codigo, string $nombre, array $subtotals): DOMElement
     {
         $node = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxTotal');
         $this->appendMoney($node, 'TaxAmount', $taxAmount, $moneda);
 
-        $subtotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxSubtotal');
-        $this->appendMoney($subtotal, 'TaxableAmount', $taxableAmount, $moneda);
-        $this->appendMoney($subtotal, 'TaxAmount', $taxAmount, $moneda);
+        foreach ($subtotals as $subtotalData) {
+            $subtotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxSubtotal');
+            $this->appendMoney($subtotal, 'TaxableAmount', $subtotalData['taxable_amount'], $moneda);
+            $this->appendMoney($subtotal, 'TaxAmount', $subtotalData['tax_amount'], $moneda);
+            if ($subtotalData['per_unit_amount'] !== null) {
+                $baseUnitMeasureNode = $this->appendCbc($subtotal, 'BaseUnitMeasure', number_format($subtotalData['base_unit_measure'], 2, '.', ''));
+                $baseUnitMeasureNode->setAttribute('unitCode', $subtotalData['base_unit_measure_unit_code']);
+                $this->appendMoney($subtotal, 'PerUnitAmount', $subtotalData['per_unit_amount'], $moneda);
+            }
 
-        $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
-        $this->appendCbc($category, 'Percent', number_format($porcentaje, 2, '.', ''));
-        $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
-        $this->appendCbc($scheme, 'ID', $codigo);
-        $this->appendCbc($scheme, 'Name', $nombre);
-        $category->appendChild($scheme);
-        $subtotal->appendChild($category);
-        $node->appendChild($subtotal);
+            $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
+            $this->appendCbc($category, 'Percent', number_format($subtotalData['porcentaje'], 2, '.', ''));
+            $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
+            $this->appendCbc($scheme, 'ID', $codigo);
+            $this->appendCbc($scheme, 'Name', $nombre);
+            $category->appendChild($scheme);
+            $subtotal->appendChild($category);
+            $node->appendChild($subtotal);
+        }
 
         return $node;
     }
@@ -930,26 +977,103 @@ class UblDocumentBuilder
 
         $item = $this->doc->createElementNS(self::CAC_NS, 'cac:Item');
         $this->appendCbc($item, 'Description', $linea['descripcion']);
+        foreach ($linea['marca'] ?? [] as $marca) {
+            $this->appendCbc($item, 'BrandName', $marca);
+        }
+        foreach ($linea['modelo'] ?? [] as $modelo) {
+            $this->appendCbc($item, 'ModelName', $modelo);
+        }
         if ($linea['codigo']) {
             $sellersId = $this->doc->createElementNS(self::CAC_NS, 'cac:SellersItemIdentification');
             $this->appendCbc($sellersId, 'ID', $linea['codigo']);
             $item->appendChild($sellersId);
         }
         if (! empty($linea['codigo_barras'])) {
-            
             $standardId = $this->doc->createElementNS(self::CAC_NS, 'cac:StandardItemIdentification');
-            $this->appendCbc($standardId, 'ID', $linea['codigo_barras']);
+            $idNode = $this->appendCbc($standardId, 'ID', $linea['codigo_barras']);
+            $this->setStandardItemIdentificationScheme($idNode, $linea['codigo_barras_scheme_id'] ?? '010');
             $item->appendChild($standardId);
+        }
+        if (! empty($linea['mandante'])) {
+            $item->appendChild($this->buildInformationContentProviderParty($linea['mandante']));
         }
         $node->appendChild($item);
 
-        $price = $this->doc->createElementNS(self::CAC_NS, 'cac:Price');
-        $this->appendMoney($price, 'PriceAmount', $linea['precio_unitario'], $moneda);
-        $baseQuantity = $this->appendCbc($price, 'BaseQuantity', '1.000000');
-        $baseQuantity->setAttribute('unitCode', $linea['unidad_medida']);
-        $node->appendChild($price);
+        $this->appendPrice($node, $linea, $moneda);
 
         return $node;
+    }
+
+    /**
+     * Agrega los atributos "@schemeID"/"@schemeName"/"@schemeAgencyID" del
+     * "cac:StandardItemIdentification/cbc:ID" según el catálogo DIAN (anexo técnico,
+     * tabla 13.3.5) -- si el código no está en el catálogo, se usa igual como "@schemeID"
+     * pero sin "@schemeName"/"@schemeAgencyID" (la DIAN no valida esos atributos para
+     * estándares fuera de tabla).
+     *
+     * @param  DOMElement  $idNode  Nodo "cbc:ID" ya creado dentro de "cac:StandardItemIdentification".
+     * @param  string  $schemeId  Código del estándar (ver self::ESTANDARES_ITEM).
+     */
+    private function setStandardItemIdentificationScheme(DOMElement $idNode, string $schemeId): void
+    {
+        $idNode->setAttribute('schemeID', $schemeId);
+
+        $estandar = self::ESTANDARES_ITEM[$schemeId] ?? null;
+        if ($estandar) {
+            if ($estandar['schemeName'] !== null) {
+                $idNode->setAttribute('schemeName', $estandar['schemeName']);
+            }
+            if ($estandar['schemeAgencyID'] !== null) {
+                $idNode->setAttribute('schemeAgencyID', $estandar['schemeAgencyID']);
+            }
+        }
+    }
+
+    /**
+     * Construye "cac:InformationContentProviderParty" de una línea -- solo aplica a operaciones
+     * de mandatos ("document.CustomizationID" = "11"), identifica al mandante (anexo técnico,
+     * reglas FBA05-FBB04). "@schemeAgencyID" siempre es el literal "195" fijo por el anexo;
+     * "@schemeID" (dígito de verificación) solo se agrega si el mandante está identificado por
+     * NIT ("scheme_name" = "31").
+     *
+     * @param  array  $mandante  Mandante en el shape interno (ver DocumentJsonMapper::mapMandante()).
+     * @return DOMElement Nodo "cac:InformationContentProviderParty" construido (aún no adjunto al árbol).
+     */
+    private function buildInformationContentProviderParty(array $mandante): DOMElement
+    {
+        $node = $this->doc->createElementNS(self::CAC_NS, 'cac:InformationContentProviderParty');
+        $powerOfAttorney = $this->doc->createElementNS(self::CAC_NS, 'cac:PowerOfAttorney');
+        $agentParty = $this->doc->createElementNS(self::CAC_NS, 'cac:AgentParty');
+        $partyIdentification = $this->doc->createElementNS(self::CAC_NS, 'cac:PartyIdentification');
+
+        $id = $this->appendCbc($partyIdentification, 'ID', $mandante['id']);
+        $id->setAttribute('schemeAgencyID', '195');
+        $id->setAttribute('schemeName', $mandante['scheme_name']);
+        if ($mandante['scheme_id'] !== null) {
+            $id->setAttribute('schemeID', $mandante['scheme_id']);
+        }
+
+        $agentParty->appendChild($partyIdentification);
+        $powerOfAttorney->appendChild($agentParty);
+        $node->appendChild($powerOfAttorney);
+
+        return $node;
+    }
+
+    /**
+     * Agrega cac:Price a una línea.
+     *
+     * @param  DOMElement  $node  Elemento de línea al que se agrega.
+     * @param  array  $linea  Línea ya calculada (ver buildLineasCalculadas()).
+     * @param  string  $moneda  Código de moneda.
+     */
+    private function appendPrice(DOMElement $node, array $linea, string $moneda): void
+    {
+        $price = $this->doc->createElementNS(self::CAC_NS, 'cac:Price');
+        $this->appendMoney($price, 'PriceAmount', $linea['precio_unitario'], $moneda);
+        $baseQuantity = $this->appendCbc($price, 'BaseQuantity', (string) (int) ($linea['precio_base_quantity'] ?? 1));
+        $baseQuantity->setAttribute('unitCode', $linea['unidad_medida']);
+        $node->appendChild($price);
     }
 
     /**
@@ -974,7 +1098,10 @@ class UblDocumentBuilder
     }
 
     /**
-     * Agrega cac:TaxTotal a una línea, si tiene impuestos.
+     * Agrega un cac:TaxTotal por cada tributo distinto de la línea (anexo técnico, regla
+     * FAX01/FAS01a/FAS01b: solo puede existir un TaxTotal por tributo). Si el mismo tributo
+     * tiene varias tarifas (ej. IVA al 19% y al 5%), van como varios cac:TaxSubtotal dentro de
+     * ese único TaxTotal, nunca en TaxTotal separados.
      *
      * @param  DOMElement  $node  Elemento de línea al que se agrega.
      * @param  array  $linea  Línea ya calculada (ver buildLineasCalculadas()).
@@ -982,27 +1109,39 @@ class UblDocumentBuilder
      */
     private function appendLineTaxTotal(DOMElement $node, array $linea, string $moneda): void
     {
-        if (empty($linea['impuestos'])) {
-            return;
+        $grupos = [];
+        foreach ($linea['impuestos'] ?? [] as $impuesto) {
+            $codigo = $impuesto['codigo'];
+            $grupos[$codigo] ??= ['nombre' => $impuesto['nombre'], 'tax_amount' => 0.0, 'subtotals' => []];
+            $grupos[$codigo]['tax_amount'] = round($grupos[$codigo]['tax_amount'] + $impuesto['tax_amount'], 2);
+            $grupos[$codigo]['subtotals'][] = $impuesto;
         }
 
-        $taxAmount = round(array_sum(array_column($linea['impuestos'], 'tax_amount')), 2);
-        $taxTotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxTotal');
-        $this->appendMoney($taxTotal, 'TaxAmount', $taxAmount, $moneda);
-        foreach ($linea['impuestos'] as $impuesto) {
-            $subtotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxSubtotal');
-            $this->appendMoney($subtotal, 'TaxableAmount', $impuesto['base_gravable'], $moneda);
-            $this->appendMoney($subtotal, 'TaxAmount', $impuesto['tax_amount'], $moneda);
-            $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
-            $this->appendCbc($category, 'Percent', number_format($impuesto['porcentaje'], 2, '.', ''));
-            $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
-            $this->appendCbc($scheme, 'ID', $impuesto['codigo']);
-            $this->appendCbc($scheme, 'Name', $impuesto['nombre']);
-            $category->appendChild($scheme);
-            $subtotal->appendChild($category);
-            $taxTotal->appendChild($subtotal);
+        foreach ($grupos as $codigo => $grupo) {
+            $taxTotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxTotal');
+            $this->appendMoney($taxTotal, 'TaxAmount', $grupo['tax_amount'], $moneda);
+
+            foreach ($grupo['subtotals'] as $impuesto) {
+                $subtotal = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxSubtotal');
+                $this->appendMoney($subtotal, 'TaxableAmount', $impuesto['base_gravable'], $moneda);
+                $this->appendMoney($subtotal, 'TaxAmount', $impuesto['tax_amount'], $moneda);
+                if ($impuesto['per_unit_amount'] !== null) {
+                    $baseUnitMeasure = $this->appendCbc($subtotal, 'BaseUnitMeasure', number_format($impuesto['base_unit_measure'], 2, '.', ''));
+                    $baseUnitMeasure->setAttribute('unitCode', $impuesto['base_unit_measure_unit_code']);
+                    $this->appendMoney($subtotal, 'PerUnitAmount', $impuesto['per_unit_amount'], $moneda);
+                }
+                $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
+                $this->appendCbc($category, 'Percent', number_format($impuesto['porcentaje'], 2, '.', ''));
+                $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
+                $this->appendCbc($scheme, 'ID', $codigo);
+                $this->appendCbc($scheme, 'Name', $grupo['nombre']);
+                $category->appendChild($scheme);
+                $subtotal->appendChild($category);
+                $taxTotal->appendChild($subtotal);
+            }
+
+            $node->appendChild($taxTotal);
         }
-        $node->appendChild($taxTotal);
     }
 
     /**

@@ -351,10 +351,11 @@ class IssueDocumentService
             $baseAmount = round($cantidad * $precioUnitario, 2);
 
             $cargosDescuentos = [];
+            $descuentoAmount = 0.0;
             if (! empty($item['descuento_valor'])) {
                 $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
                 $porcentaje = $esPorcentaje ? min((float) $item['descuento_valor'], 100) : 0.0;
-                $amount = $esPorcentaje
+                $descuentoAmount = $esPorcentaje
                     ? round($baseAmount * ($porcentaje / 100), 2)
                     : min((float) $item['descuento_valor'], $baseAmount);
 
@@ -362,10 +363,12 @@ class IssueDocumentService
                     'tipo' => 'descuento',
                     'motivo' => $item['descuento_motivo'] ?? null,
                     'porcentaje' => $porcentaje,
-                    'amount' => $amount,
+                    'amount' => $descuentoAmount,
                     'base_amount' => $baseAmount,
                 ];
             }
+
+            $lineExtensionAmount = round($baseAmount - $descuentoAmount, 2);
 
             return [
                 'codigo' => $item['codigo'],
@@ -379,7 +382,9 @@ class IssueDocumentService
                 'impuestos' => collect($item['impuestos'] ?? [])->map(fn (array $impuesto) => [
                     'tipo' => $impuesto['tipo'],
                     'porcentaje' => (float) $impuesto['porcentaje'],
-                    'base_gravable' => $impuesto['base_gravable'] ?? null,
+                    'base_gravable' => isset($impuesto['base_gravable']) && $impuesto['base_gravable'] !== ''
+                        ? (float) $impuesto['base_gravable']
+                        : $lineExtensionAmount,
                 ])->values()->all(),
             ];
         })->values()->all();
