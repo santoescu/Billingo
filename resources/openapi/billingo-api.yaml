@@ -3,18 +3,10 @@ info:
   title: Billingo API
   version: "1.0.0"
   description: >
-    API para que las empresas que usan Billingo se integren directamente, sin pasar por
-    el panel web: emitir documentos electrónicos ante la DIAN, o importar documentos que
-    la DIAN ya tiene autorizados a partir de su UUID/CUFE técnico.
-
-
-    Todas las respuestas son en JSON y en español, sin importar el header `Accept` que
-    envíe el cliente.
-
-
-    Cada empresa necesita, además de un token de API válido, tener habilitada la feature
-    puntual que quiera usar (ver la pestaña "API" en la edición de la empresa desde el
-    panel de superadmin) -- un token válido no es suficiente por sí solo.
+    La API de Billingo permite integrar la facturación electrónica colombiana
+    directamente en el sistema de cada empresa, sin pasar por el panel web: con ella se
+    pueden emitir y consultar facturas, notas crédito y notas débito, siguiendo en todo
+    momento el anexo técnico vigente de la DIAN.
 servers:
   - url: https://billingo.test/api
     description: Entorno de pruebas local
