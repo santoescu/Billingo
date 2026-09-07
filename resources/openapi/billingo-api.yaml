@@ -34,62 +34,8 @@ paths:
         si quedó aceptado, se devuelve tal cual (no se vuelve a procesar); si quedó
         rechazado o pendiente, se reintenta con los datos nuevos.
 
-        Ejemplo de JSON a enviar (factura electrónica simple, un producto):
-
-        ```json
-        {
-          "document": {
-            "DocumentType": "01",
-            "PREFIX": "FES",
-            "secuencial": "1",
-            "IssueDate": "2026-09-06",
-            "DocumentCurrencyCode": "COP",
-            "AccountingSupplierParty": {
-              "CompanyID": "900123456"
-            },
-            "AccountingCustomerParty": {
-              "PartyName": "Cliente de Ejemplo",
-              "direccion": "Calle 123 # 45-67",
-              "cityCode": "11001",
-              "CountrySubentityCode": "11",
-              "CompanyID": "900654321",
-              "TypeCompanyID": "31",
-              "email": "cliente@ejemplo.com"
-            },
-            "PaymentMeans": [
-              { "PaymentMeansCode": "10" }
-            ],
-            "Lines": [
-              {
-                "Quantity": 1,
-                "unitCode": "EA",
-                "LineExtensionAmount": 100000,
-                "TaxTotal": {
-                  "TaxSubtotal": {
-                    "TaxCategory": {
-                      "TaxScheme": { "ID": "01", "Name": "IVA" },
-                      "Percent": 19
-                    }
-                  }
-                },
-                "Item": {
-                  "SellersItemIdentification": { "ID": "producto_1" },
-                  "Description": "Producto de prueba"
-                },
-                "Price": { "PriceAmount": 100000 }
-              }
-            ],
-            "LegalMonetaryTotal": {
-              "LineExtensionAmount": 100000,
-              "TaxExclusiveAmount": 100000,
-              "TaxInclusiveAmount": 119000,
-              "AllowanceTotalAmount": 0,
-              "ChargeTotalAmount": 0,
-              "PayableAmount": 119000
-            }
-          }
-        }
-        ```
+        Selecciona un ejemplo (factura, nota crédito con/sin referencia, nota
+        débito con/sin referencia) en el panel de la derecha, junto al request.
       tags: [Documentos]
       requestBody:
         required: true
@@ -118,18 +64,240 @@ paths:
                       TypeCompanyID: "31"
                       email: "cliente@ejemplo.com"
                     PaymentMeans:
-                      - PaymentMeansCode: "10"
+                      - ID: "1"
+                        PaymentMeansCode: "10"
                     Lines:
                       - Quantity: 1
                         unitCode: "EA"
                         LineExtensionAmount: 100000
                         TaxTotal:
-                          TaxSubtotal:
-                            TaxCategory:
-                              TaxScheme:
-                                ID: "01"
-                                Name: "IVA"
-                              Percent: 19
+                          - TaxAmount: 19000
+                            TaxSubtotal:
+                              - TaxableAmount: 100000
+                                TaxAmount: 19000
+                                TaxCategory:
+                                  TaxScheme:
+                                    ID: "01"
+                                    Name: "IVA"
+                                  Percent: 19
+                        Item:
+                          SellersItemIdentification:
+                            ID: "producto_1"
+                          Description: "Producto de prueba"
+                        Price:
+                          PriceAmount: 100000
+                    LegalMonetaryTotal:
+                      LineExtensionAmount: 100000
+                      TaxExclusiveAmount: 100000
+                      TaxInclusiveAmount: 119000
+                      AllowanceTotalAmount: 0
+                      ChargeTotalAmount: 0
+                      PayableAmount: 119000
+              nota_credito_con_referencia:
+                summary: Nota crédito que referencia una factura (CustomizationID 20)
+                value:
+                  document:
+                    DocumentType: "91"
+                    CustomizationID: "20"
+                    PREFIX: "NC"
+                    secuencial: "1"
+                    IssueDate: "2026-09-06"
+                    DocumentCurrencyCode: "COP"
+                    DiscrepancyResponse:
+                      ResponseCode: "2"
+                    BillingReference:
+                      ID: "FES1"
+                      UUID: "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+                      IssueDate: "2026-09-01"
+                    AccountingSupplierParty:
+                      CompanyID: "900123456"
+                    AccountingCustomerParty:
+                      PartyName: "Cliente de Ejemplo"
+                      direccion: "Calle 123 # 45-67"
+                      cityCode: "11001"
+                      CountrySubentityCode: "11"
+                      CompanyID: "900654321"
+                      TypeCompanyID: "31"
+                      email: "cliente@ejemplo.com"
+                    PaymentMeans:
+                      - ID: "1"
+                        PaymentMeansCode: "10"
+                    Lines:
+                      - Quantity: 1
+                        unitCode: "EA"
+                        LineExtensionAmount: 100000
+                        TaxTotal:
+                          - TaxAmount: 19000
+                            TaxSubtotal:
+                              - TaxableAmount: 100000
+                                TaxAmount: 19000
+                                TaxCategory:
+                                  TaxScheme:
+                                    ID: "01"
+                                    Name: "IVA"
+                                  Percent: 19
+                        Item:
+                          SellersItemIdentification:
+                            ID: "producto_1"
+                          Description: "Producto de prueba"
+                        Price:
+                          PriceAmount: 100000
+                    LegalMonetaryTotal:
+                      LineExtensionAmount: 100000
+                      TaxExclusiveAmount: 100000
+                      TaxInclusiveAmount: 119000
+                      AllowanceTotalAmount: 0
+                      ChargeTotalAmount: 0
+                      PayableAmount: 119000
+              nota_credito_sin_referencia:
+                summary: Nota crédito sin referencia a una factura (CustomizationID 22)
+                value:
+                  document:
+                    DocumentType: "91"
+                    CustomizationID: "22"
+                    PREFIX: "NC"
+                    secuencial: "2"
+                    IssueDate: "2026-09-06"
+                    DocumentCurrencyCode: "COP"
+                    InvoicePeriod:
+                      StartDate: "2026-08-01"
+                      EndDate: "2026-08-31"
+                    AccountingSupplierParty:
+                      CompanyID: "900123456"
+                    AccountingCustomerParty:
+                      PartyName: "Cliente de Ejemplo"
+                      direccion: "Calle 123 # 45-67"
+                      cityCode: "11001"
+                      CountrySubentityCode: "11"
+                      CompanyID: "900654321"
+                      TypeCompanyID: "31"
+                      email: "cliente@ejemplo.com"
+                    PaymentMeans:
+                      - ID: "1"
+                        PaymentMeansCode: "10"
+                    Lines:
+                      - Quantity: 1
+                        unitCode: "EA"
+                        LineExtensionAmount: 100000
+                        TaxTotal:
+                          - TaxAmount: 19000
+                            TaxSubtotal:
+                              - TaxableAmount: 100000
+                                TaxAmount: 19000
+                                TaxCategory:
+                                  TaxScheme:
+                                    ID: "01"
+                                    Name: "IVA"
+                                  Percent: 19
+                        Item:
+                          SellersItemIdentification:
+                            ID: "producto_1"
+                          Description: "Producto de prueba"
+                        Price:
+                          PriceAmount: 100000
+                    LegalMonetaryTotal:
+                      LineExtensionAmount: 100000
+                      TaxExclusiveAmount: 100000
+                      TaxInclusiveAmount: 119000
+                      AllowanceTotalAmount: 0
+                      ChargeTotalAmount: 0
+                      PayableAmount: 119000
+              nota_debito_con_referencia:
+                summary: Nota débito que referencia una factura (CustomizationID 30)
+                value:
+                  document:
+                    DocumentType: "92"
+                    CustomizationID: "30"
+                    PREFIX: "ND"
+                    secuencial: "1"
+                    IssueDate: "2026-09-06"
+                    DocumentCurrencyCode: "COP"
+                    DiscrepancyResponse:
+                      ResponseCode: "1"
+                    BillingReference:
+                      ID: "FES1"
+                      UUID: "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+                      IssueDate: "2026-09-01"
+                    AccountingSupplierParty:
+                      CompanyID: "900123456"
+                    AccountingCustomerParty:
+                      PartyName: "Cliente de Ejemplo"
+                      direccion: "Calle 123 # 45-67"
+                      cityCode: "11001"
+                      CountrySubentityCode: "11"
+                      CompanyID: "900654321"
+                      TypeCompanyID: "31"
+                      email: "cliente@ejemplo.com"
+                    PaymentMeans:
+                      - ID: "1"
+                        PaymentMeansCode: "10"
+                    Lines:
+                      - Quantity: 1
+                        unitCode: "EA"
+                        LineExtensionAmount: 100000
+                        TaxTotal:
+                          - TaxAmount: 19000
+                            TaxSubtotal:
+                              - TaxableAmount: 100000
+                                TaxAmount: 19000
+                                TaxCategory:
+                                  TaxScheme:
+                                    ID: "01"
+                                    Name: "IVA"
+                                  Percent: 19
+                        Item:
+                          SellersItemIdentification:
+                            ID: "producto_1"
+                          Description: "Producto de prueba"
+                        Price:
+                          PriceAmount: 100000
+                    LegalMonetaryTotal:
+                      LineExtensionAmount: 100000
+                      TaxExclusiveAmount: 100000
+                      TaxInclusiveAmount: 119000
+                      AllowanceTotalAmount: 0
+                      ChargeTotalAmount: 0
+                      PayableAmount: 119000
+              nota_debito_sin_referencia:
+                summary: Nota débito sin referencia a una factura (CustomizationID 32)
+                value:
+                  document:
+                    DocumentType: "92"
+                    CustomizationID: "32"
+                    PREFIX: "ND"
+                    secuencial: "2"
+                    IssueDate: "2026-09-06"
+                    DocumentCurrencyCode: "COP"
+                    InvoicePeriod:
+                      StartDate: "2026-08-01"
+                      EndDate: "2026-08-31"
+                    AccountingSupplierParty:
+                      CompanyID: "900123456"
+                    AccountingCustomerParty:
+                      PartyName: "Cliente de Ejemplo"
+                      direccion: "Calle 123 # 45-67"
+                      cityCode: "11001"
+                      CountrySubentityCode: "11"
+                      CompanyID: "900654321"
+                      TypeCompanyID: "31"
+                      email: "cliente@ejemplo.com"
+                    PaymentMeans:
+                      - ID: "1"
+                        PaymentMeansCode: "10"
+                    Lines:
+                      - Quantity: 1
+                        unitCode: "EA"
+                        LineExtensionAmount: 100000
+                        TaxTotal:
+                          - TaxAmount: 19000
+                            TaxSubtotal:
+                              - TaxableAmount: 100000
+                                TaxAmount: 19000
+                                TaxCategory:
+                                  TaxScheme:
+                                    ID: "01"
+                                    Name: "IVA"
+                                  Percent: 19
                         Item:
                           SellersItemIdentification:
                             ID: "producto_1"
@@ -409,6 +577,126 @@ components:
               description: >
                 Consecutivo del documento (sin el prefijo). Obligatorio -- se combina con
                 "PREFIX" para armar el número completo del documento (ej. "FES" + "1" = "FES1").
+            InvoicePeriod:
+              type: object
+              description: >
+                Período de facturación al que se refiere el documento.
+
+
+                - Obligatorio si "document.DocumentType" es `91` (nota crédito) y
+                "document.CustomizationID" es `22`.
+
+                - Obligatorio si "document.DocumentType" es `92` (nota débito) y
+                "document.CustomizationID" es `32`.
+              properties:
+                StartDate:
+                  type: string
+                  format: date
+                  description: >
+                    Fecha de inicio del período, formato `AAAA-MM-DD`.
+
+
+                    Ejemplos válidos: `2026-09-06`
+                  minLength: 10
+                  maxLength: 10
+                EndDate:
+                  type: string
+                  format: date
+                  description: >
+                    Fecha de fin del período, formato `AAAA-MM-DD`.
+
+
+                    Ejemplos válidos: `2026-09-06`
+                  minLength: 10
+                  maxLength: 10
+            DiscrepancyResponse:
+              type: object
+              description: >
+                Motivo de la nota. No hace falta mandar "Description": el sistema pone
+                automáticamente el texto oficial de la DIAN que corresponde al código.
+
+
+                - Obligatorio si "document.DocumentType" es `91` (nota crédito) y
+                "document.CustomizationID" es `20`.
+
+                - Obligatorio si "document.DocumentType" es `92` (nota débito) y
+                "document.CustomizationID" es `30`.
+              required: [ResponseCode]
+              properties:
+                ResponseCode:
+                  type: string
+                  description: >
+                    Código del concepto de la nota -- el catálogo depende de si
+                    "document.DocumentType" es "91" o "92".
+
+
+                    Nota crédito ("91"):
+
+                    - `1`: Devolución parcial de los bienes y/o no aceptación parcial del servicio
+
+                    - `2`: Anulación de factura electrónica
+
+                    - `3`: Rebaja o descuento parcial o total
+
+                    - `4`: Ajuste de precio
+
+                    - `5`: Descuento comercial por pronto pago
+
+                    - `6`: Descuento comercial por volumen de ventas
+
+
+                    Nota débito ("92"):
+
+                    - `1`: Intereses
+
+                    - `2`: Gastos por cobrar
+
+                    - `3`: Cambio del valor
+
+                    - `4`: Otros
+                  enum: ["1", "2", "3", "4", "5", "6"]
+            OrderReference:
+              type: object
+              description: >
+                Referencia a una orden de compra (no tributaria, de interés mercantil).
+              required: [ID]
+              properties:
+                ID:
+                  type: string
+                  description: Prefijo y número del documento de la orden referenciada.
+                IssueDate:
+                  type: string
+                  format: date
+                  description: >
+                    Fecha de emisión de la orden referenciada, formato `AAAA-MM-DD`. Opcional.
+
+
+                    Ejemplos válidos: `2026-09-06`
+                  minLength: 10
+                  maxLength: 10
+            BillingReference:
+              type: object
+              description: >
+                Identifica la factura electrónica a la que corrige/afecta la nota.
+
+
+                - Obligatorio si "document.DocumentType" es `91` (nota crédito) y
+                "document.CustomizationID" es `20`.
+
+                - Obligatorio si "document.DocumentType" es `92` (nota débito) y
+                "document.CustomizationID" es `30`.
+              required: [ID, UUID, IssueDate]
+              properties:
+                ID:
+                  type: string
+                  description: Prefijo + número de la factura referenciada.
+                UUID:
+                  type: string
+                  description: CUFE de la factura referenciada.
+                IssueDate:
+                  type: string
+                  format: date
+                  description: Fecha de emisión de la factura referenciada.
             AccountingSupplierParty:
               type: object
               required: [CompanyID]
@@ -690,76 +978,6 @@ components:
                 Grupo de campos para información relacionadas con una línea del documento.
               items:
                 $ref: '#/components/schemas/DocumentLine'
-            BillingReference:
-              type: object
-              description: >
-                Obligatorio si "document.DocumentType" es "91" (nota crédito) o "92" (nota
-                débito) -- identifica la factura electrónica a la que corrige/afecta la nota. No
-                aplica (se ignora) si "document.DocumentType" es "01" (factura).
-              properties:
-                InvoiceDocumentReference:
-                  type: object
-                  required: [ID, UUID, IssueDate]
-                  properties:
-                    ID:
-                      type: string
-                      description: Prefijo + número de la factura referenciada.
-                    UUID:
-                      type: string
-                      description: CUFE de la factura referenciada.
-                    IssueDate:
-                      type: string
-                      format: date
-                      description: Fecha de emisión de la factura referenciada.
-            DiscrepancyResponse:
-              type: object
-              description: >
-                Obligatorio si "document.DocumentType" es "91" (nota crédito) o "92" (nota
-                débito) -- motivo de la nota. No aplica (se ignora) si "document.DocumentType" es
-                "01" (factura). No hace falta mandar "Description": el sistema pone
-                automáticamente el texto oficial de la DIAN que corresponde al código.
-              properties:
-                ResponseCode:
-                  type: string
-                  description: >
-                    Código del concepto de la nota -- el catálogo depende de si
-                    "document.DocumentType" es "91" o "92".
-
-
-                    Nota crédito ("91"):
-
-                    - `1`: Devolución parcial de los bienes y/o no aceptación parcial del servicio
-
-                    - `2`: Anulación de factura electrónica
-
-                    - `3`: Rebaja o descuento parcial o total
-
-                    - `4`: Ajuste de precio
-
-                    - `5`: Descuento comercial por pronto pago
-
-                    - `6`: Descuento comercial por volumen de ventas
-
-
-                    Nota débito ("92"):
-
-                    - `1`: Intereses
-
-                    - `2`: Gastos por cobrar
-
-                    - `3`: Cambio del valor
-
-                    - `4`: Otros
-            InvoicePeriod:
-              type: object
-              description: Solo para notas crédito/débito con período de facturación.
-              properties:
-                StartDate:
-                  type: string
-                  format: date
-                EndDate:
-                  type: string
-                  format: date
 
     AllowanceCharge:
       type: object
@@ -875,19 +1093,47 @@ components:
                 description: Valor base para calcular el descuento o el cargo.
                 minimum: 0
         TaxTotal:
-          type: object
-          properties:
-            TaxSubtotal:
-              description: Un objeto único, o una lista si la línea tiene varios impuestos.
-              oneOf:
-                - $ref: '#/components/schemas/TaxSubtotal'
-                - type: array
-                  items:
-                    $ref: '#/components/schemas/TaxSubtotal'
+          type: array
+          description: >
+            Grupo que informa los totales para un impuesto. Es decir, por cada impuesto que se requiera
+            informar el total, debe ir un grupo TaxTotal. Un bloque para cada código de tributo
+
+          items:
+            type: object
+            required: [TaxAmount, TaxSubtotal]
+            properties:
+              TaxAmount:
+                type: number
+                description: >
+                  Valor del tributo, Suma de todos los elementos TaxAmount de TaxSubtotal
+              TaxSubtotal:
+                type: array
+                description: >
+                  Debe ser informado un grupo de estos para cada tarifa.
+                items:
+                  $ref: '#/components/schemas/TaxSubtotal'
         Item:
           type: object
           required: [Description]
           properties:
+            Description:
+              type: string
+              description: Descripción del artículo o servicio al que se refiere la línea.
+              maxLength: 300
+            BrandName:
+              type: array
+              description: Marca del artículo. Opcional, hasta 3.
+              maxItems: 3
+              items:
+                type: string
+                maxLength: 100
+            ModelName:
+              type: array
+              description: Modelo del artículo. Opcional, hasta 3.
+              maxItems: 3
+              items:
+                type: string
+                maxLength: 100
             SellersItemIdentification:
               type: object
               properties:
@@ -902,37 +1148,207 @@ components:
                 ID:
                   type: string
                   description: Código de barras.
-            Description:
-              type: string
-              description: Descripción del artículo o servicio al que se refiere la línea.
-              maxLength: 300
+                SchemeID:
+                  type: string
+                  description: >
+                    Estándar de codificación del "ID"
+                  enum: ["001", "010", "020", "999"]
+                  default: "999"
+            InformationContentProviderParty:
+              type: object
+              description: >
+                Solo para operaciones de mandatos ("document.CustomizationID" = `11`) -- identifica
+                al mandante (el tercero por cuenta de quien el emisor está facturando). Obligatorio
+                en al menos una línea del documento cuando "CustomizationID" es `11`.
+              required: [ID, SchemeName]
+              properties:
+                ID:
+                  type: string
+                  description: Identificación del mandante.
+                SchemeName:
+                  type: string
+                  description: >
+                    Tipo de identificación DIAN del mandante.
+
+
+                    Valores permitidos:
+
+                    - `11`: Registro civil
+
+                    - `12`: Tarjeta de identidad
+
+                    - `13`: Cédula de ciudadanía
+
+                    - `21`: Tarjeta de extranjería
+
+                    - `22`: Cédula de extranjería
+
+                    - `31`: NIT
+
+                    - `41`: Pasaporte
+
+                    - `42`: Documento de identificación extranjero
+
+                    - `47`: PEP (Permiso Especial de Permanencia)
+
+                    - `48`: PPT (Permiso por Protección Temporal)
+
+                    - `50`: NIT de otro país
+
+                    - `91`: NUIP
+                  enum: ["11", "12", "13", "21", "22", "31", "41", "42", "47", "48", "50", "91"]
         Price:
           type: object
           required: [PriceAmount]
           properties:
             PriceAmount:
               type: number
+            BaseQuantity:
+              type: number
+              description: >
+                La cantidad real sobre la cual el precio aplica. Opcional -- si no se manda, el
+                sistema pone `1`.
+              default: 1
 
     TaxSubtotal:
       type: object
+      required: [TaxableAmount, TaxAmount, TaxCategory]
       properties:
         TaxableAmount:
           type: number
-          description: Base gravable explícita (opcional -- si no viene, se calcula).
+          description: >
+            Base Imponible sobre la que se calcula el valor del tributo
+        TaxAmount:
+          type: number
+          description: >
+            Valor del tributo: producto del porcentaje aplicado sobre la base imponible
+        BaseUnitMeasure:
+          type: number
+          description: >
+            Unidad de medida base para el tributo. Obligatorio solo para tributos nominales
+            (`21`, `22`, `23`, `24`, `33`, `34`).
+        PerUnitAmount:
+          type: number
+          description: >
+            Valor del tributo por unidad
         TaxCategory:
           type: object
+          required: [TaxScheme]
           properties:
             Percent:
               type: number
+              description: >
+                Tarifa del tributo, de 0 a 100. Opcional -- algunos tributos (los que se
+                calculan por valor fijo, no por porcentaje) no lo usan.
             TaxScheme:
               type: object
+              required: [ID, Name]
               properties:
                 ID:
                   type: string
-                  description: Código DIAN del impuesto (ej. "01" IVA).
-                  default: "01"
+                  description: >
+                    Código DIAN del tributo.
+
+                    - `01`: IVA (Impuesto sobre las Ventas)
+
+                    - `02`: IC (Impuesto al Consumo Departamental Nominal)
+
+                    - `03`: ICA (Impuesto de Industria, Comercio y Aviso)
+
+                    - `04`: INC (Impuesto Nacional al Consumo)
+
+                    - `05`: ReteIVA (Retención sobre el IVA)
+
+                    - `06`: ReteRenta (Retención sobre Renta)
+
+                    - `07`: ReteICA (Retención sobre el ICA)
+
+                    - `08`: IC Porcentual (Impuesto al Consumo Departamental Porcentual)
+
+                    - `20`: FtoHorticultura (Cuota de Fomento Hortifrutícola)
+
+                    - `21`: Timbre (Impuesto de Timbre)
+
+                    - `22`: INC Bolsas (Impuesto Nacional al Consumo de Bolsa Plástica)
+
+                    - `23`: INCarbono (Impuesto Nacional del Carbono)
+
+                    - `24`: INCombustibles (Impuesto Nacional a los Combustibles)
+
+                    - `25`: Sobretasa Combustibles
+
+                    - `26`: Sordicom (Contribución minoristas de combustibles)
+
+                    - `30`: IC Datos (Impuesto al Consumo de Datos)
+
+                    - `32`: ICL (Impuesto al Consumo de Licores)
+
+                    - `33`: INPP (Impuesto nacional a productos plásticos)
+
+                    - `34`: IBUA (Impuesto a las bebidas ultraprocesadas azucaradas)
+
+                    - `35`: ICUI (Impuesto a productos ultraprocesados con azúcares, sodio o
+                    grasas saturadas)
+
+                    - `36`: ADV (Ad Valorem)
+
+                    - `ZZ`: Otro tributo, tasa o contribución no listada arriba (el nombre lo
+                    define quien factura, no causa rechazo)
+
+
+                    Para los tributos `21`, `22`, `23`, `24`, `33` y `34`, que se calculan por
+                    valor fijo por unidad (nominales) en vez de por porcentaje, "PerUnitAmount"
+                    y "BaseUnitMeasure" son obligatorios.
+                  enum: ["01", "02", "03", "04", "05", "06", "07", "08", "20", "21", "22", "23", "24", "25", "26", "30", "32", "33", "34", "35", "36", "ZZ"]
                 Name:
                   type: string
+                  description: >
+                    Nombre del tributo, corresponde al "ID".
+
+                    - `IVA`: Impuesto sobre las Ventas (código `01`)
+
+                    - `IC`: Impuesto al Consumo Departamental Nominal (código `02`)
+
+                    - `ICA`: Impuesto de Industria, Comercio y Aviso (código `03`)
+
+                    - `INC`: Impuesto Nacional al Consumo (código `04`)
+
+                    - `ReteIVA`: Retención sobre el IVA (código `05`)
+
+                    - `ReteRenta`: Retención sobre Renta (código `06`)
+
+                    - `ReteICA`: Retención sobre el ICA (código `07`)
+
+                    - `IC Porcentual`: Impuesto al Consumo Departamental Porcentual (código `08`)
+
+                    - `FtoHorticultura`: Cuota de Fomento Hortifrutícola (código `20`)
+
+                    - `Timbre`: Impuesto de Timbre (código `21`)
+
+                    - `INC Bolsas`: Impuesto Nacional al Consumo de Bolsa Plástica (código `22`)
+
+                    - `INCarbono`: Impuesto Nacional del Carbono (código `23`)
+
+                    - `INCombustibles`: Impuesto Nacional a los Combustibles (código `24`)
+
+                    - `Sobretasa Combustibles` (código `25`)
+
+                    - `Sordicom`: Contribución minoristas de combustibles (código `26`)
+
+                    - `IC Datos`: Impuesto al Consumo de Datos (código `30`)
+
+                    - `ICL`: Impuesto al Consumo de Licores (código `32`)
+
+                    - `INPP`: Impuesto nacional a productos plásticos (código `33`)
+
+                    - `IBUA`: Impuesto a las bebidas ultraprocesadas azucaradas (código `34`)
+
+                    - `ICUI`: Impuesto a productos ultraprocesados con azúcares, sodio o grasas
+                    saturadas (código `35`)
+
+                    - `ADV`: Ad Valorem (código `36`)
+
+                    - Cualquier otro nombre, para el tributo `ZZ` (no causa rechazo)
 
     DocumentoResponse:
       type: object
