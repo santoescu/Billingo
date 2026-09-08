@@ -339,8 +339,9 @@ paths:
         Trae de la DIAN, con el certificado de la empresa, uno o varios documentos ya
         autorizados a partir de su UUID/CUFE técnico, y los guarda en la plataforma. Si
         el UUID ya existía localmente, actualiza ese mismo registro con lo que la DIAN
-        tenga en este momento en vez de duplicarlo. No consume cupo del contrato (no
-        cuenta como una emisión nueva).
+        tenga en este momento en vez de duplicarlo (esto no consume cupo del contrato).
+        Si el UUID no existía, sí consume un cupo del contrato, igual que emitir un
+        documento nuevo.
 
         Máximo 35 UUID por petición: cada uno hace una llamada en vivo a la DIAN, una
         tras otra, dentro del mismo request.
@@ -962,7 +963,10 @@ components:
                   description: Suma de los cargos globales del documento ("document.AllowanceCharge" con "ChargeIndicator" en `true`).
                 PayableAmount:
                   type: number
-                  description: Valor final a pagar (igual a "TaxInclusiveAmount" en los documentos que emite Billingo).
+                  description: >
+                    Valor final a pagar. Igual a "TaxInclusiveAmount" cuando el documento no trae
+                    "AllowanceCharge" a nivel de documento; si trae, es
+                    "TaxInclusiveAmount - AllowanceTotalAmount + ChargeTotalAmount".
             Lines:
               type: array
               minItems: 1
@@ -973,7 +977,7 @@ components:
 
     AllowanceCharge:
       type: object
-      required: [ChargeIndicator, AllowanceChargeReasonCode, AllowanceChargeReason, MultiplierFactorNumeric, Amount, BaseAmount]
+      required: [ChargeIndicator, AllowanceChargeReasonCode, MultiplierFactorNumeric, Amount, BaseAmount]
       description: >
         Descuentos o cargos a nivel de factura, es decir descuentos o cargos que no afectan las
         bases gravables. Los descuentos o cargos que afectan bases gravables se informan a
@@ -1384,7 +1388,7 @@ components:
           type: string
         status:
           type: string
-          enum: [importado, actualizado, no_encontrado, no_pertenece, error]
+          enum: [importado, actualizado, no_encontrado, no_pertenece, cupo_agotado, error]
         message:
           type: string
           nullable: true
@@ -1418,6 +1422,8 @@ components:
             no_encontrado:
               type: integer
             no_pertenece:
+              type: integer
+            cupo_agotado:
               type: integer
             error:
               type: integer
