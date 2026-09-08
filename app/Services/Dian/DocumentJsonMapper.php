@@ -41,6 +41,7 @@ class DocumentJsonMapper
         $customizationId = $document['CustomizationID'] ?? null;
         $lineas = $this->mapLines($document['Lines'] ?? []);
         $this->assertMandanteInformadoSiEsMandato($customizationId, $lineas);
+        $this->assertReferenciasRequeridas($customizationId, $document);
 
         $payload = [
             'tipo_documento' => $tipoDocumento,
@@ -136,6 +137,35 @@ class DocumentJsonMapper
         $tieneMandante = ! empty(array_filter(array_column($lineas, 'mandante')));
         if (! $tieneMandante) {
             throw new InvalidArgumentException('document.CustomizationID es "11" (Mandatos): al menos una línea debe traer "Item.InformationContentProviderParty" con la identificación del mandante.');
+        }
+    }
+
+    /**
+     * Exige "document.BillingReference" y "document.DiscrepancyResponse" para notas
+     * crédito/débito que referencian una factura ("CustomizationID" 20/30), y
+     * "document.InvoicePeriod" para las que no referencian ninguna (22/32) -- anexo técnico,
+     * numeral 13.2.5 (nota crédito) y 13.2.6 (nota débito).
+     *
+     * @param  string|null  $customizationId  "document.CustomizationID" tal como lo mandó el caller.
+     * @param  array  $document  Bloque "document" de la petición.
+     *
+     * @throws InvalidArgumentException Si falta el bloque que le corresponde a ese "CustomizationID".
+     */
+    private function assertReferenciasRequeridas(?string $customizationId, array $document): void
+    {
+        if (in_array($customizationId, ['20', '30'], true)) {
+            if (empty($document['BillingReference'])) {
+                throw new InvalidArgumentException('document.BillingReference es obligatorio cuando "CustomizationID" es "20" o "30".');
+            }
+            if (empty($document['DiscrepancyResponse'])) {
+                throw new InvalidArgumentException('document.DiscrepancyResponse es obligatorio cuando "CustomizationID" es "20" o "30".');
+            }
+        }
+
+        if (in_array($customizationId, ['22', '32'], true)) {
+            if (empty($document['InvoicePeriod']['StartDate']) || empty($document['InvoicePeriod']['EndDate'])) {
+                throw new InvalidArgumentException('document.InvoicePeriod.StartDate y document.InvoicePeriod.EndDate son obligatorios cuando "CustomizationID" es "22" o "32".');
+            }
         }
     }
 
