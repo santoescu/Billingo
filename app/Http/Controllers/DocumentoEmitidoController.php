@@ -1188,9 +1188,10 @@ class DocumentoEmitidoController extends Controller
             ];
         }
 
-        if (! empty($paymentMeans)) {
-            $document['PaymentMeans'] = $paymentMeans;
-        }
+        // "document.PaymentMeans" es obligatorio para DocumentJsonMapper -- si el usuario no
+        // llenó ninguna fila de forma de pago en el formulario, se manda el mismo default que
+        // la DIAN espera (contado en efectivo) en vez de dejar el campo sin mandar.
+        $document['PaymentMeans'] = ! empty($paymentMeans) ? $paymentMeans : [['ID' => '1', 'PaymentMeansCode' => '10']];
 
         $cargoTipos = $data['cargo_tipo'] ?? [];
         $cargoMotivos = $data['cargo_motivo'] ?? [];

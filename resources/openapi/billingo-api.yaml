@@ -866,12 +866,10 @@ components:
                   description: Correo del receptor.
             PaymentMeans:
               type: array
+              minItems: 1
               description: >
-                Medio(s) de pago del documento. La DIAN sí lo exige, pero en la petición es
-                opcional -- si no se manda, el sistema lo completa solo con un pago de contado en
-                efectivo (equivalente a mandar `[{"ID": "1", "PaymentMeansCode": "10"}]`) para
-                que el documento no se rechace por este campo. Se puede mandar más de uno si el
-                documento se paga con varios medios.
+                Medio(s) de pago del documento. Se puede mandar más de uno si el documento se
+                paga con varios medios.
               items:
                 type: object
                 required: [ID, PaymentMeansCode]
@@ -880,22 +878,19 @@ components:
                     type: string
                     description: >
                       Forma de pago (no confundir con "PaymentMeansCode", que es el medio con el
-                      que se paga). La DIAN lo exige siempre -- si no se manda, el sistema lo
-                      completa con "1" (contado).
+                      que se paga).
 
                       - `1`: Contado
 
                       - `2`: Crédito
                     enum: ["1", "2"]
-                    default: "1"
                     minLength: 1
                     maxLength: 1
                   PaymentMeansCode:
                     type: string
                     description: >
-                      Medio de pago, catálogo UNTDID 4461. La DIAN lo exige siempre -- si no se
-                      manda, el sistema lo completa con "10" (efectivo). El catálogo completo
-                      tiene demasiados códigos para listarlos todos acá; estos son los más usados:
+                      Medio de pago, catálogo UNTDID 4461. El catálogo completo tiene demasiados
+                      códigos para listarlos todos acá; estos son los más usados:
 
                       - `10`: Efectivo
 
@@ -912,7 +907,6 @@ components:
                       - `71`: Bonos
 
                       - `ZZZ`: Acuerdo mutuo (otro medio no listado en el catálogo)
-                    default: "10"
                     minLength: 1
                     maxLength: 3
                   PaymentDueDate:
@@ -920,7 +914,7 @@ components:
                     format: date
                     description: >
                       Fecha de vencimiento del pago (solo aplica si "ID" es "2", crédito),
-                      formato `AAAA-MM-DD`.
+                      formato `AAAA-MM-DD`. Opcional.
 
 
                       Ejemplos válidos: `2026-09-06`

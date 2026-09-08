@@ -34,7 +34,9 @@ class DocumentJsonMapper
 
         $this->assertSupplierMatchesCompany($company, $document['AccountingSupplierParty'] ?? []);
         $cliente = $this->resolveCustomerParty($company, $document['AccountingCustomerParty'] ?? []);
-        $paymentMeansList = $this->mapPaymentMeansList($document['PaymentMeans'] ?? []);
+        $paymentMeansList = $this->mapPaymentMeansList(
+            $document['PaymentMeans'] ?? throw new InvalidArgumentException('El campo "document.PaymentMeans" es obligatorio.')
+        );
         $paymentMeans = $paymentMeansList[0] ?? null;
         $customizationId = $document['CustomizationID'] ?? null;
         $lineas = $this->mapLines($document['Lines'] ?? []);
@@ -322,16 +324,24 @@ class DocumentJsonMapper
     }
 
     /**
-     * Traduce el bloque "PaymentMeans" (arreglo, puede traer varios medios de pago) al shape interno.
+     * Traduce el bloque "PaymentMeans" (arreglo, puede traer varios medios de pago) al shape
+     * interno -- "ID" y "PaymentMeansCode" son obligatorios en cada entrada, sin ningún default;
+     * solo "PaymentDueDate" es opcional.
      *
      * @param  array  $paymentMeansList  Bloque "PaymentMeans" de la petición.
-     * @return array Lista de medios de pago en el shape interno (vacía si no vino ninguno).
+     * @return array Lista de medios de pago en el shape interno.
+     *
+     * @throws InvalidArgumentException Si el arreglo viene vacío, o a alguna entrada le falta "ID"/"PaymentMeansCode".
      */
     private function mapPaymentMeansList(array $paymentMeansList): array
     {
+        if (empty($paymentMeansList)) {
+            throw new InvalidArgumentException('El campo "document.PaymentMeans" es obligatorio.');
+        }
+
         return array_values(array_map(fn (array $paymentMeans) => [
-            'id' => $paymentMeans['ID'] ?? '1',
-            'codigo' => $paymentMeans['PaymentMeansCode'] ?? '10',
+            'id' => $paymentMeans['ID'] ?? throw new InvalidArgumentException('document.PaymentMeans.ID es obligatorio.'),
+            'codigo' => $paymentMeans['PaymentMeansCode'] ?? throw new InvalidArgumentException('document.PaymentMeans.PaymentMeansCode es obligatorio.'),
             'fecha_vencimiento' => $paymentMeans['PaymentDueDate'] ?? null,
             'payment_id' => $paymentMeans['PaymentID'] ?? null,
         ], $paymentMeansList));
