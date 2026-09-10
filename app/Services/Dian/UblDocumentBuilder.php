@@ -888,7 +888,9 @@ class UblDocumentBuilder
             }
 
             $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
-            $this->appendCbc($category, 'Percent', number_format($subtotalData['porcentaje'], 2, '.', ''));
+            if ($subtotalData['per_unit_amount'] === null) {
+                $this->appendCbc($category, 'Percent', number_format($subtotalData['porcentaje'], 2, '.', ''));
+            }
             $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
             $this->appendCbc($scheme, 'ID', $codigo);
             $this->appendCbc($scheme, 'Name', $nombre);
@@ -1143,7 +1145,9 @@ class UblDocumentBuilder
                     $this->appendMoney($subtotal, 'PerUnitAmount', $impuesto['per_unit_amount'], $moneda);
                 }
                 $category = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxCategory');
-                $this->appendCbc($category, 'Percent', number_format($impuesto['porcentaje'], 2, '.', ''));
+                if ($impuesto['per_unit_amount'] === null) {
+                    $this->appendCbc($category, 'Percent', number_format($impuesto['porcentaje'], 2, '.', ''));
+                }
                 $scheme = $this->doc->createElementNS(self::CAC_NS, 'cac:TaxScheme');
                 $this->appendCbc($scheme, 'ID', $codigo);
                 $this->appendCbc($scheme, 'Name', $grupo['nombre']);

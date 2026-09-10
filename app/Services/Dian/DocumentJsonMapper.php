@@ -4,19 +4,11 @@ namespace App\Services\Dian;
 
 use App\Models\Company;
 use App\Models\ThirdParty;
+use App\Models\Tributo;
 use InvalidArgumentException;
 
 class DocumentJsonMapper
 {
-    /**
-     * Tributos que el anexo técnico exige informar de forma nominal (valor fijo por unidad,
-     * vía "PerUnitAmount"/"BaseUnitMeasure") en vez de porcentual (vía "Percent"):
-     * `21` Timbre, `22` INC Bolsas, `23` INCarbono, `24` INCombustibles (regla explícita del
-     * anexo, numeral FAX09-FAX11), más `33` INPP y `34` IBUA (confirmado en la tabla de
-     * tarifas 13.3.11 -- ambos se calculan con la misma fórmula PerUnitAmount x
-     * BaseUnitMeasure).
-     */
-    private const TRIBUTOS_NOMINALES = ['21', '22', '23', '24', '33', '34'];
 
     /**
      * Traduce el JSON recibido al payload interno de UblDocumentBuilder,
@@ -529,7 +521,7 @@ class DocumentJsonMapper
 
             $mapeados = array_map(function (array $subtotal) use ($unitCode) {
                 $tipo = $subtotal['TaxCategory']['TaxScheme']['ID'] ?? throw new InvalidArgumentException('Lines.TaxTotal.TaxSubtotal.TaxCategory.TaxScheme.ID es obligatorio.');
-                $esNominal = in_array($tipo, self::TRIBUTOS_NOMINALES, true);
+                $esNominal = in_array($tipo, Tributo::nominalCodes(), true);
 
                 $impuesto = [
                     'tipo' => $tipo,
