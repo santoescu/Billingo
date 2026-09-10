@@ -8,12 +8,18 @@ class SelectConfig
      * Config para un select simple (sin buscador).
      *
      * @param  string|null  $placeholder  Texto del placeholder; por defecto __('Select...').
+     * @param  bool  $allowEmptyOption  Preline descarta del dropdown cualquier <option
+     *                                  value=""> a menos que esto sea true -- ponerlo en true
+     *                                  cuando ese <option> vacío es una opción real que el
+     *                                  usuario debe poder volver a elegir (ej. "deshacer" una
+     *                                  selección), no solo el placeholder inicial.
      */
-    public static function basic(?string $placeholder = null): string
+    public static function basic(?string $placeholder = null, bool $allowEmptyOption = false): string
     {
         $json = <<<'JSON'
         {
             "placeholder": "__SELECT_PLACEHOLDER__",
+            "optionAllowEmptyOption": __OPTION_ALLOW_EMPTY_OPTION__,
             "toggleTag": "<button type=\"button\" aria-expanded=\"false\"></button>",
             "toggleClasses": "hs-select-disabled:pointer-events-none hs-select-disabled:opacity-50 relative h-10 py-2 ps-3 pe-10 flex min-w-0 overflow-hidden w-full cursor-pointer [&>*]:min-w-0 [&>*]:truncate appearance-none bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-start text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent",
             "dropdownClasses": "mt-2 z-50 w-full max-h-72 p-1 space-y-0.5 bg-white border border-zinc-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 dark:bg-zinc-700 dark:border-white/10",
@@ -22,7 +28,11 @@ class SelectConfig
         }
         JSON;
 
-        return str_replace('__SELECT_PLACEHOLDER__', $placeholder ?? __('Select...'), $json);
+        return str_replace(
+            ['__SELECT_PLACEHOLDER__', '__OPTION_ALLOW_EMPTY_OPTION__'],
+            [$placeholder ?? __('Select...'), $allowEmptyOption ? 'true' : 'false'],
+            $json
+        );
     }
 
     /**

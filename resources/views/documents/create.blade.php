@@ -115,25 +115,38 @@
                 <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Document') }}</h3>
             </div>
             <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div id="doc-tipo_documento-field" class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
+                <div id="doc-tipo_documento-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Document type') }}</label>
-                    <select id="doc-tipo_documento" name="tipo_documento" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                    <select id="doc-tipo_documento" name="{{ $editMode ? '' : 'tipo_documento' }}" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" @disabled($editMode)>
                         @foreach ($documentTypeLabels as $code => $label)
                             <option value="{{ $code }}" @selected(old('tipo_documento', $editDocument->tipo_documento ?? '01') === $code)>{{ $code }} - {{ $label }}</option>
                         @endforeach
                     </select>
+                    @if ($editMode)
+                        {{-- El select de arriba queda deshabilitado a propósito (no se puede
+                             cambiar el tipo de un documento ya rechazado) -- un <select
+                             disabled> no se manda al hacer submit, por eso el valor real va en
+                             este input oculto (mismo patrón que "prefix"/"secuencial"). --}}
+                        <input type="hidden" name="tipo_documento" value="{{ $editDocument->tipo_documento }}">
+                    @endif
                 </div>
-                <div class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Operation type') }}</label>
                     <select id="doc-tipo_operacion" name="tipo_operacion" data-hs-select='{!! $basicSelectConfig !!}' class="hidden"></select>
                 </div>
-                <div id="doc-resolution-field" class="{{ (($posMode ?? false) || $editMode) ? 'hidden' : '' }}">
+                <div id="doc-resolution-field" class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Resolution') }}</label>
-                    <select id="doc-resolution" name="resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
+                    <select id="doc-resolution" name="{{ $editMode ? '' : 'resolution_id' }}" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" @disabled($editMode)>
                         @if ($editMode)
-                            <option value="{{ $editDocument->resolution_id }}" selected data-prefix="{{ $editDocument->prefix }}" data-next-number="{{ $editDocument->secuencial }}">{{ $editDocument->prefix }}</option>
+                            <option value="{{ $editDocument->resolution_id }}" selected data-prefix="{{ $editDocument->prefix }}" data-next-number="{{ $editDocument->secuencial }}">{{ trim($editDocument->prefix . ' - ' . __('Resolution') . ' ' . ($editDocument->resolution?->resolution_number ?? '')) }}</option>
                         @endif
                     </select>
+                    @if ($editMode)
+                        {{-- Mismo patrón que "tipo_documento": el select queda deshabilitado
+                             (no se puede cambiar la resolución de un documento ya rechazado),
+                             así que el valor real va en este input oculto. --}}
+                        <input type="hidden" name="resolution_id" value="{{ $editDocument->resolution_id }}">
+                    @endif
                 </div>
                 @if ($posMode ?? false)
                     <flux:input id="doc-prefix-display" :label="__('Prefix')" value="{{ $shift->fvResolution?->prefix }}" readonly disabled />
@@ -146,6 +159,12 @@
                     <flux:input id="doc-secuencial-display" :label="__('Number')" value="" readonly disabled />
                 @endif
                 <x-date-picker name="issue_date" :label="__('Issue date')" :value="old('issue_date')" readonly />
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                    <flux:input name="orden_compra_id" :label="__('Purchase order number')" placeholder="{{ __('Optional') }}" value="{{ old('orden_compra_id', $editDocument->payload['orden_referencia']['id'] ?? null) }}" />
+                </div>
+                <div class="{{ ($posMode ?? false) ? 'hidden' : '' }}">
+                    <x-date-picker name="orden_compra_fecha" :label="__('Purchase order date')" :value="old('orden_compra_fecha', $editDocument->payload['orden_referencia']['issue_date'] ?? null)" :allow-empty="true" />
+                </div>
             </div>
         </div>
 
@@ -353,7 +372,8 @@
                 @endif
                 <div class="w-40">{{ __('Discount') }}</div>
                 <div class="flex-1">{{ __('Taxes') }}</div>
-                <div class="w-24 text-end">{{ __('Subtotal') }}</div>
+                <div class="w-24">{{ __('Subtotal') }}</div>
+                <div class="w-10"></div>
                 <div class="w-10"></div>
             </div>
             <div id="documentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
@@ -390,6 +410,22 @@
                     </div>
                 </div>
             @endif
+        </div>
+
+        <div class="border border-gray-200 rounded-lg dark:border-neutral-700 {{ ($posMode ?? false) ? 'hidden' : '' }}">
+            <button type="button" class="w-full px-4 py-3 flex justify-between items-center" onclick="toggleNotesSection()">
+                <span class="flex items-center gap-2">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Notes') }}</h3>
+                    <span class="text-xs text-gray-400 dark:text-neutral-500">({{ __('Optional') }})</span>
+                </span>
+                <svg id="notesToggleIcon" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+            <div id="notesSectionBody" class="hidden">
+                <div id="noteLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700 border-t border-gray-200 dark:border-neutral-700"></div>
+                <div class="p-4 border-t border-gray-200 dark:border-neutral-700">
+                    <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addNoteLine()">{{ __('Add note') }}</flux:button>
+                </div>
+            </div>
         </div>
 
         @if ($posMode ?? false)
@@ -642,6 +678,17 @@
         </div>
     </template>
 
+    <template id="noteLineTemplate">
+        <div class="note-line p-4 flex items-end gap-4">
+            <div class="flex-1">
+                <flux:input class:input="note-text" name="notas[__INDEX__]" :label="__('Note')" />
+            </div>
+            <button type="button" class="h-10 text-gray-400 hover:text-red-600 focus:outline-hidden dark:hover:text-red-400" onclick="removeNoteLine(this)">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+            </button>
+        </div>
+    </template>
+
     <template id="documentLineTemplate">
         <div class="document-line p-3 space-y-2">
             <input type="hidden" class="line-unidad" name="items[__INDEX__][unidad_medida]" value="EA">
@@ -766,9 +813,45 @@
                     <span class="line-subtotal block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
                 </div>
 
-                <button type="button" class="line-delete-btn flex size-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none" aria-label="{{ __('Delete') }}" onclick="removeDocumentLine(this)" disabled>
-                    <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                </button>
+                <div class="flex shrink-0 items-center">
+                    <button type="button" class="line-extra-toggle-btn flex size-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Brand, model and mandante') }}" title="{{ __('Brand, model and mandante') }}" onclick="toggleLineExtraFields(this)">
+                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    </button>
+                    <button type="button" class="line-delete-btn flex size-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none" aria-label="{{ __('Delete') }}" onclick="removeDocumentLine(this)" disabled>
+                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Marca/modelo (Lines[].BrandName/ModelName) y mandante (solo si aplica --
+                 Item.InformationContentProviderParty, "Mandatos") -- todo opcional, se
+                 despliega junto con el botón "+" en vez de estar siempre visible. --}}
+            <div class="line-extra-row hidden flex flex-wrap gap-3 pt-2 border-t border-zinc-100 dark:border-white/10">
+                <div class="w-56 shrink-0">
+                    <flux:input class:input="line-marca" name="items[__INDEX__][marca]" :label="__('Brand')" />
+                </div>
+                <div class="w-56 shrink-0">
+                    <flux:input class:input="line-modelo" name="items[__INDEX__][modelo]" :label="__('Model')" />
+                </div>
+                {{-- Solo aplica a "Mandatos" (tipo_operacion 11) -- ver
+                     updateLineMandanteVisibility(). No existe en POS, ahí no se ofrece
+                     "Mandatos" como tipo de operación. --}}
+                @unless ($posMode ?? false)
+                    <div class="line-mandante-fields hidden flex flex-wrap gap-3">
+                        <flux:field class="w-72 shrink-0 [&>.hs-select]:max-w-[17rem]">
+                            <flux:label class="whitespace-nowrap">{{ __('Mandante identification type') }}</flux:label>
+                            <select class="line-mandante-tipo hidden" name="items[__INDEX__][mandante_tipo_identificacion]" data-hs-select='{!! \App\Support\SelectConfig::basic(allowEmptyOption: true) !!}'>
+                                <option value="" selected>{{ __('No mandante') }}</option>
+                                @foreach ($identificationTypes as $code => $label)
+                                    <option value="{{ $code }}">{{ $code }} - {{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </flux:field>
+                        <div class="w-56 shrink-0">
+                            <flux:input class:input="line-mandante-id" name="items[__INDEX__][mandante_identificacion]" :label="__('Mandante identification')" />
+                        </div>
+                    </div>
+                @endunless
             </div>
         </div>
     </template>
@@ -799,11 +882,22 @@
                 let lineIndex = 0;
                 let paymentLineIndex = 0;
                 let chargeLineIndex = 0;
+                let noteLineIndex = 0;
 
                 function setSelectValue(el, value) {
                     const instance = window.HSSelect && HSSelect.getInstance(el);
                     if (instance) {
-                        instance.setValue(value ?? '');
+                        try {
+                            // Preline revienta (TypeError sin capturar) si "value" no coincide
+                            // con ninguna <option> que el widget ya conozca en este momento
+                            // (ej. una bodega borrada, o un select que todavía no cargó sus
+                            // opciones por AJAX) -- sin este try/catch, ese error aborta TODO
+                            // el resto del script que sigue después (otras líneas, el resto de
+                            // init()...), no solo este campo puntual.
+                            instance.setValue(value ?? '');
+                        } catch (error) {
+                            el.value = value ?? '';
+                        }
                     } else {
                         el.value = value ?? '';
                     }
@@ -946,6 +1040,60 @@
                             periodoRoot.querySelector('[data-daterange-hidden-from]').value = '';
                             periodoRoot.querySelector('[data-daterange-hidden-to]').value = '';
                             periodoRoot.querySelector('[data-daterange-trigger]').value = '';
+                        }
+                    }
+
+                    document.querySelectorAll('#documentLinesBody .document-line').forEach(updateLineMandanteVisibility);
+                }
+
+                /**
+                 * Muestra/oculta el bloque de marca/modelo (y mandante, si aplica) de una
+                 * línea con el botón "+" -- a diferencia del mandante, marca/modelo no
+                 * dependen de nada del documento, el usuario los abre a mano cuando los
+                 * necesita.
+                 * @param {HTMLElement} button Botón "+" que se clickeó (".line-extra-toggle-btn").
+                 * @returns {void}
+                 */
+                window.toggleLineExtraFields = function (button) {
+                    const row = button.closest('.document-line');
+                    row.querySelector('.line-extra-row')?.classList.toggle('hidden');
+                };
+
+                /**
+                 * Muestra/oculta los campos de mandante de una línea según el tipo de
+                 * operación del documento -- solo aplica a "Mandatos" (11), el backend
+                 * (DocumentJsonMapper::assertMandanteInformadoSiEsMandato()) exige que al
+                 * menos una línea lo traiga cuando aplica. Si se oculta, limpia lo escrito
+                 * para no mandar un mandante leftover de una operación anterior.
+                 * @param {HTMLElement} row Fila de línea (".document-line").
+                 * @returns {void}
+                 */
+                function updateLineMandanteVisibility(row) {
+                    const mandanteFields = row.querySelector('.line-mandante-fields');
+                    if (! mandanteFields) {
+                        return;
+                    }
+
+                    const tipoOperacion = document.getElementById('doc-tipo_operacion')?.value;
+                    const requiresMandante = tipoOperacion === '11';
+                    mandanteFields.classList.toggle('hidden', ! requiresMandante);
+
+                    const select = mandanteFields.querySelector('.line-mandante-tipo');
+                    const idInput = mandanteFields.querySelector('.line-mandante-id');
+
+                    // initLineSelects() se salta este select mientras nace oculto (ver su
+                    // comentario) -- recién acá, la primera vez que deja de estarlo, hay
+                    // suficiente layout real para que Preline calcule bien su ancho.
+                    if (requiresMandante && window.HSSelect && select && select.style.display !== 'none') {
+                        new HSSelect(select);
+                    }
+
+                    if (! requiresMandante) {
+                        if (select) {
+                            setSelectValue(select, '');
+                        }
+                        if (idInput) {
+                            idInput.value = '';
                         }
                     }
                 }
@@ -1539,7 +1687,25 @@
                  */
                 function initLineSelects(row) {
                     if (window.HSSelect) {
-                        row.querySelectorAll('[data-hs-select]').forEach((el) => new HSSelect(el));
+                        row.querySelectorAll('[data-hs-select]').forEach((el) => {
+                            // Preline mide el ancho de las opciones al construir el widget --
+                            // como ".line-extra-row" (botón "+") y ".line-mandante-fields"
+                            // (solo Mandatos) nacen ocultas (display:none), todo mediría 0 y el
+                            // ancho quedaría mal calculado para siempre, aunque después se
+                            // muestre. Se salta acá (solo el select de mandante -- el resto de
+                            // selects de la fila, incluido el de "Agregar impuesto" que también
+                            // nace dentro de un ".hs-dropdown-menu" con su propia clase
+                            // "hidden", se inicializan igual que siempre) y se inicializa la
+                            // primera vez que deje de estar oculto (ver
+                            // updateLineMandanteVisibility()).
+                            if (
+                                el.closest('.line-extra-row')?.classList.contains('hidden')
+                                || el.closest('.line-mandante-fields')?.classList.contains('hidden')
+                            ) {
+                                return;
+                            }
+                            new HSSelect(el);
+                        });
                     }
                     if (window.HSInputNumber) {
                         row.querySelectorAll('[data-hs-input-number]').forEach((el) => new HSInputNumber(el));
@@ -2751,6 +2917,19 @@
                         recalcLine(row);
                     });
 
+                    // Si el usuario elige "No mandante" luego de haber escrito una
+                    // identificación por error, la limpia -- si no, quedaría un ID sin tipo
+                    // y dispararía la validación al revés ("tipo es obligatorio").
+                    row.querySelector('.line-mandante-tipo')?.addEventListener('change', (event) => {
+                        if (! event.target.value) {
+                            const idInput = row.querySelector('.line-mandante-id');
+                            if (idInput) {
+                                idInput.value = '';
+                            }
+                        }
+                    });
+
+                    updateLineMandanteVisibility(row);
                     recalcLine(row);
 
                     return row;
@@ -2853,6 +3032,34 @@
 
                 window.removeChargeLine = function (button) {
                     button.closest('.charge-line').remove();
+                };
+
+                window.toggleNotesSection = function () {
+                    const body = document.getElementById('notesSectionBody');
+                    const icon = document.getElementById('notesToggleIcon');
+                    const isHidden = body.classList.toggle('hidden');
+                    icon.classList.toggle('rotate-180', ! isHidden);
+
+                    if (! isHidden && document.querySelectorAll('#noteLinesBody .note-line').length === 0) {
+                        addNoteLine();
+                    }
+                };
+
+                window.addNoteLine = function () {
+                    const template = document.getElementById('noteLineTemplate');
+                    const html = template.innerHTML.replaceAll('__INDEX__', noteLineIndex);
+                    const container = document.getElementById('noteLinesBody');
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = html;
+                    const row = wrapper.firstElementChild;
+                    container.appendChild(row);
+                    noteLineIndex++;
+
+                    return row;
+                };
+
+                window.removeNoteLine = function (button) {
+                    button.closest('.note-line').remove();
                 };
 
                 /**
@@ -3014,8 +3221,47 @@
 
                             (line.impuestos || []).forEach((tax) => addLineTaxFromData(row, tax));
 
+                            if (line.mandante || line.marca || line.modelo) {
+                                row.querySelector('.line-extra-row')?.classList.remove('hidden');
+
+                                const marcaInput = row.querySelector('.line-marca');
+                                if (marcaInput && line.marca) {
+                                    marcaInput.value = line.marca;
+                                }
+                                const modeloInput = row.querySelector('.line-modelo');
+                                if (modeloInput && line.modelo) {
+                                    modeloInput.value = line.modelo;
+                                }
+
+                                if (line.mandante) {
+                                    const mandanteSelect = row.querySelector('.line-mandante-tipo');
+                                    const mandanteId = row.querySelector('.line-mandante-id');
+                                    if (mandanteSelect && window.HSSelect && mandanteSelect.style.display !== 'none') {
+                                        new HSSelect(mandanteSelect);
+                                    }
+                                    if (mandanteSelect) {
+                                        setSelectValue(mandanteSelect, line.mandante.tipo_identificacion || '');
+                                    }
+                                    if (mandanteId) {
+                                        mandanteId.value = line.mandante.identificacion || '';
+                                    }
+                                }
+                            }
+
                             recalcLine(row);
                         });
+
+                        // applyProduct() agrega sola una fila vacía nueva cada vez que se
+                        // elige producto en la que era la última fila -- al precargar varias
+                        // líneas de golpe, eso deja una fila vacía después de cada una (no
+                        // solo al final). Se limpian todas y se deja una sola al final, igual
+                        // que en una edición manual.
+                        document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
+                            if (row.dataset.productPicked !== 'true') {
+                                row.remove();
+                            }
+                        });
+                        addDocumentLine();
 
                         editPrefill.payment_means.forEach((means) => {
                             const row = addPaymentLine();

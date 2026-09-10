@@ -85,11 +85,17 @@
                 <div data-datepicker-days class="grid grid-cols-7 gap-y-0.5"></div>
             </div>
 
-            <div class="p-2 border-t border-zinc-200 dark:border-white/10">
+            <div class="p-2 border-t border-zinc-200 dark:border-white/10 flex gap-1">
                 <button type="button" data-datepicker-today
-                    class="w-full py-1.5 text-sm font-medium text-center text-accent hover:bg-zinc-100 dark:hover:bg-white/10 rounded-lg focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10">
+                    class="flex-1 py-1.5 text-sm font-medium text-center text-accent hover:bg-zinc-100 dark:hover:bg-white/10 rounded-lg focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10">
                     {{ __('Today') }}
                 </button>
+                @if ($allowEmpty)
+                    <button type="button" data-datepicker-clear
+                        class="flex-1 py-1.5 text-sm font-medium text-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10 rounded-lg focus:outline-hidden focus:bg-zinc-100 dark:focus:bg-white/10">
+                        {{ __('Clear') }}
+                    </button>
+                @endif
             </div>
         </div>
     </div>

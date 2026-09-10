@@ -32,6 +32,7 @@
                 const prevBtn = panel.querySelector('[data-datepicker-prev]');
                 const nextBtn = panel.querySelector('[data-datepicker-next]');
                 const todayBtn = panel.querySelector('[data-datepicker-today]');
+                const clearBtn = panel.querySelector('[data-datepicker-clear]');
 
                 let selectedDate = hidden.value ? new Date(hidden.value + 'T00:00:00') : null;
                 const today = new Date();
@@ -155,6 +156,14 @@
                     viewMonth = now.getMonth();
                     hidden.value = toIsoDate(now);
                     trigger.value = formatDisplay(now);
+                    closePanel();
+                    renderCalendar();
+                });
+
+                clearBtn?.addEventListener('click', () => {
+                    selectedDate = null;
+                    hidden.value = '';
+                    trigger.value = '';
                     closePanel();
                     renderCalendar();
                 });

@@ -172,6 +172,17 @@
                                 <td class="meta-value">{{ optional($documento->due_date)->format('Y-m-d') ?? '—' }}</td>
                             </tr>
                         @endif
+                        @if (! empty($documento->payload['orden_referencia']['id']))
+                            <tr>
+                                <td class="meta-label">{{ __('Purchase order') }}</td>
+                                <td class="meta-value">
+                                    {{ $documento->payload['orden_referencia']['id'] }}
+                                    @if (! empty($documento->payload['orden_referencia']['issue_date']))
+                                        ({{ $documento->payload['orden_referencia']['issue_date'] }})
+                                    @endif
+                                </td>
+                            </tr>
+                        @endif
                     </table>
                 </div>
             </td>

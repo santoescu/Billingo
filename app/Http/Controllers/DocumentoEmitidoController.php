@@ -25,6 +25,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -266,6 +267,12 @@ class DocumentoEmitidoController extends Controller
                 'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
                 'descuento' => $this->firstLineDiscountForEditing($linea['cargos_descuentos'] ?? []),
                 'impuestos' => $linea['impuestos'] ?? [],
+                'mandante' => ! empty($linea['mandante']) ? [
+                    'tipo_identificacion' => $linea['mandante']['scheme_name'] ?? null,
+                    'identificacion' => $linea['mandante']['id'] ?? null,
+                ] : null,
+                'marca' => $linea['marca'][0] ?? null,
+                'modelo' => $linea['modelo'][0] ?? null,
             ];
         })->values()->all();
 
@@ -568,6 +575,12 @@ class DocumentoEmitidoController extends Controller
     {
         try {
             $documento = $this->issueFromRequest($request, $service);
+        } catch (ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $e->validator->errors()->first()], 422);
+            }
+
+            throw $e;
         } catch (InvalidArgumentException|RuntimeException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['message' => $e->getMessage()], 422);
@@ -684,6 +697,11 @@ class DocumentoEmitidoController extends Controller
             'issue_date' => ['nullable', 'date'],
             'issue_time' => ['nullable', 'string', 'max:20'],
 
+            'orden_compra_id' => ['nullable', 'string', 'max:50'],
+            'orden_compra_fecha' => ['nullable', 'date'],
+            'notas' => ['nullable', 'array'],
+            'notas.*' => ['nullable', 'string', 'max:500'],
+
             'referencia_factura_id' => ['required_if:tipo_operacion,20,30', 'nullable', 'string', 'max:50'],
             'referencia_factura_uuid' => ['required_with:referencia_factura_id', 'nullable', 'string', 'max:100'],
             'referencia_factura_fecha_emision' => ['required_with:referencia_factura_id', 'nullable', 'date'],
@@ -733,6 +751,10 @@ class DocumentoEmitidoController extends Controller
             'items.*.impuestos.*.tipo' => ['required_with:items.*.impuestos', 'string', 'max:5'],
             'items.*.impuestos.*.porcentaje' => ['required_with:items.*.impuestos', 'numeric', 'min:0'],
             'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
+            'items.*.mandante_tipo_identificacion' => ['required_with:items.*.mandante_identificacion', 'nullable', 'string', 'max:2'],
+            'items.*.mandante_identificacion' => ['required_with:items.*.mandante_tipo_identificacion', 'nullable', 'string', 'max:20'],
+            'items.*.marca' => ['nullable', 'string', 'max:100'],
+            'items.*.modelo' => ['nullable', 'string', 'max:100'],
         ]);
 
         $data['items'] = $this->enforceCatalogPriceForNonAdmins($company, $data['items'], $company->membership->role, $company->membership->modules ?? []);
@@ -770,6 +792,13 @@ class DocumentoEmitidoController extends Controller
         try {
             $document = $this->buildDocumentFromRequest($request, $company, claimNumber: false, editingDocument: $editingDocument);
             $documento = $service->buildPreview($company, ['document' => $document]);
+        } catch (ValidationException $e) {
+            // buildDocumentFromRequest() valida con $request->validate() -- sin este catch,
+            // esa excepción se le escapa al manejador global, que en esta ruta (no
+            // "api/*", ver bootstrap/app.php) responde con un redirect normal en vez de
+            // JSON. El fetch() del modal de previsualización sigue ese redirect y termina
+            // metiendo la página completa (con el formulario) dentro del iframe.
+            return response()->json(['message' => $e->validator->errors()->first()], 422);
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -1149,6 +1178,21 @@ class DocumentoEmitidoController extends Controller
             $document['DueDate'] = $data['payment_due_date'][0];
         }
 
+        if (! empty($data['orden_compra_id'])) {
+            $document['OrderReference'] = array_filter([
+                'ID' => $data['orden_compra_id'],
+                'IssueDate' => $data['orden_compra_fecha'] ?? null,
+            ]);
+        }
+
+        if (! empty($data['notas'])) {
+            $document['Note'] = collect($data['notas'])
+                ->map(fn (?string $nota) => trim((string) $nota))
+                ->filter()
+                ->values()
+                ->all();
+        }
+
         if (! empty($data['referencia_factura_id'])) {
             $document['BillingReference'] = [
                 'ID' => $data['referencia_factura_id'],
@@ -1365,6 +1409,12 @@ class DocumentoEmitidoController extends Controller
                 'Description' => $item['descripcion'],
                 'SellersItemIdentification' => ['ID' => $item['codigo']],
                 'StandardItemIdentification' => ! empty($item['codigo_barras']) ? ['ID' => $item['codigo_barras']] : null,
+                'InformationContentProviderParty' => ! empty($item['mandante_identificacion']) ? [
+                    'SchemeName' => $item['mandante_tipo_identificacion'],
+                    'ID' => $item['mandante_identificacion'],
+                ] : null,
+                'BrandName' => ! empty($item['marca']) ? [$item['marca']] : null,
+                'ModelName' => ! empty($item['modelo']) ? [$item['modelo']] : null,
             ]),
             'Price' => [
                 'PriceAmount' => $precioUnitario,
