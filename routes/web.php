@@ -11,6 +11,7 @@ use App\Http\Controllers\CompanyMemberController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DianController;
 use App\Http\Controllers\DocumentoEmitidoController;
+use App\Http\Controllers\DocumentoRecibidoController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PosController;
@@ -127,6 +128,15 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [ThirdPartyController::class, 'store'])->defaults('role', 'proveedor')->name('store');
             Route::put('{thirdParty}', [ThirdPartyController::class, 'update'])->defaults('role', 'proveedor')->name('update');
             Route::delete('{thirdParty}', [ThirdPartyController::class, 'destroy'])->defaults('role', 'proveedor')->name('destroy');
+        });
+
+    Route::middleware(['company.selected', 'company.role:receiving,administrador,comprador,auditor'])
+        ->prefix('received-documents')->name('received-documents.')->group(function () {
+            Route::get('/', [DocumentoRecibidoController::class, 'index'])->name('index');
+            Route::post('/', [DocumentoRecibidoController::class, 'store'])->name('store');
+            Route::get('{documento}', [DocumentoRecibidoController::class, 'show'])->name('show');
+            Route::get('{documento}/pdf', [DocumentoRecibidoController::class, 'pdf'])->name('pdf');
+            Route::post('{documento}/toggle-paid', [DocumentoRecibidoController::class, 'togglePaid'])->name('toggle-paid');
         });
 
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])

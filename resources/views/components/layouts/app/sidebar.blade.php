@@ -105,6 +105,13 @@
             'label' => __('Document receiving'),
             'items' => array_key_exists('receiving', $myModules) ? [
                 [
+                    'id' => 'sidebar-received-documents',
+                    'name' => __('Received documents'),
+                    'icon' => 'inbox-arrow-down',
+                    'url' => route('received-documents.index'),
+                    'current' => request()->routeIs('received-documents.*'),
+                ],
+                [
                     'id' => 'sidebar-providers',
                     'name' => __('Providers'),
                     'icon' => 'truck',
