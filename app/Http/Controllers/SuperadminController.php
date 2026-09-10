@@ -161,6 +161,8 @@ class SuperadminController extends Controller
             'pos_used' => 0,
             'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
             'cotizaciones_used' => 0,
+            'receiving_limit' => $data['receiving_limit'] ?? null,
+            'receiving_used' => 0,
             'referrer_user_id' => $data['referrer_user_id'] ?? null,
             'commission_percentage' => $data['commission_percentage'] ?? null,
         ]);
@@ -198,6 +200,7 @@ class SuperadminController extends Controller
             'invoicing_limit' => $data['invoicing_limit'] ?? null,
             'pos_limit' => $data['pos_limit'] ?? null,
             'cotizaciones_limit' => $data['cotizaciones_limit'] ?? null,
+            'receiving_limit' => $data['receiving_limit'] ?? null,
             'referrer_user_id' => $data['referrer_user_id'] ?? null,
             'commission_percentage' => $data['commission_percentage'] ?? null,
         ]);
@@ -223,7 +226,7 @@ class SuperadminController extends Controller
         // deja en blanco -- 'nullable' no los convierte a null por sí solo, solo se salta el
         // resto de reglas, así que sin este paso "date"/"integer" fallarían o, peor, se
         // guardaría '' tal cual (Carbon la interpreta como "ahora").
-        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit', 'referrer_user_id', 'commission_percentage']))
+        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit', 'receiving_limit', 'referrer_user_id', 'commission_percentage']))
             ->map(fn ($value) => $value === '' ? null : $value)
             ->all());
 
@@ -242,6 +245,7 @@ class SuperadminController extends Controller
             'invoicing_limit' => ['nullable', 'integer', 'min:1'],
             'pos_limit' => ['nullable', 'integer', 'min:1'],
             'cotizaciones_limit' => ['nullable', 'integer', 'min:1'],
+            'receiving_limit' => ['nullable', 'integer', 'min:1'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['string'],
             'referrer_user_id' => ['nullable', 'string'],

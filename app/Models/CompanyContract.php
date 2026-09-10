@@ -27,8 +27,10 @@ class CompanyContract extends Model
         'pos_used',
         'cotizaciones_limit',
         'cotizaciones_used',
+        'receiving_limit',
+        'receiving_used',
         // Desglose de cuántos documentos aportó cada empresa al consumo
-        // total -- shape: {company_id: {invoicing: n, pos: n, cotizaciones: n}}.
+        // total -- shape: {company_id: {invoicing: n, pos: n, cotizaciones: n, receiving: n}}.
         // Es solo informativo (para el panel de superadmin): el cupo
         // siempre se controla con los contadores de arriba, nunca con este
         // desglose.
@@ -46,7 +48,7 @@ class CompanyContract extends Model
     const RENEWAL_LIFETIME = 'lifetime';
     const RENEWAL_MONTHLY = 'monthly';
 
-    const QUOTA_MODULES = ['invoicing', 'pos', 'cotizaciones'];
+    const QUOTA_MODULES = ['invoicing', 'pos', 'cotizaciones', 'receiving'];
 
     protected function casts(): array
     {
@@ -91,7 +93,7 @@ class CompanyContract extends Model
 
     /**
      * @param  string  $companyId
-     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones, receiving.
      * @return int Cuántos documentos de ese módulo aportó esa empresa al consumo total de este contrato.
      */
     public function usageForCompany(string $companyId, string $module): int
@@ -100,7 +102,7 @@ class CompanyContract extends Model
     }
 
     /**
-     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones, receiving.
      * @return bool Si este contrato específicamente cubre ese módulo -- dos contratos pueden
      *              estar vigentes al mismo tiempo (mismas fechas o distintas) siempre que
      *              cubran módulos distintos, cada uno descuenta solo de lo suyo.
@@ -129,7 +131,7 @@ class CompanyContract extends Model
     }
 
     /**
-     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones, receiving.
      * @return array{0: string, 1: string} Nombres de los campos [limit, used] a usar según el modo de cupo.
      */
     private function fieldsFor(string $module): array
@@ -140,7 +142,7 @@ class CompanyContract extends Model
     }
 
     /**
-     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones, receiving.
      * @return int|null Cupo restante para ese módulo, null si no tiene límite.
      */
     public function remaining(string $module): ?int
@@ -175,6 +177,7 @@ class CompanyContract extends Model
             'invoicing_used' => 0,
             'pos_used' => 0,
             'cotizaciones_used' => 0,
+            'receiving_used' => 0,
             'period_started_at' => now(),
         ]);
 
@@ -190,7 +193,7 @@ class CompanyContract extends Model
      * puramente informativo, se registra aunque el contrato sea ilimitado o ese módulo no tenga
      * tope.
      *
-     * @param  string  $module  Uno de: invoicing, pos, cotizaciones.
+     * @param  string  $module  Uno de: invoicing, pos, cotizaciones, receiving.
      * @param  string|null  $companyId  Empresa que está emitiendo el documento, para el desglose por empresa.
      *
      * @throws \RuntimeException Si el contrato no está vigente o no queda cupo disponible.

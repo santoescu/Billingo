@@ -218,6 +218,7 @@
                                         'invoicing_limit' => $contract->invoicing_limit,
                                         'pos_limit' => $contract->pos_limit,
                                         'cotizaciones_limit' => $contract->cotizaciones_limit,
+                                        'receiving_limit' => $contract->receiving_limit,
                                         'company_ids' => collect($contract->company_ids ?? [])->reject(fn ($id) => (string) $id === (string) $company->_id)->values(),
                                         'referrer_user_id' => $contract->referrer_user_id,
                                         'commission_percentage' => $contract->commission_percentage,
@@ -637,7 +638,7 @@
                     </div>
 
                     @if (empty($quotaModules))
-                        <p id="contract-per-module-fields" class="hidden text-sm text-neutral-500 dark:text-neutral-400">{{ __('This company has none of the document-producing modules active yet (Invoicing, POS, Quotations).') }}</p>
+                        <p id="contract-per-module-fields" class="hidden text-sm text-neutral-500 dark:text-neutral-400">{{ __('This company has none of the document-producing modules active yet (Invoicing, POS, Quotations, Receiving).') }}</p>
                     @else
                         <div id="contract-per-module-fields" class="hidden space-y-4">
                             @foreach ($quotaModules as $moduleKey)

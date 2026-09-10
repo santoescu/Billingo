@@ -368,6 +368,11 @@ class Company extends Model
         return $this->hasMany(DocumentoEmitido::class);
     }
 
+    public function documentosRecibidos()
+    {
+        return $this->hasMany(DocumentoRecibido::class);
+    }
+
     public function documentosPos()
     {
         return $this->hasMany(DocumentoPos::class);
