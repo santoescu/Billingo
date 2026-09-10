@@ -233,7 +233,7 @@ class UblDocumentBuilder
         $root->appendChild($this->buildMonetaryTotal($moneda, $totales));
 
         foreach ($lineas as $index => $linea) {
-            $root->appendChild($this->buildLine($moneda, $index + 1, $linea));
+            $root->appendChild($this->buildLine($moneda, $index + 1, $linea, $payload['customization_id'] ?? null));
         }
 
         $this->doc->formatOutput = false;
@@ -955,12 +955,24 @@ class UblDocumentBuilder
      * @param  string  $moneda  Código de moneda.
      * @param  int  $id  Número de línea (1-indexed).
      * @param  array  $linea  Línea ya calculada (ver buildLineasCalculadas()).
+     * @param  string|null  $customizationId  "document.CustomizationID" del documento completo.
      * @return DOMElement Nodo de línea construido (aún no adjunto al árbol).
      */
-    private function buildLine(string $moneda, int $id, array $linea): DOMElement
+    private function buildLine(string $moneda, int $id, array $linea, ?string $customizationId): DOMElement
     {
         $node = $this->doc->createElementNS(self::CAC_NS, 'cac:' . self::LINE_ELEMENT[$this->tipo]);
-        $this->appendCbc($node, 'ID', (string) $id);
+        $lineId = $this->appendCbc($node, 'ID', (string) $id);
+
+        // Regla FAV08a del anexo técnico: en Mandatos (CustomizationID "11") este atributo no
+        // puede venir vacío en NINGUNA línea -- "1" en las que traen mandante, "0" en las que
+        // no (CustomizationID "11" solo exige que al menos una lo traiga, ver
+        // assertMandanteInformadoSiEsMandato()). En cualquier otro CustomizationID no se manda
+        // este atributo. La DIAN no documenta con claridad estos valores -- son los que usan
+        // otros integradores para esta regla, se mandan fijos, sin exponerlos como campo
+        // configurable.
+        if ($customizationId === '11') {
+            $lineId->setAttribute('schemeID', empty($linea['mandante']) ? '0' : '1');
+        }
 
         $quantity = $this->appendCbc($node, self::QUANTITY_ELEMENT[$this->tipo], number_format($linea['cantidad'], 6, '.', ''));
         $quantity->setAttribute('unitCode', $linea['unidad_medida']);

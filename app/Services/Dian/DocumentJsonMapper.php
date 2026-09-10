@@ -223,7 +223,7 @@ class DocumentJsonMapper
      */
     private function buildNumeral(array $document): string
     {
-        if (empty($document['secuencial'])) {
+        if (! isset($document['secuencial']) || $document['secuencial'] === '') {
             throw new InvalidArgumentException('El campo "document.secuencial" es obligatorio.');
         }
 

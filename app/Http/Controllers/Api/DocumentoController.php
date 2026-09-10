@@ -59,13 +59,12 @@ class DocumentoController extends Controller
     public function importUuid(Request $request, IssueDocumentService $service)
     {
         $data = $request->validate([
-            'uuid' => ['required_without:uuids', 'string'],
-            'uuids' => ['required_without:uuid', 'array', 'min:1', 'max:35'],
+            'uuids' => ['required', 'array', 'min:1', 'max:35'],
             'uuids.*' => ['string'],
         ]);
 
         $company = $request->attributes->get('company');
-        $uuids = $data['uuids'] ?? [$data['uuid']];
+        $uuids = $data['uuids'];
 
         $results = [];
 

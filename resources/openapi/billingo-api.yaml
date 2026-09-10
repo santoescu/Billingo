@@ -343,14 +343,14 @@ paths:
         Si el UUID no existía, sí consume un cupo del contrato, igual que emitir un
         documento nuevo.
 
-        Máximo 35 UUID por petición: cada uno hace una llamada en vivo a la DIAN, una
-        tras otra, dentro del mismo request.
+        Máximo 35 UUID por petición (mínimo 1): cada uno hace una llamada en vivo a la DIAN,
+        una tras otra, dentro del mismo request.
 
         Ejemplo de JSON a enviar (un solo UUID):
 
         ```json
         {
-          "uuid": "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+          "uuids": ["351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"]
         }
         ```
 
@@ -375,7 +375,7 @@ paths:
               uno:
                 summary: Un solo UUID
                 value:
-                  uuid: "351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"
+                  uuids: ["351fc2faecfbc1d4d253b2cf32bd666b7033330f556c5fb93dfc9453a9094c9a34c9dbc9fd3bcedba159e4b197eeadb8"]
               varios:
                 summary: Varios UUID en un solo lote
                 value:
@@ -435,6 +435,17 @@ components:
       properties:
         message:
           type: string
+        errors:
+          type: object
+          nullable: true
+          description: >
+            Solo en errores de validación de forma de la petición (ej. "uuids" vacío o con más
+            de 35 elementos): detalle por campo, formato estándar de validación de Laravel
+            (cada llave es el nombre del campo, cada valor un arreglo de mensajes).
+          additionalProperties:
+            type: array
+            items:
+              type: string
       required: [message]
 
     EmitirDocumentoRequest:
@@ -1364,12 +1375,11 @@ components:
 
     ImportarUuidRequest:
       type: object
-      description: Mandar "uuid" (uno) o "uuids" (varios) -- no ambos.
+      required: [uuids]
       properties:
-        uuid:
-          type: string
         uuids:
           type: array
+          description: Uno o varios UUID/CUFE a importar.
           minItems: 1
           maxItems: 35
           items:
