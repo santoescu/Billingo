@@ -10,11 +10,15 @@
 
     $customer = $documento->payload['accounting_customer_party'] ?? [];
     $lineas = $documento->payload['lineas'] ?? [];
+    $notas = $documento->payload['notas'] ?? [];
+    $paymentMeansList = $documento->payload['payment_means_list'] ?? [];
 
     $paymentFormLabels = [
         '1' => __('Cash'),
         '2' => __('Credit'),
     ];
+
+    $paymentMeansCodeCatalog = \App\Models\PaymentMeansCode::all()->keyBy('codigo');
 @endphp
 
 <x-layouts.app :title="$documento->numeral">
@@ -125,6 +129,47 @@
                 </div>
             </div>
 
+            @if (filled($paymentMeansList))
+                <div id="doc-show-payment-means" class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                        <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Payment means') }}</h3>
+                    </div>
+                    <div class="overflow-hidden">
+                        <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                            <thead class="bg-gray-50 dark:bg-neutral-700">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Payment form') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Payment method') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Due date') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                                @foreach ($paymentMeansList as $pago)
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $paymentFormLabels[$pago['id'] ?? ''] ?? $pago['id'] ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $paymentMeansCodeCatalog[$pago['codigo'] ?? '']->medio ?? $pago['codigo'] ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $pago['fecha_vencimiento'] ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            @if (filled($notas))
+                <div id="doc-show-notes" class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                        <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Notes') }}</h3>
+                    </div>
+                    <div class="p-4 flex flex-col gap-2 text-sm">
+                        @foreach ($notas as $nota)
+                            <div class="text-gray-800 dark:text-neutral-200">{{ $nota }}</div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if ($documento->status_message)
                 <div id="doc-show-dian-message" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
@@ -199,14 +244,6 @@
                         <span class="text-gray-800 dark:text-neutral-200">{{ $documento->total_formatted }}</span>
                     </div>
                     <flux:separator variant="subtle" />
-                    <div class="flex justify-between">
-                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment form') }}</span>
-                        <span class="text-gray-800 dark:text-neutral-200">{{ $paymentFormLabels[$documento->payment_means_id ?? ''] ?? $documento->payment_means_id ?? '—' }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment method') }}</span>
-                        <span class="text-gray-800 dark:text-neutral-200">{{ $paymentMeansCode->medio ?? $documento->payment_means_code ?? '—' }}</span>
-                    </div>
                     @if ($documento->is_credit)
                         <div class="flex justify-between items-center">
                             <span class="text-gray-500 dark:text-neutral-500">{{ __('Payment status') }}</span>
