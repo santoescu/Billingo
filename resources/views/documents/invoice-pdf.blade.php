@@ -43,15 +43,16 @@
         .col-tax { width: 16%; }
         .col-subtotal { width: 16%; }
 
-        .tax-summary { width: 55%; margin-top: 14px; }
-        .tax-summary td { padding: 3px 10px; font-size: 10.5px; }
-        .tax-summary th { padding: 3px 10px; font-size: 9px; text-transform: uppercase; color: #6b7280; text-align: left; }
-
         .totals { width: 45%; margin-left: 55%; margin-top: 14px; }
         .totals td { padding: 4px 10px; font-size: 12px; }
         .totals .total-row td { border-top: 1.5px solid #111827; padding-top: 8px; font-size: 15px; font-weight: bold; }
 
         .footer-note { margin-top: 16px; padding: 10px 14px; background-color: #f9fafb; border-radius: 4px; font-size: 9.5px; color: #6b7280; }
+
+        .notes { margin-top: 14px; clear: both; }
+        .notes-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; margin: 0 0 4px; }
+        .notes ul { margin: 0; padding-left: 14px; }
+        .notes li { font-size: 10.5px; margin: 2px 0; }
     </style>
 </head>
 @php
@@ -201,7 +202,15 @@
             @php
                 $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0);
                 $lineTaxes = collect($linea['impuestos'] ?? [])
-                    ->map(fn ($impuesto) => ($impuesto['nombre'] ?? '') . ' ' . rtrim(rtrim(number_format((float) ($impuesto['porcentaje'] ?? 0), 2, '.', ''), '0'), '.') . '%')
+                    ->map(function ($impuesto) {
+                        $nombre = $impuesto['nombre'] ?? '';
+
+                        if (($impuesto['per_unit_amount'] ?? null) !== null) {
+                            return $nombre . ' ' . number_format((float) $impuesto['per_unit_amount'], 2) . ' x ' . rtrim(rtrim(number_format((float) ($impuesto['base_unit_measure'] ?? 0), 2, '.', ''), '0'), '.');
+                        }
+
+                        return $nombre . ' ' . rtrim(rtrim(number_format((float) ($impuesto['porcentaje'] ?? 0), 2, '.', ''), '0'), '.') . '%';
+                    })
                     ->implode(', ');
             @endphp
             <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
@@ -214,40 +223,65 @@
         @endforeach
     </table>
 
-    @php $impuestos = $documento->payload['impuestos'] ?? []; @endphp
-    @if (! empty($impuestos))
-        <table class="tax-summary">
-            <tr>
-                <th>{{ __('Tax') }}</th>
-                <th class="end">{{ __('Rate') }}</th>
-                <th class="end">{{ __('Taxable base') }}</th>
-                <th class="end">{{ __('Value') }}</th>
-            </tr>
-            @foreach ($impuestos as $impuesto)
-                <tr>
-                    <td>{{ $impuesto['nombre'] ?? '—' }}</td>
-                    <td class="end">{{ rtrim(rtrim(number_format((float) ($impuesto['porcentaje'] ?? 0), 2, '.', ''), '0'), '.') }}%</td>
-                    <td class="end">{{ number_format((float) ($impuesto['taxable_amount'] ?? 0), 2) }}</td>
-                    <td class="end">{{ number_format((float) ($impuesto['tax_amount'] ?? 0), 2) }}</td>
-                </tr>
-            @endforeach
-        </table>
-    @endif
+    @php
+        $impuestos = $documento->payload['impuestos'] ?? [];
+        $cargosDescuentos = $documento->payload['cargos_descuentos'] ?? [];
+        $allowanceTotal = collect($cargosDescuentos)->where('tipo', 'descuento')->sum('amount');
+        $chargeTotal = collect($cargosDescuentos)->where('tipo', 'cargo')->sum('amount');
+    @endphp
 
     <table class="totals">
         <tr>
             <td class="muted">{{ __('Subtotal') }}</td>
             <td class="end">{{ number_format((float) $documento->subtotal, 2) }}</td>
         </tr>
+        @foreach ($impuestos as $impuesto)
+            @foreach (($impuesto['subtotals'] ?? []) as $subtotal)
+                @php
+                    $esNominal = ($subtotal['per_unit_amount'] ?? null) !== null;
+                    $rateLabel = $esNominal
+                        ? number_format((float) $subtotal['per_unit_amount'], 2) . ' x ' . rtrim(rtrim(number_format((float) ($subtotal['base_unit_measure'] ?? 0), 2, '.', ''), '0'), '.')
+                        : rtrim(rtrim(number_format((float) ($subtotal['porcentaje'] ?? 0), 2, '.', ''), '0'), '.') . '%';
+                @endphp
+                <tr>
+                    <td class="muted">{{ trim(($impuesto['nombre'] ?? '') . ' ' . $rateLabel) }}</td>
+                    <td class="end">{{ number_format((float) ($subtotal['tax_amount'] ?? 0), 2) }}</td>
+                </tr>
+            @endforeach
+        @endforeach
         <tr>
             <td class="muted">{{ __('Tax') }}</td>
             <td class="end">{{ number_format((float) $documento->tax_total, 2) }}</td>
         </tr>
+        @if ($allowanceTotal > 0)
+            <tr>
+                <td class="muted">{{ __('Discount') }}</td>
+                <td class="end">-{{ number_format((float) $allowanceTotal, 2) }}</td>
+            </tr>
+        @endif
+        @if ($chargeTotal > 0)
+            <tr>
+                <td class="muted">{{ __('Charge') }}</td>
+                <td class="end">{{ number_format((float) $chargeTotal, 2) }}</td>
+            </tr>
+        @endif
         <tr class="total-row">
             <td>{{ __('Total') }}</td>
             <td class="end">{{ $documento->total_formatted }}</td>
         </tr>
     </table>
+
+    @php $notas = array_filter($documento->payload['notas'] ?? []); @endphp
+    @if (! empty($notas))
+        <div class="notes">
+            <p class="notes-title">{{ __('Notes') }}</p>
+            <ul>
+                @foreach ($notas as $nota)
+                    <li>{{ $nota }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <p class="footer-note">{{ __('This document is the graphic representation of a :type, generated in accordance with DIAN regulations. Scan the QR code to verify it in the DIAN catalog.', ['type' => $documentTypeLabels[$documento->tipo_documento ?? ''] ?? $documento->tipo_documento]) }}</p>
 </body>
