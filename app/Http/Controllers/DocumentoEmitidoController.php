@@ -15,6 +15,7 @@ use App\Models\PriceType;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\Resolution;
+use App\Models\Tributo;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
@@ -149,6 +150,7 @@ class DocumentoEmitidoController extends Controller
         $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
         $departments = Department::orderBy('descripcion')->get();
         $fiscalResponsibilities = FiscalResponsibility::orderBy('codigo')->get();
+        $tributos = Tributo::orderBy('codigo')->get();
 
         $clients = $company->clients()->orderBy('name')->get()->map($this->mapClientForJs(...));
 
@@ -174,6 +176,7 @@ class DocumentoEmitidoController extends Controller
             'measurementUnits',
             'departments',
             'fiscalResponsibilities',
+            'tributos',
             'clients',
             'priceTypes',
             'quotationPrefill',
@@ -266,7 +269,18 @@ class DocumentoEmitidoController extends Controller
                 'warehouse_id' => $linea['bodega_id'] ?? null,
                 'unit_price' => (float) ($linea['precio_unitario'] ?? 0),
                 'descuento' => $this->firstLineDiscountForEditing($linea['cargos_descuentos'] ?? []),
-                'impuestos' => $linea['impuestos'] ?? [],
+                // "lineas.impuestos" ya guardado usa el shape interno de DocumentTotalsCalculator
+                // ("codigo", "per_unit_amount", "base_unit_measure"), pero el JS de esta pantalla
+                // espera el shape del mini formulario "agregar impuesto" ("tipo", "valor_unitario",
+                // "cantidad_base") -- se traduce acá antes de mandarlo al JS.
+                'impuestos' => collect($linea['impuestos'] ?? [])->map(fn (array $impuesto) => [
+                    'tipo' => $impuesto['tipo'] ?? $impuesto['codigo'] ?? null,
+                    'nombre' => $impuesto['nombre'] ?? null,
+                    'porcentaje' => $impuesto['porcentaje'] ?? 0,
+                    'base_gravable' => $impuesto['base_gravable'] ?? null,
+                    'valor_unitario' => $impuesto['per_unit_amount'] ?? null,
+                    'cantidad_base' => $impuesto['base_unit_measure'] ?? null,
+                ])->all(),
                 'mandante' => ! empty($linea['mandante']) ? [
                     'tipo_identificacion' => $linea['mandante']['scheme_name'] ?? null,
                     'identificacion' => $linea['mandante']['id'] ?? null,
@@ -749,8 +763,10 @@ class DocumentoEmitidoController extends Controller
             'items.*.descuento_motivo' => ['nullable', 'string', 'max:255'],
             'items.*.impuestos' => ['nullable', 'array'],
             'items.*.impuestos.*.tipo' => ['required_with:items.*.impuestos', 'string', 'max:5'],
-            'items.*.impuestos.*.porcentaje' => ['required_with:items.*.impuestos', 'numeric', 'min:0'],
+            'items.*.impuestos.*.porcentaje' => ['nullable', 'numeric', 'min:0'],
             'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
+            'items.*.impuestos.*.valor_unitario' => ['nullable', 'numeric', 'min:0'],
+            'items.*.impuestos.*.cantidad_base' => ['nullable', 'numeric', 'min:0'],
             'items.*.mandante_tipo_identificacion' => ['required_with:items.*.mandante_identificacion', 'nullable', 'string', 'max:2'],
             'items.*.mandante_identificacion' => ['required_with:items.*.mandante_tipo_identificacion', 'nullable', 'string', 'max:20'],
             'items.*.marca' => ['nullable', 'string', 'max:100'],
@@ -1237,37 +1253,7 @@ class DocumentoEmitidoController extends Controller
         // la DIAN espera (contado en efectivo) en vez de dejar el campo sin mandar.
         $document['PaymentMeans'] = ! empty($paymentMeans) ? $paymentMeans : [['ID' => '1', 'PaymentMeansCode' => '10']];
 
-        $cargoTipos = $data['cargo_tipo'] ?? [];
-        $cargoMotivos = $data['cargo_motivo'] ?? [];
-        $cargoValorTipos = $data['cargo_valor_tipo'] ?? [];
-        $cargoValores = $data['cargo_valor'] ?? [];
-        $cargoRowCount = max(count($cargoTipos), count($cargoMotivos), count($cargoValorTipos), count($cargoValores));
-
-        $cargos = [];
-        if ($cargoRowCount > 0) {
-            $baseAmount = $this->calculateLineExtensionSubtotal($data['items']);
-
-            for ($i = 0; $i < $cargoRowCount; $i++) {
-                if (empty($cargoMotivos[$i]) || ! isset($cargoValores[$i]) || $cargoValores[$i] === '') {
-                    continue;
-                }
-
-                $esCargo = ($cargoTipos[$i] ?? 'descuento') === 'cargo';
-                $esPorcentaje = ($cargoValorTipos[$i] ?? 'fijo') === 'porcentaje';
-                $porcentaje = $esPorcentaje ? (float) $cargoValores[$i] : 0.0;
-                $amount = $esPorcentaje ? round($baseAmount * ($porcentaje / 100), 2) : (float) $cargoValores[$i];
-
-                $cargos[] = [
-                    'ChargeIndicator' => $esCargo,
-                    'AllowanceChargeReasonCode' => $esCargo ? '02' : '00',
-                    'AllowanceChargeReason' => $cargoMotivos[$i],
-                    'MultiplierFactorNumeric' => $porcentaje,
-                    'Amount' => $amount,
-                    'BaseAmount' => $baseAmount,
-                ];
-            }
-        }
-
+        $cargos = $this->buildCargosPayload($data);
         if (! empty($cargos)) {
             $document['AllowanceCharge'] = $cargos;
         }
@@ -1275,6 +1261,145 @@ class DocumentoEmitidoController extends Controller
         $document['LegalMonetaryTotal'] = $this->calculateLegalMonetaryTotal($document);
 
         return $document;
+    }
+
+    /**
+     * Traduce las filas paralelas "cargo_tipo[]"/"cargo_motivo[]"/"cargo_valor_tipo[]"/
+     * "cargo_valor[]" del formulario web al shape "document.AllowanceCharge" que espera
+     * DocumentJsonMapper -- separado de buildDocumentJson() para poder reusarlo en totals()
+     * (que no arma el documento completo, solo necesita los cargos para calcular el total).
+     *
+     * @param  array  $data  Datos ya validados de la petición (items + cargo_*).
+     * @return array Bloque "document.AllowanceCharge".
+     */
+    private function buildCargosPayload(array $data): array
+    {
+        $cargoTipos = $data['cargo_tipo'] ?? [];
+        $cargoMotivos = $data['cargo_motivo'] ?? [];
+        $cargoValorTipos = $data['cargo_valor_tipo'] ?? [];
+        $cargoValores = $data['cargo_valor'] ?? [];
+        $cargoRowCount = max(count($cargoTipos), count($cargoMotivos), count($cargoValorTipos), count($cargoValores));
+
+        if ($cargoRowCount === 0) {
+            return [];
+        }
+
+        $baseAmount = $this->calculateLineExtensionSubtotal($data['items']);
+        $cargos = [];
+
+        for ($i = 0; $i < $cargoRowCount; $i++) {
+            if (empty($cargoMotivos[$i]) || ! isset($cargoValores[$i]) || $cargoValores[$i] === '') {
+                continue;
+            }
+
+            $esCargo = ($cargoTipos[$i] ?? 'descuento') === 'cargo';
+            $esPorcentaje = ($cargoValorTipos[$i] ?? 'fijo') === 'porcentaje';
+            $porcentaje = $esPorcentaje ? (float) $cargoValores[$i] : 0.0;
+            $amount = $esPorcentaje ? round($baseAmount * ($porcentaje / 100), 2) : (float) $cargoValores[$i];
+
+            $cargos[] = [
+                'ChargeIndicator' => $esCargo,
+                'AllowanceChargeReasonCode' => $esCargo ? '02' : '00',
+                'AllowanceChargeReason' => $cargoMotivos[$i],
+                'MultiplierFactorNumeric' => $porcentaje,
+                'Amount' => $amount,
+                'BaseAmount' => $baseAmount,
+            ];
+        }
+
+        return $cargos;
+    }
+
+    /**
+     * Calcula subtotal, impuestos agrupados y totales del documento en base a las líneas y
+     * cargos/descuentos que el usuario ya llenó en el panel -- para la sección "Totales" que se
+     * actualiza en vivo mientras arma la factura, sin tener que llenar cliente/resolución/forma
+     * de pago primero (a diferencia de preview(), que sí arma el documento completo). Cualquier
+     * estado a medio llenar (ej. un impuesto sin base_gravable todavía) simplemente no actualiza
+     * los totales en vez de mostrar un error, porque esto se llama en cada tecla.
+     */
+    public function totals(Request $request)
+    {
+        try {
+            // Esta ruta no está bajo "api/*" (ver bootstrap/app.php) -- sin este catch, una
+            // ValidationException se le escapa al manejador global, que acá responde con un
+            // redirect normal (302) en vez de JSON, sin importar el header "Accept". El fetch()
+            // de la sección "Totales" seguía ese redirect y nunca actualizaba nada (mismo
+            // problema ya documentado en preview()).
+            $data = $request->validate([
+                'items' => ['required', 'array', 'min:1'],
+                'items.*.codigo' => ['nullable', 'string', 'max:50'],
+                'items.*.descripcion' => ['nullable', 'string', 'max:500'],
+                'items.*.unidad_medida' => ['nullable', 'string', 'max:10'],
+                // La línea vacía que se auto-agrega al final del panel (para escribir el
+                // siguiente producto) deshabilita su input de cantidad hasta que se elija un
+                // producto (ver updateCantidadLimits()) -- un <input disabled> no se manda en el
+                // FormData, así que esa línea llega sin "cantidad" del todo. No puede ser
+                // "required" acá; se descarta más abajo (array_filter) en vez de rechazarse.
+                'items.*.cantidad' => ['nullable', 'numeric', 'min:0'],
+                'items.*.precio_unitario' => ['nullable', 'numeric', 'min:0'],
+                'items.*.descuento_valor_tipo' => ['nullable', 'string', 'in:porcentaje,fijo'],
+                'items.*.descuento_valor' => ['nullable', 'numeric', 'min:0'],
+                'items.*.descuento_motivo' => ['nullable', 'string', 'max:255'],
+                'items.*.impuestos' => ['nullable', 'array'],
+                'items.*.impuestos.*.tipo' => ['required_with:items.*.impuestos', 'string', 'max:5'],
+                'items.*.impuestos.*.porcentaje' => ['nullable', 'numeric', 'min:0'],
+                'items.*.impuestos.*.base_gravable' => ['nullable', 'numeric', 'min:0'],
+                'items.*.impuestos.*.valor_unitario' => ['nullable', 'numeric', 'min:0'],
+                'items.*.impuestos.*.cantidad_base' => ['nullable', 'numeric', 'min:0'],
+                'cargo_tipo' => ['nullable', 'array'],
+                'cargo_tipo.*' => ['nullable', 'string', 'in:cargo,descuento'],
+                'cargo_motivo' => ['nullable', 'array'],
+                'cargo_motivo.*' => ['nullable', 'string', 'max:255'],
+                'cargo_valor_tipo' => ['nullable', 'array'],
+                'cargo_valor_tipo.*' => ['nullable', 'string', 'in:porcentaje,fijo'],
+                'cargo_valor' => ['nullable', 'array'],
+                'cargo_valor.*' => ['nullable', 'numeric', 'min:0'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['ok' => false]);
+        }
+
+        $data['items'] = array_values(array_map(
+            fn (array $item) => array_merge(['codigo' => '', 'descripcion' => ''], $item),
+            array_filter($data['items'], fn (array $item) => (float) ($item['cantidad'] ?? 0) > 0 && (float) ($item['precio_unitario'] ?? 0) >= 0)
+        ));
+
+        if (empty($data['items'])) {
+            return response()->json(['ok' => false]);
+        }
+
+        try {
+            $lines = array_map(fn (array $item, int $index) => $this->buildInvoiceLine($item, $index), $data['items'], array_keys($data['items']));
+
+            $mapper = new DocumentJsonMapper();
+            $mappedLines = $mapper->mapLines($lines);
+            $mappedCargos = $mapper->mapCargosDescuentos($this->buildCargosPayload($data));
+
+            $calculo = (new DocumentTotalsCalculator())->calcularTotalesDocumento($mappedLines, $mappedCargos);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['ok' => false]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            // "tax_exclusive_amount" es la base imponible (regla FAU04: solo el primer tributo
+            // de cada línea) -- no es lo mismo que "Subtotal" (cantidad x precio de todas las
+            // líneas, ya con descuentos de línea aplicados). Para la sección "Totales" del panel
+            // se usa "line_extension_amount", que sí es ese subtotal.
+            'subtotal' => $calculo['line_extension_amount'],
+            'impuestos' => $calculo['impuestos'],
+            // OJO: NO restar "tax_exclusive_amount" acá -- esa es la base imponible (regla
+            // FAU04, solo el primer tributo de cada línea), no la suma de los impuestos. Si
+            // una línea no tiene ningún impuesto, su base imponible es $0, y "tax_inclusive -
+            // tax_exclusive" terminaría reportando el subtotal ENTERO como si fuera impuesto.
+            // "tax_inclusive_amount" ya es "line_extension_amount + suma de impuestos", así que
+            // restarle "line_extension_amount" da la suma de impuestos real.
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['line_extension_amount'], 2),
+            'allowance_total_amount' => $calculo['totales']['allowance_total_amount'],
+            'charge_total_amount' => $calculo['totales']['charge_total_amount'],
+            'total' => $calculo['totales']['payable_amount'],
+        ]);
     }
 
     /**
@@ -1445,21 +1570,36 @@ class DocumentoEmitidoController extends Controller
         $line['LineExtensionAmount'] = $lineExtensionAmount;
 
         if (! empty($item['impuestos'])) {
-            $taxSubtotals = array_map(function (array $impuesto) use ($lineExtensionAmount) {
+            $nominalCodes = Tributo::nominalCodes();
+
+            $taxSubtotals = array_map(function (array $impuesto) use ($lineExtensionAmount, $nominalCodes) {
+                $tipo = $impuesto['tipo'];
+                $esNominal = in_array($tipo, $nominalCodes, true);
                 $taxableAmount = isset($impuesto['base_gravable']) && $impuesto['base_gravable'] !== ''
                     ? (float) $impuesto['base_gravable']
                     : $lineExtensionAmount;
-                $percent = (float) $impuesto['porcentaje'];
 
-                return [
-                    'codigo' => $impuesto['tipo'],
+                $subtotal = [
+                    'codigo' => $tipo,
                     'TaxableAmount' => $taxableAmount,
-                    'TaxAmount' => round($taxableAmount * ($percent / 100), 2),
                     'TaxCategory' => [
-                        'Percent' => $percent,
-                        'TaxScheme' => ['ID' => $impuesto['tipo'], 'Name' => $impuesto['nombre'] ?? (new DocumentTotalsCalculator())->nombreImpuesto($impuesto['tipo'])],
+                        'Percent' => $esNominal ? 0 : (float) $impuesto['porcentaje'],
+                        'TaxScheme' => ['ID' => $tipo, 'Name' => $impuesto['nombre'] ?? (new DocumentTotalsCalculator())->nombreImpuesto($tipo)],
                     ],
                 ];
+
+                if ($esNominal) {
+                    $perUnitAmount = (float) ($impuesto['valor_unitario'] ?? throw new InvalidArgumentException("El tributo \"{$tipo}\" es nominal, falta el valor por unidad."));
+                    $baseUnitMeasure = (float) ($impuesto['cantidad_base'] ?? throw new InvalidArgumentException("El tributo \"{$tipo}\" es nominal, falta la cantidad base."));
+                    $subtotal['PerUnitAmount'] = $perUnitAmount;
+                    $subtotal['BaseUnitMeasure'] = $baseUnitMeasure;
+                    $subtotal['TaxAmount'] = round($perUnitAmount * $baseUnitMeasure, 2);
+                } else {
+                    $percent = (float) $impuesto['porcentaje'];
+                    $subtotal['TaxAmount'] = round($taxableAmount * ($percent / 100), 2);
+                }
+
+                return $subtotal;
             }, $item['impuestos']);
 
             // Un bloque "TaxTotal" por cada tributo distinto (anexo técnico, regla

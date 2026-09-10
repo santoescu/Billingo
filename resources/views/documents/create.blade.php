@@ -377,39 +377,60 @@
                 <div class="w-10"></div>
             </div>
             <div id="documentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
-            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-700 flex justify-end items-center gap-3">
+            {{-- Fuera de POS, este total lo reemplaza la sección "Totales" (más completa, con
+                 impuestos desglosados) -- acá se deja oculto pero vivo, porque
+                 updatePosChange() sigue leyendo su "dataset.raw" para el cambio en efectivo. --}}
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-700 flex justify-end items-center gap-3 {{ ($posMode ?? false) ? '' : 'hidden' }}">
                 <span class="text-sm font-medium text-gray-600 dark:text-neutral-400">{{ __('Total') }}</span>
                 <span id="documentLinesTotal" class="text-sm font-semibold text-gray-800 dark:text-neutral-200">$0.00</span>
             </div>
         </div>
 
-        <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
-            <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
-                <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Payment') }}</h3>
-                <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addPaymentLine()">{{ __('Add payment') }}</flux:button>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="{{ ($posMode ?? false) ? 'lg:col-span-3' : 'lg:col-span-2' }} border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Payment') }}</h3>
+                    <flux:button type="button" size="sm" variant="filled" icon="plus" onclick="addPaymentLine()">{{ __('Add payment') }}</flux:button>
+                </div>
+
+                <div id="paymentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
+
+                @if ($posMode ?? false)
+                    <div id="pos-cash-section" class="hidden p-4 border-t border-gray-200 dark:border-neutral-700 flex flex-wrap items-end gap-4">
+                        <div class="w-48">
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-efectivo-display">{{ __('Cash received') }}</label>
+                            <div class="relative">
+                                <input type="hidden" id="pos-efectivo-hidden" name="efectivo_recibido" value="">
+                                <input type="text" inputmode="decimal" id="pos-efectivo-display"
+                                    class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
+                                <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-48">
+                            <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Change') }}</span>
+                            <span id="pos-change-display" class="block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            <div id="paymentLinesBody" class="divide-y divide-gray-200 dark:divide-neutral-700"></div>
-
-            @if ($posMode ?? false)
-                <div id="pos-cash-section" class="hidden p-4 border-t border-gray-200 dark:border-neutral-700 flex flex-wrap items-end gap-4">
-                    <div class="w-48">
-                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-efectivo-display">{{ __('Cash received') }}</label>
-                        <div class="relative">
-                            <input type="hidden" id="pos-efectivo-hidden" name="efectivo_recibido" value="">
-                            <input type="text" inputmode="decimal" id="pos-efectivo-display"
-                                class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
-                            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
-                                <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+            @unless ($posMode ?? false)
+                <div class="lg:col-span-1 border border-gray-200 rounded-lg dark:border-neutral-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                        <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Totals') }}</h3>
+                    </div>
+                    <div class="p-4">
+                        <div id="documentTotalsRows" class="space-y-2 text-sm">
+                            <div class="flex items-center justify-between gap-4">
+                                <span class="text-zinc-600 dark:text-neutral-400">{{ __('Total') }}</span>
+                                <span class="text-zinc-700 dark:text-zinc-300">$0.00</span>
                             </div>
                         </div>
                     </div>
-                    <div class="w-48">
-                        <span class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Change') }}</span>
-                        <span id="pos-change-display" class="block text-sm font-semibold text-gray-800 dark:text-neutral-200 h-10 leading-10">$0.00</span>
-                    </div>
                 </div>
-            @endif
+            @endunless
         </div>
 
         <div class="border border-gray-200 rounded-lg dark:border-neutral-700 {{ ($posMode ?? false) ? 'hidden' : '' }}">
@@ -776,12 +797,18 @@
                                 <div>
                                     <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Tax') }}</label>
                                     <select class="line-newtax-tipo hidden" data-hs-select='{!! $basicSelectConfig !!}'>
-                                        <option value="01" selected>01 - IVA</option>
-                                        <option value="03">03 - ICA</option>
-                                        <option value="04">04 - INC</option>
+                                        @foreach ($tributos as $tributo)
+                                            <option value="{{ $tributo->codigo }}" data-nominal="{{ $tributo->es_nominal ? '1' : '0' }}" @selected($tributo->codigo === '01')>{{ $tributo->codigo }} - {{ $tributo->nombre }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
-                                <div>
+                                <div class="line-newtax-porcentaje-select-group hidden">
+                                    <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Percentage') }}</label>
+                                    <select class="line-newtax-porcentaje-select hidden" data-hs-select='{!! $basicSelectConfig !!}'>
+                                        <option value="19" selected>19%</option>
+                                    </select>
+                                </div>
+                                <div class="line-newtax-porcentaje-group">
                                     <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Percentage') }}</label>
                                     <div class="relative">
                                         <input type="hidden" class="line-newtax-porcentaje" value="19">
@@ -789,6 +816,23 @@
                                         <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
                                             <span class="text-xs text-zinc-500 dark:text-zinc-400">%</span>
                                         </div>
+                                    </div>
+                                </div>
+                                <div class="line-newtax-nominal-group hidden space-y-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Unit value') }}</label>
+                                        <div class="relative">
+                                            <input type="hidden" class="line-newtax-valorunitario" value="">
+                                            <input type="text" inputmode="decimal" class="line-newtax-valorunitario-display h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
+                                            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
+                                                <span class="text-xs text-zinc-500 dark:text-zinc-400">$</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Base quantity') }}</label>
+                                        <input type="hidden" class="line-newtax-basemedida" value="">
+                                        <input type="text" inputmode="decimal" class="line-newtax-basemedida-display h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent" placeholder="0">
                                     </div>
                                 </div>
                                 <div>
@@ -862,6 +906,8 @@
                 <input type="hidden" class="line-tax-tipo" name="items[__LINEINDEX__][impuestos][__TAXINDEX__][tipo]">
                 <input type="hidden" class="line-tax-porcentaje" name="items[__LINEINDEX__][impuestos][__TAXINDEX__][porcentaje]">
                 <input type="hidden" class="line-tax-base" name="items[__LINEINDEX__][impuestos][__TAXINDEX__][base_gravable]">
+                <input type="hidden" class="line-tax-valor-unitario" name="items[__LINEINDEX__][impuestos][__TAXINDEX__][valor_unitario]">
+                <input type="hidden" class="line-tax-cantidad-base" name="items[__LINEINDEX__][impuestos][__TAXINDEX__][cantidad_base]">
                 <span class="line-tax-label font-medium"></span>
                 <button type="button" class="text-zinc-400 hover:text-red-600 dark:hover:text-red-400 focus:outline-hidden" aria-label="{{ __('Delete') }}" onclick="removeLineTax(this)">
                     <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
@@ -1726,7 +1772,86 @@
                     }
                 }
 
-                const taxNames = { '01': 'IVA', '03': 'ICA', '04': 'INC' };
+                const taxNames = @json($tributos->pluck('nombre', 'codigo'));
+                const nominalTributos = @json($tributos->where('es_nominal', true)->pluck('codigo')->values());
+                const taxTarifas = @json($tributos->pluck('tarifas', 'codigo'));
+
+                /**
+                 * Tributos con tarifa(s) fija(s) en el catálogo (ver
+                 * SeedTributos.php) -- para esos, el porcentaje se elige de una
+                 * lista en vez de escribirse a mano.
+                 * @param {string} tipo
+                 * @returns {boolean}
+                 */
+                function tieneTarifasFijas(tipo) {
+                    return ! nominalTributos.includes(tipo) && (taxTarifas[tipo] || []).length > 0;
+                }
+
+                /**
+                 * Muestra el campo correcto para la tarifa del impuesto elegido
+                 * en el mini formulario "agregar impuesto": una lista de
+                 * porcentajes si el tributo trae tarifas fijas en el catálogo,
+                 * un campo de texto libre si no (ej. ICA, ReteRenta -- varían
+                 * por municipio/concepto y no están en el anexo técnico), o los
+                 * campos "Valor por unidad"/"Cantidad base" si es nominal (ver
+                 * Tributo::nominalCodes()) -- estos últimos se calculan distinto
+                 * (PerUnitAmount x BaseUnitMeasure en vez de Percent x
+                 * TaxableAmount).
+                 * @param {HTMLElement} select
+                 * @returns {void}
+                 */
+                window.updateNewTaxFieldsVisibility = function (select) {
+                    const panel = select.closest('.hs-dropdown-menu');
+                    const tipo = select.value;
+                    const esNominal = nominalTributos.includes(tipo);
+                    const conTarifas = tieneTarifasFijas(tipo);
+
+                    panel.querySelector('.line-newtax-nominal-group').classList.toggle('hidden', ! esNominal);
+                    panel.querySelector('.line-newtax-porcentaje-select-group').classList.toggle('hidden', ! conTarifas);
+                    panel.querySelector('.line-newtax-porcentaje-group').classList.toggle('hidden', esNominal || conTarifas);
+
+                    if (conTarifas) {
+                        const tarifaSelect = panel.querySelector('.line-newtax-porcentaje-select');
+                        const tarifas = taxTarifas[tipo] || [];
+                        const porDefecto = tipo === '01' && tarifas.includes(19) ? 19 : tarifas[tarifas.length - 1];
+
+                        // Este botón "Agregar impuesto" se abre con el mismo click que dispara
+                        // prefillNewTaxBase() (que llama esta función) -- si HSSelect mide el
+                        // ancho de las opciones ANTES de que Preline termine de abrir el
+                        // ".hs-dropdown-menu" (todavía "opacity-0 hidden" en ese instante), el
+                        // widget queda armado con ancho 0 y no se ve/no responde. Se difiere al
+                        // siguiente tick para que el dropdown ya esté visible al medir.
+                        setTimeout(() => {
+                            rebuildSelect(tarifaSelect, tarifas.map((tarifa) => ({ value: String(tarifa), label: tarifa + '%' })));
+                            setSelectValue(tarifaSelect, String(porDefecto));
+                        }, 0);
+                    }
+                };
+
+                /**
+                 * Arma el texto del badge de un impuesto de línea -- porcentual
+                 * ("19% · $100.000") o nominal ("IBUA $65 x 12", ver
+                 * Tributo::nominalCodes()).
+                 * @param {string} tipo
+                 * @param {number} porcentaje
+                 * @param {number|null} base
+                 * @param {number|null} valorUnitario
+                 * @param {number|null} cantidadBase
+                 * @returns {string}
+                 */
+                function formatTaxBadgeLabel(tipo, porcentaje, base, valorUnitario, cantidadBase) {
+                    const nombre = taxNames[tipo] || tipo;
+
+                    if (nominalTributos.includes(tipo)) {
+                        const valorLabel = formatMoney(valorUnitario || 0);
+                        const cantidadLabel = (cantidadBase || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        return nombre + ' ' + valorLabel + ' x ' + cantidadLabel;
+                    }
+
+                    const porcentajeLabel = porcentaje.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                    const baseLabel = base !== null ? ' · ' + formatMoney(base) : '';
+                    return nombre + ' ' + porcentajeLabel + '%' + baseLabel;
+                }
 
                 /**
                  * Reposiciona el botón "Agregar impuesto" de una línea según
@@ -1819,7 +1944,7 @@
                     form.addEventListener('submit', async (event) => {
                         event.preventDefault();
 
-                        const formData = new FormData(form);
+                        const formData = buildDocumentFormData(form);
 
                         try {
                             const response = await fetch(form.action, {
@@ -2007,7 +2132,7 @@
                         setButtonLoading(submitBtn, '{{ __('Loading preview...') }}');
 
                         try {
-                            const formData = new FormData(form);
+                            const formData = buildDocumentFormData(form);
                             const response = await fetch('{{ route('documents.preview') }}', {
                                 method: 'POST',
                                 headers: {
@@ -2044,7 +2169,7 @@
                     confirmBtn.addEventListener('click', async () => {
                         setButtonLoading(confirmBtn, '{{ __('Sending...') }}');
 
-                        const formData = new FormData(form);
+                        const formData = buildDocumentFormData(form);
 
                         try {
                             const response = await fetch(form.action, {
@@ -2082,6 +2207,27 @@
                             resetConfirmButton();
                         }
                     });
+
+                    // Al emitir, se navega a la página del documento ya creado
+                    // (window.location.href = data.redirect_url). Si el usuario después usa el
+                    // botón "Atrás" del navegador, muchos navegadores restauran esta página desde
+                    // la bfcache tal cual quedó ANTES de emitir -- con el botón de envío todavía
+                    // deshabilitado ("Procesando...") y a veces el modal de vista previa abierto,
+                    // sin que nada de eso se vuelva a ejecutar. Ahí es donde el formulario
+                    // "parece" no dejar agregar productos (el modal tapa la pantalla, o el botón
+                    // de envío ya no responde) -- se resetea todo al volver desde la bfcache.
+                    window.addEventListener('pageshow', (event) => {
+                        if (! event.persisted) {
+                            return;
+                        }
+
+                        resetSubmitButton();
+                        resetConfirmButton();
+
+                        if (window.HSOverlay) {
+                            HSOverlay.close('#document-preview-modal');
+                        }
+                    });
                 }
 
                 /**
@@ -2114,30 +2260,47 @@
                 }
 
                 /**
-                 * Quita del formulario, justo antes de enviarlo, la línea de
-                 * producto vacía que siempre queda al final (esperando el
+                 * Arma el FormData del formulario de documento, excluyendo
+                 * los campos de cualquier línea sin producto elegido (la
+                 * fila vacía que siempre queda al final, esperando el
                  * siguiente producto que se busque -- se agrega sola al
                  * elegir un producto, ver applyProduct()). Si el usuario
                  * emite el documento sin llenarla, no debe mandarse al
                  * servidor como si fuera un ítem real (descripción vacía,
-                 * cantidad 0); se quita solo al enviar, nunca antes, porque
-                 * mientras se sigue editando sigue siendo el lugar donde
-                 * buscar el próximo producto.
-                 * @returns {void}
+                 * cantidad 0).
+                 *
+                 * Antes esto se hacía quitando la fila del DOM en el
+                 * "submit" del formulario -- pero la vista previa
+                 * (initDocumentAjaxSubmit) también dispara "submit" (con
+                 * preventDefault, sin navegar a ningún lado), así que la
+                 * fila desaparecía del DOM para siempre apenas se
+                 * previsualizaba, sin dejar ningún buscador de producto para
+                 * seguir agregando líneas. Ahora se excluye solo del
+                 * FormData que se manda, sin tocar el DOM -- así la fila
+                 * sigue ahí para seguir editando pase lo que pase (vista
+                 * previa, error de envío, etc.).
+                 * @param {HTMLFormElement} form
+                 * @returns {FormData}
                  */
-                function initEmptyLineSubmitCleanup() {
-                    const form = document.getElementById('documentForm');
-                    if (! form) {
-                        return;
-                    }
+                function buildDocumentFormData(form) {
+                    const formData = new FormData(form);
+                    const emptyLineIndexes = [];
 
-                    form.addEventListener('submit', () => {
-                        document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
-                            if (row.dataset.productPicked !== 'true') {
-                                row.remove();
+                    document.querySelectorAll('#documentLinesBody .document-line').forEach((row) => {
+                        if (row.dataset.productPicked !== 'true') {
+                            emptyLineIndexes.push(row.dataset.lineIndex);
+                        }
+                    });
+
+                    if (emptyLineIndexes.length) {
+                        Array.from(formData.keys()).forEach((key) => {
+                            if (emptyLineIndexes.some((index) => key.startsWith('items[' + index + ']'))) {
+                                formData.delete(key);
                             }
                         });
-                    });
+                    }
+
+                    return formData;
                 }
 
                 /**
@@ -2419,6 +2582,204 @@
                     totalEl.textContent = formatMoney(total);
                     totalEl.dataset.raw = total;
                     updatePosChange?.();
+                    refreshDocumentTotals();
+                }
+
+                const documentTotalsUrl = '{{ route('documents.totals') }}';
+                let documentTotalsDebounce = null;
+
+                /**
+                 * Recalcula subtotal/impuestos/total en el servidor (mismas
+                 * reglas de DocumentTotalsCalculator que usa el PDF, en vez de
+                 * reimplementar los porcentajes/nominales/cargos a mano en JS)
+                 * y actualiza la sección "Totales" -- se llama en cada cambio
+                 * relevante, con debounce para no pegarle al servidor en cada
+                 * tecla. Estados a medio llenar (ej. un impuesto sin base
+                 * todavía) simplemente no actualizan nada, sin mostrar error.
+                 * No aplica en POS (ver "$posMode" en el blade): esa pantalla
+                 * no muestra esta sección. Nunca debe poder tirar una
+                 * excepción hacia el caller (recalcLine()/recalcTotal() la
+                 * llaman en medio de flujos que sí importan, como
+                 * applyProduct() agregando la siguiente línea en blanco) --
+                 * por eso todo el cuerpo va en try/catch.
+                 * @returns {void}
+                 */
+                function refreshDocumentTotals() {
+                    try {
+                        if (! document.getElementById('documentTotalsRows')) {
+                            return;
+                        }
+
+                        clearTimeout(documentTotalsDebounce);
+                        documentTotalsDebounce = setTimeout(() => {
+                            try {
+                                const form = document.getElementById('documentForm');
+                                const formData = new FormData(form);
+
+                                fetch(documentTotalsUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        'Accept': 'application/json',
+                                    },
+                                    body: formData,
+                                })
+                                    .then((response) => response.ok ? response.json() : null)
+                                    .then((data) => {
+                                        if (! data || ! data.ok) {
+                                            return;
+                                        }
+
+                                        renderDocumentTotals(data);
+                                    })
+                                    .catch(() => {});
+                            } catch (error) {
+                                // no-op -- esta sección nunca debe romper el resto del formulario.
+                            }
+                        }, 400);
+                    } catch (error) {
+                        // no-op -- esta sección nunca debe romper el resto del formulario.
+                    }
+                }
+
+                /**
+                 * Arma la lista de filas de la sección "Totales": un
+                 * "Subtotal {tarifa}"/"Subtotal {tributo} {tarifa}" por cada
+                 * tarifa distinta que aparezca en el documento (ej. "Subtotal
+                 * 19%" con la base, "Subtotal IVA 19%" con el valor del
+                 * impuesto), más Impuestos/Descuento/Cargo/Total -- mismo
+                 * criterio visual que otros sistemas de facturación (columna
+                 * de etiqueta + valor en caja gris), en vez de una tabla de
+                 * columnas fija.
+                 * @param {object} data Respuesta de documents.totals ("ok:true").
+                 * @returns {void}
+                 */
+                function renderDocumentTotals(data) {
+                    const impuestos = data.impuestos || [];
+                    const rows = [totalsRow('{{ __('Subtotal') }}', formatMoney(data.subtotal))];
+
+                    impuestos.forEach((impuesto) => {
+                        const nombre = impuesto.nombre || impuesto.codigo || '';
+
+                        (impuesto.subtotals || []).forEach((sub) => {
+                            const esNominal = sub.per_unit_amount !== null && sub.per_unit_amount !== undefined;
+                            const rateLabel = esNominal
+                                ? (formatMoney(sub.per_unit_amount) + ' x ' + (parseFloat(sub.base_unit_measure) || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }))
+                                : (parseFloat(sub.porcentaje) || 0) + '%';
+
+                            rows.push(totalsPlainRow(nombre + ' ' + rateLabel, formatMoney(sub.tax_amount)));
+                        });
+                    });
+
+                    rows.push(totalsTaxRow('{{ __('Tax') }}', formatMoney(data.tax_total), impuestos));
+
+                    if (data.allowance_total_amount) {
+                        rows.push(totalsRow('{{ __('Discount') }}', '-' + formatMoney(data.allowance_total_amount)));
+                    }
+                    if (data.charge_total_amount) {
+                        rows.push(totalsRow('{{ __('Charge') }}', formatMoney(data.charge_total_amount)));
+                    }
+
+                    rows.push(totalsRow('{{ __('Total') }}', formatMoney(data.total), true));
+
+                    document.getElementById('documentTotalsRows').innerHTML = rows.join('');
+                }
+
+                /**
+                 * Una fila "etiqueta / valor en caja gris" de la sección
+                 * "Totales" (ver renderDocumentTotals()).
+                 * @param {string} label
+                 * @param {string} value
+                 * @param {boolean} [strong] Fila final ("Total"), con borde y en negrita.
+                 * @returns {string}
+                 */
+                function totalsRow(label, value, strong) {
+                    return '<div class="flex items-center justify-between gap-4' + (strong ? ' pt-2 border-t border-gray-200 dark:border-neutral-700' : '') + '">'
+                        + '<span class="' + (strong ? 'font-semibold text-gray-800 dark:text-white' : 'text-zinc-600 dark:text-neutral-400') + '">' + dianEscapeHtml(label) + '</span>'
+                        + '<span class="' + (strong ? 'font-semibold text-gray-800 dark:text-white' : 'text-zinc-700 dark:text-zinc-300') + '">' + dianEscapeHtml(value) + '</span>'
+                    + '</div>';
+                }
+
+                /**
+                 * Una fila "etiqueta / valor" simple, sin la caja gris de
+                 * totalsRow() -- se usa para el detalle por tarifa dentro de
+                 * "Impuestos" (ej. "IVA 19%   $3.257,42"), ya que el detalle
+                 * completo por tributo vive en el popover (ver
+                 * buildTaxDetailPopoverHtml()).
+                 * @param {string} label
+                 * @param {string} value
+                 * @returns {string}
+                 */
+                function totalsPlainRow(label, value) {
+                    return '<div class="flex items-center justify-between gap-4 text-zinc-600 dark:text-neutral-400">'
+                        + '<span>' + dianEscapeHtml(label) + '</span>'
+                        + '<span>' + dianEscapeHtml(value) + '</span>'
+                    + '</div>';
+                }
+
+                /**
+                 * La fila "Impuestos" de la sección "Totales" -- igual que
+                 * totalsRow(), pero la etiqueta lleva un ícono que al pasar
+                 * el mouse por encima abre un popover con el detalle por
+                 * tributo (tarifa, base gravable, valor).
+                 * @param {string} label
+                 * @param {string} value
+                 * @param {Array<object>} impuestos
+                 * @returns {string}
+                 */
+                function totalsTaxRow(label, value, impuestos) {
+                    return '<div class="flex items-center justify-between gap-4">'
+                        + '<span class="group relative inline-flex items-center gap-1 text-zinc-600 dark:text-neutral-400 cursor-help">'
+                            + dianEscapeHtml(label)
+                            + '<svg class="shrink-0 size-3.5 text-zinc-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+                            + '<div class="hidden group-hover:block absolute z-20 bottom-full start-0 mb-2 w-72 p-3 bg-white border border-zinc-200 rounded-lg shadow-xl dark:bg-neutral-800 dark:border-neutral-700 normal-case font-normal text-start">'
+                                + buildTaxDetailPopoverHtml(impuestos)
+                            + '</div>'
+                        + '</span>'
+                        + '<span class="text-zinc-700 dark:text-zinc-300">' + dianEscapeHtml(value) + '</span>'
+                    + '</div>';
+                }
+
+                /**
+                 * Tabla de detalle por tributo (nombre, tarifa, base
+                 * gravable, valor) que se muestra dentro del popover de la
+                 * fila "Impuestos" -- mismo criterio que la tabla de
+                 * impuestos del PDF (invoice-pdf.blade.php): si el tributo es
+                 * nominal (algún subtotal trae "per_unit_amount") no se
+                 * muestra tarifa, y si el mismo tributo tiene varias tarifas
+                 * se listan separadas por coma.
+                 * @param {Array<object>} impuestos
+                 * @returns {string}
+                 */
+                function buildTaxDetailPopoverHtml(impuestos) {
+                    if (! impuestos.length) {
+                        return '<p class="text-xs text-zinc-400 dark:text-neutral-500">{{ __('No taxes') }}</p>';
+                    }
+
+                    const rows = impuestos.map((impuesto) => {
+                        const subtotals = impuesto.subtotals || [];
+                        const esNominal = subtotals.some((s) => s.per_unit_amount !== null && s.per_unit_amount !== undefined);
+                        const rate = esNominal
+                            ? '—'
+                            : [...new Set(subtotals.map((s) => s.porcentaje))].map((p) => (parseFloat(p) || 0) + '%').join(', ');
+
+                        return '<tr class="text-zinc-700 dark:text-zinc-300">'
+                            + '<td class="py-1 pe-2">' + dianEscapeHtml(impuesto.nombre || impuesto.codigo || '') + '</td>'
+                            + '<td class="py-1 px-2 text-end">' + rate + '</td>'
+                            + '<td class="py-1 px-2 text-end">' + formatMoney(impuesto.taxable_amount || 0) + '</td>'
+                            + '<td class="py-1 ps-2 text-end">' + formatMoney(impuesto.tax_amount || 0) + '</td>'
+                        + '</tr>';
+                    }).join('');
+
+                    return '<table class="w-full text-xs">'
+                        + '<thead><tr class="text-zinc-400 dark:text-neutral-500">'
+                            + '<th class="text-start font-medium pb-1">{{ __('Tax') }}</th>'
+                            + '<th class="text-end font-medium pb-1 px-2">{{ __('Rate') }}</th>'
+                            + '<th class="text-end font-medium pb-1 px-2">{{ __('Taxable base') }}</th>'
+                            + '<th class="text-end font-medium pb-1">{{ __('Value') }}</th>'
+                        + '</tr></thead>'
+                        + '<tbody>' + rows + '</tbody>'
+                    + '</table>';
                 }
 
                 /**
@@ -2718,6 +3079,7 @@
                     const baseDisplay = panel.querySelector('.line-newtax-base-display');
                     setLinePriceValue(row, (cantidad * precio).toFixed(2), baseHidden, baseDisplay);
                     baseDisplay.select();
+                    updateNewTaxFieldsVisibility(panel.querySelector('.line-newtax-tipo'));
                 };
 
                 /**
@@ -2734,15 +3096,22 @@
 
                     const tipoSelect = panel.querySelector('.line-newtax-tipo');
                     const porcentajeInput = panel.querySelector('.line-newtax-porcentaje');
+                    const porcentajeSelect = panel.querySelector('.line-newtax-porcentaje-select');
                     const baseInput = panel.querySelector('.line-newtax-base');
+                    const valorUnitarioInput = panel.querySelector('.line-newtax-valorunitario');
+                    const baseMedidaInput = panel.querySelector('.line-newtax-basemedida');
 
                     const tipo = tipoSelect.value || '01';
-                    const porcentaje = Math.min(parseFloat(porcentajeInput.value) || 0, 100);
+                    const esNominal = nominalTributos.includes(tipo);
+                    const conTarifas = tieneTarifasFijas(tipo);
+                    const porcentaje = esNominal ? 0 : (conTarifas ? (parseFloat(porcentajeSelect.value) || 0) : Math.min(parseFloat(porcentajeInput.value) || 0, 100));
+                    const valorUnitario = esNominal ? (parseFloat(valorUnitarioInput.value) || 0) : null;
+                    const cantidadBase = esNominal ? (parseFloat(baseMedidaInput.value) || 0) : null;
                     const baseRaw = baseInput.value.trim();
                     const base = baseRaw !== '' ? Math.max(parseFloat(baseRaw) || 0, 0) : null;
 
-                    if (porcentaje <= 0) {
-                        panel.querySelector('.line-newtax-porcentaje-display').focus();
+                    if (esNominal ? valorUnitario <= 0 : (! conTarifas && porcentaje <= 0)) {
+                        panel.querySelector(esNominal ? '.line-newtax-valorunitario-display' : '.line-newtax-porcentaje-display').focus();
                         return;
                     }
 
@@ -2759,15 +3128,18 @@
                     badge.querySelector('.line-tax-tipo').value = tipo;
                     badge.querySelector('.line-tax-porcentaje').value = porcentaje;
                     badge.querySelector('.line-tax-base').value = base !== null ? base : '';
+                    badge.querySelector('.line-tax-valor-unitario').value = valorUnitario !== null ? valorUnitario : '';
+                    badge.querySelector('.line-tax-cantidad-base').value = cantidadBase !== null ? cantidadBase : '';
 
-                    const porcentajeLabel = porcentaje.toLocaleString('es-CO', { maximumFractionDigits: 2 });
-                    const baseLabel = base !== null ? ' · ' + formatMoney(base) : '';
-                    badge.querySelector('.line-tax-label').textContent = (taxNames[tipo] || tipo) + ' ' + porcentajeLabel + '%' + baseLabel;
+                    badge.querySelector('.line-tax-label').textContent = formatTaxBadgeLabel(tipo, porcentaje, base, valorUnitario, cantidadBase);
 
                     setSelectValue(tipoSelect, '01');
                     setLinePriceValue(row, '19', porcentajeInput, panel.querySelector('.line-newtax-porcentaje-display'));
                     baseInput.value = '';
                     panel.querySelector('.line-newtax-base-display').value = '';
+                    setLinePriceValue(row, '', valorUnitarioInput, panel.querySelector('.line-newtax-valorunitario-display'));
+                    setLinePriceValue(row, '', baseMedidaInput, panel.querySelector('.line-newtax-basemedida-display'));
+                    updateNewTaxFieldsVisibility(tipoSelect);
 
                     if (window.HSDropdown) {
                         HSDropdown.close(dropdown);
@@ -2802,14 +3174,16 @@
                     const tipo = tax.tipo || '01';
                     const porcentaje = parseFloat(tax.porcentaje) || 0;
                     const base = (tax.base_gravable !== null && tax.base_gravable !== undefined) ? parseFloat(tax.base_gravable) : null;
+                    const valorUnitario = (tax.valor_unitario !== null && tax.valor_unitario !== undefined) ? parseFloat(tax.valor_unitario) : null;
+                    const cantidadBase = (tax.cantidad_base !== null && tax.cantidad_base !== undefined) ? parseFloat(tax.cantidad_base) : null;
 
                     badge.querySelector('.line-tax-tipo').value = tipo;
                     badge.querySelector('.line-tax-porcentaje').value = porcentaje;
                     badge.querySelector('.line-tax-base').value = base !== null ? base : '';
+                    badge.querySelector('.line-tax-valor-unitario').value = valorUnitario !== null ? valorUnitario : '';
+                    badge.querySelector('.line-tax-cantidad-base').value = cantidadBase !== null ? cantidadBase : '';
 
-                    const porcentajeLabel = porcentaje.toLocaleString('es-CO', { maximumFractionDigits: 2 });
-                    const baseLabel = base !== null ? ' · ' + formatMoney(base) : '';
-                    badge.querySelector('.line-tax-label').textContent = (taxNames[tipo] || tipo) + ' ' + porcentajeLabel + '%' + baseLabel;
+                    badge.querySelector('.line-tax-label').textContent = formatTaxBadgeLabel(tipo, porcentaje, base, valorUnitario, cantidadBase);
 
                     updateAddTaxButtonState(row);
                 }
@@ -2892,6 +3266,11 @@
                     const newTaxPorcentajeDisplay = row.querySelector('.line-newtax-porcentaje-display');
                     const newTaxBaseHidden = row.querySelector('.line-newtax-base');
                     const newTaxBaseDisplay = row.querySelector('.line-newtax-base-display');
+                    const newTaxValorUnitarioHidden = row.querySelector('.line-newtax-valorunitario');
+                    const newTaxValorUnitarioDisplay = row.querySelector('.line-newtax-valorunitario-display');
+                    const newTaxBaseMedidaHidden = row.querySelector('.line-newtax-basemedida');
+                    const newTaxBaseMedidaDisplay = row.querySelector('.line-newtax-basemedida-display');
+                    const newTaxTipoSelect = row.querySelector('.line-newtax-tipo');
 
                     newTaxPorcentajeDisplay.addEventListener('input', () => {
                         handleCappedPriceInput(newTaxPorcentajeDisplay.value, newTaxPorcentajeHidden, newTaxPorcentajeDisplay, 100);
@@ -2900,8 +3279,24 @@
                     newTaxBaseDisplay.addEventListener('input', () => {
                         const cantidad = parseFloat(row.querySelector('.line-cantidad').value) || 0;
                         const precio = parseFloat(row.querySelector('.line-precio').value) || 0;
-                        handleCappedPriceInput(newTaxBaseDisplay.value, newTaxBaseHidden, newTaxBaseDisplay, cantidad * precio);
+                        // Si la línea todavía no tiene cantidad/precio (subtotal $0), no se
+                        // limita el tope -- si no, cualquier valor tecleado se recortaba a $0 y
+                        // el campo parecía "no dejar escribir".
+                        handleCappedPriceInput(newTaxBaseDisplay.value, newTaxBaseHidden, newTaxBaseDisplay, (cantidad * precio) || null);
                     });
+
+                    newTaxValorUnitarioDisplay.addEventListener('input', () => {
+                        setLinePriceValue(row, newTaxValorUnitarioDisplay.value, newTaxValorUnitarioHidden, newTaxValorUnitarioDisplay);
+                    });
+
+                    newTaxBaseMedidaDisplay.addEventListener('input', () => {
+                        setLinePriceValue(row, newTaxBaseMedidaDisplay.value, newTaxBaseMedidaHidden, newTaxBaseMedidaDisplay);
+                    });
+
+                    // Ver comentario de bodegaSelect más abajo -- HSSelect no siempre dispara
+                    // el "change" nativo del <select>, así que se escuchan ambos.
+                    newTaxTipoSelect.addEventListener('change', () => updateNewTaxFieldsVisibility(newTaxTipoSelect));
+                    newTaxTipoSelect.addEventListener('change.hs.select', () => updateNewTaxFieldsVisibility(newTaxTipoSelect));
 
                     row.addEventListener('input', (event) => {
                         if (event.target.matches('.line-cantidad')) {
@@ -3011,6 +3406,21 @@
                     if (! isHidden && document.querySelectorAll('#chargeLinesBody .charge-line').length === 0) {
                         addChargeLine();
                     }
+
+                    // Al colapsar, se quitan las filas que quedaron vacías (ej. la que se
+                    // auto-agrega al abrir la sección la primera vez) -- si no, sus campos
+                    // "required" (motivo/valor) quedan inválidos DENTRO de un contenedor
+                    // oculto, y el navegador revienta el submit entero con "An invalid form
+                    // control ... is not focusable" sin avisarle nada al usuario.
+                    if (isHidden) {
+                        document.querySelectorAll('#chargeLinesBody .charge-line').forEach((row) => {
+                            const motivo = row.querySelector('.charge-motivo')?.value.trim() || '';
+                            const valor = parseFloat(row.querySelector('.charge-valor')?.value) || 0;
+                            if (! motivo && valor <= 0) {
+                                row.remove();
+                            }
+                        });
+                    }
                 };
 
                 window.addChargeLine = function () {
@@ -3032,7 +3442,16 @@
 
                 window.removeChargeLine = function (button) {
                     button.closest('.charge-line').remove();
+                    refreshDocumentTotals();
                 };
+
+                // Los cargos/descuentos no tienen su propio recalcLine()/recalcTotal() (esas
+                // solo suman líneas) -- se escucha acá, delegado en el contenedor, para que la
+                // sección "Totales" también reaccione a estos campos sin tener que engancharlos
+                // fila por fila.
+                document.getElementById('chargeLinesBody')?.addEventListener('input', refreshDocumentTotals);
+                document.getElementById('chargeLinesBody')?.addEventListener('change', refreshDocumentTotals);
+                document.getElementById('chargeLinesBody')?.addEventListener('change.hs.select', refreshDocumentTotals);
 
                 window.toggleNotesSection = function () {
                     const body = document.getElementById('notesSectionBody');
@@ -3063,14 +3482,11 @@
                 };
 
                 /**
-                 * Wiring inicial de la pantalla del documento. El orden de
-                 * los tres init de submit importa: la limpieza de líneas
-                 * vacías (initEmptyLineSubmitCleanup) tiene que registrarse
-                 * ANTES que el envío por fetch del POS (initPosAjaxCheckout),
-                 * para que ya haya quitado la línea sin producto del DOM
-                 * antes de que se arme el FormData (los listeners de
-                 * "submit" corren en el orden en que se registraron). El
-                 * popover "aplicar tipo de precio a todas las líneas" pone,
+                 * Wiring inicial de la pantalla del documento. La línea sin
+                 * producto siempre se excluye a la hora de armar el
+                 * FormData (ver buildDocumentFormData()), así que no hace
+                 * falta coordinar el orden de los init de submit para eso.
+                 * El popover "aplicar tipo de precio a todas las líneas" pone,
                  * por cada línea que YA tenga producto elegido, el precio de
                  * ese tipo si el producto lo tiene (si no, la línea se deja
                  * tal como estaba); usa "--auto-close:false" así que se
@@ -3112,7 +3528,6 @@
                         });
                     }
 
-                    initEmptyLineSubmitCleanup();
                     initSubmitProcessingState();
                     initPosAjaxCheckout();
                     initDocumentAjaxSubmit();

@@ -182,6 +182,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('create/validate-uuid', [DocumentoEmitidoController::class, 'validateUuid'])->name('create-validate-uuid');
             Route::post('/', [DocumentoEmitidoController::class, 'store'])->name('store');
             Route::post('preview', [DocumentoEmitidoController::class, 'preview'])->name('preview');
+            Route::post('totals', [DocumentoEmitidoController::class, 'totals'])->name('totals');
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
             Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
             Route::get('{documento}/invoice-preview', [DocumentoEmitidoController::class, 'invoicePreview'])->name('invoice-preview');
