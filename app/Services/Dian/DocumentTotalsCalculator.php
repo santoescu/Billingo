@@ -2,10 +2,13 @@
 
 namespace App\Services\Dian;
 
+use App\Models\Tributo;
 use InvalidArgumentException;
 
 class DocumentTotalsCalculator
 {
+    private static array $nombresTributoCache = [];
+
     /**
      * Punto de entrada único: calcula líneas, impuestos agrupados, cargos y
      * totales del documento completo, en el mismo orden/criterio que antes
@@ -91,7 +94,7 @@ class DocumentTotalsCalculator
                 $baseUnitMeasure = $impuesto['base_unit_measure'] ?? null;
 
                 $taxAmount = $perUnitAmount !== null
-                    ? round($perUnitAmount * $baseUnitMeasure / 100, 2)
+                    ? round($perUnitAmount * $baseUnitMeasure, 2)
                     : round($baseGravable * ($porcentaje / 100), 2);
 
                 if (isset($impuesto['tax_amount_expected'])) {
@@ -207,7 +210,7 @@ class DocumentTotalsCalculator
      * "TaxSubtotal.TaxAmount" (el valor del tributo de un solo "TaxSubtotal") -- Billingo no lo
      * calcula para armar el XML, lo valida contra lo que calculó para ese tributo puntual
      * ("TaxableAmount x Percent / 100" o, para tributos nominales, "PerUnitAmount x
-     * BaseUnitMeasure / 100") y rechaza la petición explicando la diferencia si no coincide.
+     * BaseUnitMeasure") y rechaza la petición explicando la diferencia si no coincide.
      *
      * @param  float  $esperado  "TaxSubtotal.TaxAmount" tal como lo mandó el caller.
      * @param  float  $calculado  Valor calculado por Billingo para ese tributo.
@@ -338,16 +341,11 @@ class DocumentTotalsCalculator
     /**
      * Traduce un código de impuesto DIAN a su nombre.
      *
-     * @param  string  $codigo  Código DIAN del impuesto (01, 03, 04).
+     * @param  string  $codigo  Código DIAN del impuesto (catálogo "tributos" en Mongo).
      * @return string Nombre del impuesto.
      */
     public function nombreImpuesto(string $codigo): string
     {
-        return match ($codigo) {
-            '01' => 'IVA',
-            '03' => 'ICA',
-            '04' => 'INC',
-            default => $codigo,
-        };
+        return self::$nombresTributoCache[$codigo] ??= Tributo::where('codigo', $codigo)->value('nombre') ?? $codigo;
     }
 }
