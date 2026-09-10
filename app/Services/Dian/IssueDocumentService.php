@@ -115,8 +115,13 @@ class IssueDocumentService
             'cliente_id' => $payload['cliente_id'] ?? null,
             'payload' => $payload,
             'ambiente' => $ambiente,
-            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
-            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            // "tax_exclusive_amount" es la base imponible (regla FAU04: solo el primer tributo
+            // de cada línea), no el subtotal real -- si una línea no tiene ningún tributo, esa
+            // base queda en $0 y "tax_inclusive - tax_exclusive" terminaba reportando el
+            // subtotal entero como si fuera impuesto. "line_extension_amount" sí es el subtotal
+            // (cantidad x precio de todas las líneas, con descuentos de línea aplicados).
+            'subtotal' => $calculo['line_extension_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['line_extension_amount'], 2),
             'total' => $calculo['totales']['payable_amount'],
             'currency' => $payload['moneda'] ?? 'COP',
             'payment_means_id' => $payload['payment_means']['id'] ?? null,
@@ -264,8 +269,13 @@ class IssueDocumentService
             'cliente_id' => $payload['cliente_id'] ?? null,
             'payload' => $payload,
             'issue_date' => $this->resolveIssueDateTime($payload),
-            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
-            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            // "tax_exclusive_amount" es la base imponible (regla FAU04: solo el primer tributo
+            // de cada línea), no el subtotal real -- si una línea no tiene ningún tributo, esa
+            // base queda en $0 y "tax_inclusive - tax_exclusive" terminaba reportando el
+            // subtotal entero como si fuera impuesto. "line_extension_amount" sí es el subtotal
+            // (cantidad x precio de todas las líneas, con descuentos de línea aplicados).
+            'subtotal' => $calculo['line_extension_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['line_extension_amount'], 2),
             'total' => $calculo['totales']['payable_amount'],
             'currency' => $payload['moneda'] ?? 'COP',
             'payment_means_id' => $payload['payment_means']['id'] ?? null,
@@ -316,8 +326,13 @@ class IssueDocumentService
 
         $updates = [
             'payload' => $payload,
-            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
-            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            // "tax_exclusive_amount" es la base imponible (regla FAU04: solo el primer tributo
+            // de cada línea), no el subtotal real -- si una línea no tiene ningún tributo, esa
+            // base queda en $0 y "tax_inclusive - tax_exclusive" terminaba reportando el
+            // subtotal entero como si fuera impuesto. "line_extension_amount" sí es el subtotal
+            // (cantidad x precio de todas las líneas, con descuentos de línea aplicados).
+            'subtotal' => $calculo['line_extension_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['line_extension_amount'], 2),
             'total' => $calculo['totales']['payable_amount'],
         ];
 
@@ -488,8 +503,13 @@ class IssueDocumentService
             'cliente_id' => $payload['cliente_id'] ?? null,
             'payload' => $payload,
             'issue_date' => $this->resolveIssueDateTime($payload),
-            'subtotal' => $calculo['totales']['tax_exclusive_amount'],
-            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['totales']['tax_exclusive_amount'], 2),
+            // "tax_exclusive_amount" es la base imponible (regla FAU04: solo el primer tributo
+            // de cada línea), no el subtotal real -- si una línea no tiene ningún tributo, esa
+            // base queda en $0 y "tax_inclusive - tax_exclusive" terminaba reportando el
+            // subtotal entero como si fuera impuesto. "line_extension_amount" sí es el subtotal
+            // (cantidad x precio de todas las líneas, con descuentos de línea aplicados).
+            'subtotal' => $calculo['line_extension_amount'],
+            'tax_total' => round($calculo['totales']['tax_inclusive_amount'] - $calculo['line_extension_amount'], 2),
             'total' => $calculo['totales']['payable_amount'],
             'currency' => $payload['moneda'] ?? 'COP',
             'notes' => $payload['notas'] ?? null,
@@ -613,6 +633,20 @@ class IssueDocumentService
 
         $this->syncProducts($company, $payload['lineas'] ?? []);
 
+        // $this->builder->build() ya calculó esto internamente para armar el XML, pero no lo
+        // devuelve -- se recalcula acá (mismo criterio que buildPreview()) para que el "payload"
+        // que se guarda tenga "lineas[].impuestos" y "impuestos" (nivel documento) ya agregados,
+        // y no el shape crudo del mapper. Si no, la tabla de impuestos del PDF
+        // (invoice-pdf.blade.php) y el prefill de edición de un documento rechazado quedan
+        // vacíos aunque las líneas sí tengan impuestos. Se hace DESPUÉS de syncProducts() (y
+        // antes de guardar el payload) a propósito: DocumentTotalsCalculator::buildLineasCalculadas()
+        // no conserva "bodega_id" (no es parte de su cálculo), y discountInventory() más abajo
+        // todavía necesita leerlo de las líneas crudas.
+        $calculoTotales = $this->totals->calcularTotalesDocumento($payload['lineas'] ?? [], $payload['cargos_descuentos'] ?? []);
+        $lineasParaInventario = $payload['lineas'] ?? [];
+        $payload['lineas'] = $calculoTotales['lineas'];
+        $payload['impuestos'] = $calculoTotales['impuestos'];
+
         $documentoData = [
             'company_id' => (string) $company->_id,
             'tipo_documento' => $tipoDocumento,
@@ -693,7 +727,7 @@ class IssueDocumentService
         ]);
 
         if (! $skipInventoryDiscount && ! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
-            $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, $userId);
+            $this->discountInventory($company, $lineasParaInventario, $numeral, $userId);
         }
 
         return $documento;
