@@ -41,6 +41,7 @@
                 const applyBtn = panel.querySelector('[data-daterange-apply]');
                 const allowOpenEnd = root.hasAttribute('data-daterange-allow-open-end');
                 const floating = root.hasAttribute('data-daterange-floating');
+                const align = root.getAttribute('data-daterange-align') || 'right';
 
                 let committedStart = hiddenFrom.value ? new Date(hiddenFrom.value + 'T00:00:00') : null;
                 let committedEnd = hiddenTo.value ? new Date(hiddenTo.value + 'T00:00:00') : null;
@@ -157,7 +158,7 @@
                     const triggerRect = trigger.getBoundingClientRect();
                     const panelWidth = panel.offsetWidth;
 
-                    let left = triggerRect.right - panelWidth;
+                    let left = align === 'left' ? triggerRect.left : triggerRect.right - panelWidth;
                     left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
 
                     let top = triggerRect.bottom + 8;
