@@ -109,12 +109,13 @@ class ReceivedDocumentParser
             $document = $this->parseWithoutNamespacePrefixes($inner);
         }
 
-        $tipoDocumento = match ($document->getName()) {
+        $tipoEstructura = match ($document->getName()) {
             'Invoice' => 'factura',
             'CreditNote' => 'nota_credito',
             'DebitNote' => 'nota_debito',
             default => throw new InvalidArgumentException("Tipo de documento UBL no soportado: \"{$document->getName()}\"."),
         };
+        $tipoDocumento = $this->extractTipoDocumentoCode($document, $tipoEstructura);
 
         $uuid = (string) ($document->UUID ?? '');
         $numeroCompleto = (string) ($document->ID ?? throw new InvalidArgumentException('El documento no trae "cbc:ID" (número).'));
@@ -153,7 +154,7 @@ class ReceivedDocumentParser
             'subtotal' => (float) ($monetaryTotal->LineExtensionAmount ?? 0),
             'tax_total' => $taxTotal,
             'total' => (float) ($monetaryTotal->PayableAmount ?? 0),
-            'lineas' => $this->extractLineas($document, $tipoDocumento),
+            'lineas' => $this->extractLineas($document, $tipoEstructura),
             'dian_validation' => $isAttachedDocument ? $this->extractDianValidation($root) : null,
             'payload' => [
                 // Mismo shape que "accounting_customer_party" del lado emisión (ver
@@ -306,6 +307,27 @@ class ReceivedDocumentParser
             'telefono' => (string) ($party->Contact->Telephone ?? ''),
             'email' => (string) ($party->Contact->ElectronicMail ?? ''),
         ];
+    }
+
+    /**
+     * Código DIAN del documento (01, 02, 03, 04, 91, 92) -- mismo vocabulario que usa
+     * DocumentoEmitido::tipo_documento (ver DocumentJsonMapper, donde "document.DocumentType" es
+     * justamente uno de estos códigos, no "factura"/"nota_credito"/"nota_debito"). Se lee del
+     * campo cbc:InvoiceTypeCode/CreditNoteTypeCode/DebitNoteTypeCode según el tipo de documento; si
+     * el proveedor no lo trae (pasa con notas débito -- ver UblDocumentBuilder, que tampoco lo
+     * manda del lado emisión), se usa el único código que existe en la práctica para ese tipo.
+     *
+     * @param  SimpleXMLElement  $document
+     * @param  string  $tipoEstructura  "factura"|"nota_credito"|"nota_debito" (ver parse()).
+     * @return string
+     */
+    private function extractTipoDocumentoCode(SimpleXMLElement $document, string $tipoEstructura): string
+    {
+        return match ($tipoEstructura) {
+            'factura' => (string) ($document->InvoiceTypeCode ?? '') ?: '01',
+            'nota_credito' => (string) ($document->CreditNoteTypeCode ?? '') ?: '91',
+            'nota_debito' => (string) ($document->DebitNoteTypeCode ?? '') ?: '92',
+        };
     }
 
     /**

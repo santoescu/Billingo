@@ -1,8 +1,11 @@
 @php
     $documentTypeLabels = [
-        'factura' => __('Invoice'),
-        'nota_credito' => __('Credit note'),
-        'nota_debito' => __('Debit note'),
+        '01' => __('Electronic sales invoice'),
+        '02' => __('Electronic sales invoice (export)'),
+        '03' => __('Electronic transmission instrument (type 03)'),
+        '04' => __('Electronic sales invoice (type 04)'),
+        '91' => __('Credit note'),
+        '92' => __('Debit note'),
     ];
 
     $emisor = $documento->payload['accounting_supplier_party'] ?? [];
