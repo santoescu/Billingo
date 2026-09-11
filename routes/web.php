@@ -133,6 +133,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['company.selected', 'company.role:receiving,administrador,comprador,auditor'])
         ->prefix('received-documents')->name('received-documents.')->group(function () {
             Route::get('/', [DocumentoRecibidoController::class, 'index'])->name('index');
+            Route::get('data', [DocumentoRecibidoController::class, 'data'])->name('data');
+            Route::get('provider-search', [DocumentoRecibidoController::class, 'providerSearch'])->name('provider-search');
             Route::post('/', [DocumentoRecibidoController::class, 'store'])->name('store');
             Route::get('{documento}', [DocumentoRecibidoController::class, 'show'])->name('show');
             Route::get('{documento}/pdf', [DocumentoRecibidoController::class, 'pdf'])->name('pdf');

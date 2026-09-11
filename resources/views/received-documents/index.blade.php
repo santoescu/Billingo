@@ -14,61 +14,92 @@
         </div>
     @endif
 
-    <div class="flex flex-col">
-        <div class="-m-1.5 overflow-x-auto">
-            <div class="p-1.5 min-w-full inline-block align-middle">
-                <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-                    <div class="py-3 px-4 flex justify-between items-center gap-4">
-                        <div class="relative max-w-xs">
-                            <label class="sr-only">{{ __('Search') }}</label>
-                            <flux:input type="text" id="received-documents-search" placeholder="{{ __('Search') }}" autocomplete="off" />
-                        </div>
+    @php
+        $receivedDocumentsDefaultFrom = now()->startOfMonth()->format('Y-m-d');
+        $receivedDocumentsDefaultTo = now()->format('Y-m-d');
+        $receivedDocumentsTypeLabels = [
+            '01' => __('Electronic sales invoice'),
+            '02' => __('Electronic sales invoice (export)'),
+            '03' => __('Electronic transmission instrument (type 03)'),
+            '04' => __('Electronic sales invoice (type 04)'),
+            '91' => __('Credit note'),
+            '92' => __('Debit note'),
+        ];
+    @endphp
 
-                        <flux:button variant="primary" icon="arrow-up-tray" data-hs-overlay="#upload-received-document-modal">
-                            {{ __('Upload document') }}
-                        </flux:button>
-                    </div>
+    <div class="flex flex-col gap-4">
+        <div id="received-documents-filters" class="hidden flex flex-wrap items-end gap-3">
+            <div class="w-64">
+                <x-date-range-picker name-from="received_from" name-to="received_to" :label="__('Date range')" :value-from="$receivedDocumentsDefaultFrom" :value-to="$receivedDocumentsDefaultTo" :allow-open-end="true" :floating="true" align="left" />
+            </div>
+            <div class="w-56 relative">
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400" for="received-documents-filter-provider">{{ __('Provider') }}</label>
+                <input type="text" id="received-documents-filter-provider" autocomplete="off" placeholder="{{ __('Search by name or identification') }}"
+                    class="w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs h-10 py-2 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                <input type="hidden" id="received-documents-filter-provider-id">
+                <div id="received-documents-filter-provider-results" class="hidden absolute z-20 mt-1 w-full max-h-72 overflow-y-auto bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-white/10 rounded-lg shadow-xl"></div>
+            </div>
+            <div class="w-40">
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Numeral') }}</label>
+                <flux:input type="text" id="received-documents-filter-numeral" placeholder="{{ __('Numeral') }}" autocomplete="off" />
+            </div>
+            <div class="w-48">
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Document type') }}</label>
+                <select id="received-documents-filter-document-type" class="hidden" data-hs-select='{!! \App\Support\SelectConfig::basic(__('All')) !!}'>
+                    <option value="">{{ __('All') }}</option>
+                    @foreach ($receivedDocumentsTypeLabels as $code => $label)
+                        <option value="{{ $code }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="w-40">
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Payment form') }}</label>
+                <select id="received-documents-filter-payment-form" class="hidden" data-hs-select='{!! \App\Support\SelectConfig::basic(__('All')) !!}'>
+                    <option value="">{{ __('All') }}</option>
+                    <option value="contado">{{ __('Cash') }}</option>
+                    <option value="credito">{{ __('Credit') }}</option>
+                </select>
+            </div>
+        </div>
 
-                    <div class="overflow-hidden">
-                        <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="receivedDocumentsTable">
-                            <thead class="bg-gray-50 dark:bg-neutral-700">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Issue date') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Provider') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Document') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Total') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Status') }}</th>
-                                    <th scope="col" class="px-6 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                @forelse ($documentos as $documento)
-                                    <tr>
-                                        <td class="px-6 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ optional($documento->issue_date)->format('Y-m-d') ?? '—' }}</td>
-                                        <td class="px-6 py-3 text-sm text-gray-800 dark:text-neutral-200">
-                                            {{ $documento->proveedor->name ?? data_get($documento->payload, 'accounting_supplier_party.razon_social', '—') }}
-                                            <span class="block text-xs text-gray-400 dark:text-neutral-500">{{ data_get($documento->payload, 'accounting_supplier_party.identificacion') }}</span>
-                                        </td>
-                                        <td class="px-6 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $documento->numeral }}</td>
-                                        <td class="px-6 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $documento->total_formatted }}</td>
-                                        <td class="px-6 py-3">
-                                            <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
-                                        </td>
-                                        <td class="px-6 py-3 text-end">
-                                            <a href="{{ route('received-documents.show', $documento->_id) }}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}" title="{{ __('View') }}">
-                                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="px-6 py-6 text-center text-sm text-neutral-400">{{ __('There are no registered :name.', ['name' => __('Received documents')]) }}</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <div class="py-3 px-4 flex justify-between items-center gap-4">
+                <div class="relative max-w-xs">
+                    <label class="sr-only">{{ __('Search') }}</label>
+                    <flux:input type="text" id="received-documents-search" placeholder="{{ __('Search') }}" autocomplete="off" />
                 </div>
+
+                <div class="flex gap-2">
+                    <button type="button" id="received-documents-filters-toggle-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden" aria-label="{{ __('Filters') }}" title="{{ __('Filters') }}">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                    </button>
+
+                    <button type="button" id="received-documents-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadReceivedDocumentsTable()">
+                        <svg id="received-documents-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    </button>
+
+                    <flux:button variant="primary" icon="arrow-up-tray" data-hs-overlay="#upload-received-document-modal">
+                        {{ __('Upload document') }}
+                    </flux:button>
+                </div>
+            </div>
+
+            <div class="overflow-hidden rounded-b-lg">
+                <table id="receivedDocumentsTable" class="w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Issue date') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Provider') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Document') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Document type') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Payment form') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Total') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Status') }}</th>
+                            <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase dark:text-neutral-500"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -146,24 +177,332 @@
         </div>
     </div>
 
-    @if (session('received-documents-errors'))
+    @include('partials.datatable-pagination')
+    <x-date-range-picker-script />
+
+    @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (window.HSOverlay) {
-                    HSOverlay.open('#upload-received-document-modal');
+            (function () {
+                // Misma idea que documents/index.blade.php: la tabla se llena por AJAX (ver
+                // DocumentoRecibidoController::data()), DataTables arma cada <tr> a partir de
+                // columns.render, el backend solo manda el array de documentos en JSON.
+                let receivedDocumentsTable = null;
+                let documentTypeLabels = {};
+
+                const i18n = {
+                    viewPdf: @json(__('View PDF')),
+                    view: @json(__('View')),
+                };
+
+                function escapeHtml(value) {
+                    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+                    })[char]);
                 }
-            });
+
+                function renderProvider(row, type) {
+                    if (type === 'filter' || type === 'sort') {
+                        return `${row.provider_name ?? ''} ${row.provider_identification ?? ''}`.trim();
+                    }
+
+                    return `<div class="text-gray-800 dark:text-neutral-200">${escapeHtml(row.provider_name ?? '—')}</div>`
+                        + `<div class="text-xs text-gray-400 dark:text-neutral-500">${escapeHtml(row.provider_identification ?? '')}</div>`;
+                }
+
+                function renderPaymentForm(row, type) {
+                    if (type === 'filter' || type === 'sort') {
+                        return row.payment_form ?? '';
+                    }
+
+                    return escapeHtml(row.payment_form_label ?? '—');
+                }
+
+                function renderDocumentType(row, type) {
+                    if (type === 'filter') {
+                        return row.tipo_documento ?? '';
+                    }
+
+                    const label = documentTypeLabels[row.tipo_documento] ?? row.tipo_documento;
+
+                    if (type === 'sort') {
+                        return label ?? '';
+                    }
+
+                    return escapeHtml(label ?? '—');
+                }
+
+                function renderStatus(row) {
+                    return `<span class="rounded-md px-2 py-0.5 text-xs font-medium ${row.status_badge_classes}">${escapeHtml(row.status_label)}</span>`;
+                }
+
+                function renderActions(row) {
+                    return `<div class="flex justify-end items-center gap-1">
+                        <a href="${row.urls.pdf}" target="_blank" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="${i18n.viewPdf}" title="${i18n.viewPdf}">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                        </a>
+                        <a href="${row.urls.show}" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="${i18n.view}" title="${i18n.view}">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                        </a>
+                    </div>`;
+                }
+
+                function initReceivedDocumentsTable() {
+                    receivedDocumentsTable = initWorkflowDataTable('#receivedDocumentsTable', '#received-documents-search', {
+                        emptyTable: "{{ __('There are no registered :name.', ['name' => __('Received documents')]) }}",
+                        columns: [
+                            { data: 'issue_date', className: 'px-6 py-3 text-sm text-gray-600 dark:text-neutral-400' },
+                            { data: null, className: 'px-6 py-3 text-sm', render: (data, type, row) => renderProvider(row, type) },
+                            { data: 'numeral', className: 'px-6 py-3 text-sm font-medium text-gray-800 break-words dark:text-neutral-200' },
+                            { data: null, className: 'px-6 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderDocumentType(row, type) },
+                            { data: null, className: 'px-6 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderPaymentForm(row, type) },
+                            { data: 'total_formatted', className: 'px-6 py-3 text-sm text-gray-600 dark:text-neutral-400' },
+                            { data: null, className: 'px-6 py-3 text-sm', render: (data, type, row) => renderStatus(row) },
+                            { data: null, orderable: false, className: 'px-6 py-3 text-end text-sm', render: (data, type, row) => renderActions(row) },
+                        ],
+                    });
+                    receivedDocumentsTable.order([]).draw();
+                }
+
+                /**
+                 * La tabla no viene lista en el HTML inicial (ver
+                 * DocumentoRecibidoController::index()) -- se pide por AJAX apenas carga la
+                 * página, mismo patrón que documents/index.blade.php. El filtrado (fecha,
+                 * proveedor, numeral, tipo de documento, forma de pago) se resuelve del lado del
+                 * servidor (ver DocumentoRecibidoController::data()), no en el navegador -- con
+                 * empresas que acumulan decenas de miles de documentos recibidos, traerlos todos
+                 * de una para filtrar en DataTables no escala. Por eso cada llamada manda el
+                 * estado actual de los filtros como query params; el rango de fechas siempre va
+                 * (arranca en "1° del mes actual -> hoy", ver $receivedDocumentsDefaultFrom/To),
+                 * así que un refresh nunca trae el historial completo sin querer.
+                 * @returns {void}
+                 */
+                function buildReceivedDocumentsFilterParams() {
+                    const params = new URLSearchParams();
+
+                    const from = document.querySelector('[data-daterange-hidden-from]')?.value;
+                    const to = document.querySelector('[data-daterange-hidden-to]')?.value;
+                    const providerId = document.getElementById('received-documents-filter-provider-id')?.value ?? '';
+                    const numeral = document.getElementById('received-documents-filter-numeral')?.value ?? '';
+                    const documentType = document.getElementById('received-documents-filter-document-type')?.value ?? '';
+                    const paymentForm = document.getElementById('received-documents-filter-payment-form')?.value ?? '';
+
+                    if (from) params.set('from', from);
+                    if (to) params.set('to', to);
+                    if (providerId) params.set('provider_id', providerId);
+                    if (numeral) params.set('numeral', numeral);
+                    if (documentType) params.set('document_type', documentType);
+                    if (paymentForm) params.set('payment_form', paymentForm);
+
+                    return params;
+                }
+
+                function loadReceivedDocumentsTable() {
+                    const tbody = document.querySelector('#receivedDocumentsTable tbody');
+                    if (! tbody) return;
+
+                    const refreshBtn = document.getElementById('received-documents-refresh-btn');
+                    const refreshIcon = document.getElementById('received-documents-refresh-icon');
+                    if (refreshBtn) refreshBtn.disabled = true;
+                    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+                    const params = buildReceivedDocumentsFilterParams();
+
+                    fetch(`{{ route('received-documents.data') }}?${params.toString()}`, { headers: { Accept: 'application/json' } })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (! receivedDocumentsTable) {
+                                initReceivedDocumentsTable();
+                            }
+
+                            documentTypeLabels = data.document_type_labels;
+                            receivedDocumentsTable.clear();
+                            receivedDocumentsTable.rows.add(data.rows);
+                            receivedDocumentsTable.order([]).draw();
+
+                            if (window.HSOverlay) HSOverlay.autoInit();
+                        })
+                        .finally(() => {
+                            if (refreshBtn) refreshBtn.disabled = false;
+                            if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                        });
+                }
+
+                /**
+                 * Reset del select nativo de Preline (HSSelect) -- setValue() sincroniza el
+                 * toggle visible, a diferencia de escribir .value directo en el <select> oculto.
+                 * @param {string} id
+                 * @returns {void}
+                 */
+                function resetHsSelect(id) {
+                    const el = document.getElementById(id);
+                    if (! el) return;
+
+                    const instance = window.HSSelect && HSSelect.getInstance(el);
+                    if (instance) {
+                        instance.setValue('');
+                    } else {
+                        el.value = '';
+                    }
+                }
+
+                /**
+                 * Vuelve el rango de fechas a "1° del mes actual -> hoy" -- mismo default que
+                 * trae la página al cargar (ver $receivedDocumentsDefaultFrom/To en el blade), así
+                 * que "limpiar filtros" nunca deja la búsqueda sin rango de fechas.
+                 * @returns {void}
+                 */
+                function resetDateRangeFilter() {
+                    const today = new Date();
+                    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const toIso = (date) => date.toISOString().slice(0, 10);
+
+                    const hiddenFrom = document.querySelector('[data-daterange-hidden-from]');
+                    const hiddenTo = document.querySelector('[data-daterange-hidden-to]');
+                    const trigger = document.querySelector('[data-daterange-trigger]');
+
+                    if (hiddenFrom) hiddenFrom.value = toIso(from);
+                    if (hiddenTo) hiddenTo.value = toIso(today);
+                    if (trigger) trigger.value = `${toIso(from)} / ${toIso(today)}`;
+                }
+
+                /**
+                 * Deja los filtros en su estado por defecto (rango de fechas 1° del mes -> hoy,
+                 * el resto vacío) y recarga la tabla -- se usa al cerrar el panel de filtros (ver
+                 * bindReceivedDocumentsFilters()), para que cerrar el panel sea lo mismo que
+                 * "olvidate de estos filtros y mostrame el mes actual otra vez".
+                 * @returns {void}
+                 */
+                function clearReceivedDocumentsFilters() {
+                    resetDateRangeFilter();
+
+                    document.getElementById('received-documents-filter-provider').value = '';
+                    document.getElementById('received-documents-filter-provider-id').value = '';
+                    document.getElementById('received-documents-filter-numeral').value = '';
+                    resetHsSelect('received-documents-filter-document-type');
+                    resetHsSelect('received-documents-filter-payment-form');
+
+                    loadReceivedDocumentsTable();
+                }
+
+                /**
+                 * Buscador de proveedor del filtro -- mismo patrón que el buscador de cliente de
+                 * documents/create.blade.php (debounce de 400ms, mínimo 3 caracteres, descarta
+                 * respuestas que ya quedaron obsoletas porque el usuario siguió escribiendo), pero
+                 * en vez de llenar un formulario completo solo guarda el _id elegido en un input
+                 * oculto -- es lo único que manda el filtro (ver provider_id en
+                 * buildReceivedDocumentsFilterParams()).
+                 * @returns {void}
+                 */
+                function initReceivedDocumentsProviderSearch() {
+                    const searchInput = document.getElementById('received-documents-filter-provider');
+                    const hiddenId = document.getElementById('received-documents-filter-provider-id');
+                    const resultsEl = document.getElementById('received-documents-filter-provider-results');
+                    if (! searchInput || ! hiddenId || ! resultsEl) return;
+
+                    let searchTimeout = null;
+
+                    function closeResults() {
+                        resultsEl.classList.add('hidden');
+                        resultsEl.innerHTML = '';
+                    }
+
+                    function renderResults(providers) {
+                        resultsEl.innerHTML = '';
+
+                        if (! providers.length) {
+                            resultsEl.innerHTML = `<div class="p-3 text-sm text-amber-600 dark:text-amber-400">${escapeHtml('{{ __('No results found.') }}')}</div>`;
+                            resultsEl.classList.remove('hidden');
+                            return;
+                        }
+
+                        providers.forEach((provider) => {
+                            const item = document.createElement('button');
+                            item.type = 'button';
+                            item.className = 'w-full text-start p-3 hover:bg-gray-100 dark:hover:bg-white/10 focus:outline-hidden';
+                            item.innerHTML = `<div class="text-sm font-medium text-gray-800 dark:text-white">${escapeHtml(provider.name ?? '—')}</div>`
+                                + `<div class="text-xs text-gray-500 dark:text-neutral-400">${escapeHtml(provider.identificacion ?? '')}</div>`;
+                            item.addEventListener('click', () => {
+                                searchInput.value = provider.name ?? '';
+                                hiddenId.value = provider.id;
+                                closeResults();
+                            });
+                            resultsEl.appendChild(item);
+                        });
+
+                        resultsEl.classList.remove('hidden');
+                    }
+
+                    searchInput.addEventListener('input', () => {
+                        hiddenId.value = '';
+
+                        const query = searchInput.value.trim();
+                        clearTimeout(searchTimeout);
+
+                        if (query === '') {
+                            closeResults();
+                            return;
+                        }
+
+                        if (query.length < 3) {
+                            resultsEl.innerHTML = `<div class="p-3 text-sm text-gray-500 dark:text-neutral-400">${escapeHtml('{{ __('Type at least 3 characters to search.') }}')}</div>`;
+                            resultsEl.classList.remove('hidden');
+                            return;
+                        }
+
+                        searchTimeout = setTimeout(() => {
+                            fetch(`{{ route('received-documents.provider-search') }}?q=${encodeURIComponent(query)}`, { headers: { Accept: 'application/json' } })
+                                .then((response) => response.json())
+                                .then((data) => {
+                                    if (searchInput.value.trim() !== query) return;
+                                    renderResults(data.providers || []);
+                                });
+                        }, 400);
+                    });
+
+                    document.addEventListener('click', (event) => {
+                        if (! searchInput.contains(event.target) && ! resultsEl.contains(event.target)) {
+                            closeResults();
+                        }
+                    });
+                }
+
+                /**
+                 * Sin guardia de "ya se enganchó" a propósito -- a diferencia de un listener
+                 * delegado sobre "document" (que sí necesitaría esa guardia porque "document"
+                 * sobrevive entre navegaciones Livewire), estos elementos se vuelven a crear en
+                 * cada navegación wire:navigate, así que hace falta re-engancharlos cada vez que
+                 * este script se re-ejecuta.
+                 */
+                function bindReceivedDocumentsFilters() {
+                    initReceivedDocumentsProviderSearch();
+
+                    /**
+                     * El panel de filtros arranca cerrado (ver la clase "hidden" en el blade) --
+                     * al abrirlo no hace falta nada más (el usuario los configura y le da a
+                     * "Refresh" para buscar con ellos), pero al cerrarlo se limpian y se recarga
+                     * la tabla de una, así nunca queda una búsqueda filtrada "escondida" detrás
+                     * de un panel cerrado.
+                     */
+                    document.getElementById('received-documents-filters-toggle-btn')?.addEventListener('click', () => {
+                        const isNowHidden = document.getElementById('received-documents-filters')?.classList.toggle('hidden');
+
+                        if (isNowHidden) {
+                            clearReceivedDocumentsFilters();
+                        }
+                    });
+                }
+
+                window.loadReceivedDocumentsTable = loadReceivedDocumentsTable;
+
+                bindReceivedDocumentsFilters();
+
+                document.addEventListener('DOMContentLoaded', loadReceivedDocumentsTable);
+                document.addEventListener('livewire:navigated', loadReceivedDocumentsTable);
+            })();
         </script>
-    @endif
+    @endpush
 
     <script>
-        document.getElementById('received-documents-search')?.addEventListener('input', (event) => {
-            const query = event.target.value.trim().toLowerCase();
-            document.querySelectorAll('#receivedDocumentsTable tbody tr').forEach((row) => {
-                row.classList.toggle('hidden', query !== '' && ! row.textContent.toLowerCase().includes(query));
-            });
-        });
-
         /**
          * Engancha el widget de arrastrar/soltar (Dropzone, vía Preline
          * HSFileUpload) con el <input type="file" multiple> real que se
@@ -177,9 +516,8 @@
          */
         // Envuelto en DOMContentLoaded a propósito: el bundle de Vite carga app.js (que trae
         // Preline, de ahí sale window.HSFileUpload) como <script type="module">, que SIEMPRE se difiere hasta
-        // que el documento termina de parsear -- si este bloque corriera de una al toque (como
-        // el de la búsqueda de arriba, que no depende de Preline), "window.HSFileUpload" todavía
-        // no existiría, el "if" de abajo se saltaría en silencio, y ni el input real se
+        // que el documento termina de parsear -- si este bloque corriera de una al toque, "window.HSFileUpload"
+        // todavía no existiría, el "if" de abajo se saltaría en silencio, y ni el input real se
         // sincronizaría con los archivos elegidos ni la barra de progreso se marcaría completa
         // (mismo motivo por el que companies/create.blade.php hace lo mismo con el certificado).
         document.addEventListener('DOMContentLoaded', function () {

@@ -1,5 +1,7 @@
 {
     "Sequential": "Secuencial",
+    "Filters": "Filtros",
+    "No results found.": "No se encontraron resultados.",
     "Payment means": "Medios de pago",
     "References": "Referencias",
     "Order date": "Fecha de la orden",
@@ -650,8 +652,8 @@
     "Choose at least one file first.": "Elige al menos un archivo primero.",
     "generated, the provider did not send one": "generado, el proveedor no mandó uno",
     "This is not the graphic representation the provider generated -- they did not send one. Billingo built this page from the data in the XML they sent.": "Esta no es la representación gráfica que generó el proveedor -- no mandó ninguna. Billingo armó esta página con los datos del XML que sí mandó.",
-    ":file: this document was already uploaded before (same UUID).": ":file: este documento ya se había subido antes (mismo UUID).",
-    ":file: this document is not addressed to :company (its AccountingCustomerParty NIT is :nit).": ":file: este documento no está dirigido a :company (su NIT en AccountingCustomerParty es :nit).",
+    ":numeral: this document was already uploaded before (same UUID).": ":numeral: este documento ya se había subido antes (mismo UUID).",
+    ":numeral: this document does not belong to :company, it belongs to identification :nit.": ":numeral: este documento no le pertenece a :company, le pertenece a la identificación :nit.",
     ":count document uploaded.|:count documents uploaded.": ":count documento subido.|:count documentos subidos.",
     "This company has none of the document-producing modules active yet (Invoicing, POS, Quotations, Receiving).": "Esta empresa todavía no tiene activo ningún módulo que produzca documentos (Emisión, Punto de venta, Cotizaciones, Recepción).",
     "Profile information updated.": "Información del perfil actualizada.",

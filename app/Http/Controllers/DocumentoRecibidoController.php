@@ -7,6 +7,7 @@ use App\Models\DocumentoRecibido;
 use App\Models\ThirdParty;
 use App\Services\Dian\ReceivedDocumentParser;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use InvalidArgumentException;
@@ -14,17 +15,140 @@ use RuntimeException;
 
 class DocumentoRecibidoController extends Controller
 {
+    // Mismos códigos DIAN que DocumentoEmitidoController::DOCUMENT_TYPE_LABELS_KEYS.
+    private const DOCUMENT_TYPE_LABELS_KEYS = [
+        '01' => 'Electronic sales invoice',
+        '02' => 'Electronic sales invoice (export)',
+        '03' => 'Electronic transmission instrument (type 03)',
+        '04' => 'Electronic sales invoice (type 04)',
+        '91' => 'Credit note',
+        '92' => 'Debit note',
+    ];
+
     /**
-     * Bandeja de documentos recibidos: facturas/notas que los proveedores le mandaron a la
-     * empresa activa, más recientes primero.
+     * $documentos vacío a propósito: la tabla se llena por AJAX (ver data()) apenas termina de
+     * cargar la página, en vez de bloquear el primer render con la consulta completa del
+     * historial -- mismo patrón que DocumentoEmitidoController::index()/data().
      */
     public function index(Request $request)
     {
         $company = $this->currentCompany($request);
 
-        $documentos = $company->documentosRecibidos()->with('proveedor')->orderByDesc('created_at')->get();
+        $documentos = collect();
 
         return view('received-documents.index', compact('company', 'documentos'));
+    }
+
+    /**
+     * Lista los documentos recibidos por la empresa activa, más recientes primero, filtrados
+     * directamente en la consulta (no en el navegador) -- con potencialmente decenas de miles de
+     * documentos por empresa, traer todo de una para filtrar del lado del cliente no escala.
+     * Todos los filtros son opcionales; sin ninguno, trae el historial completo (el frontend
+     * siempre manda al menos "from"/"to" con el rango por defecto -- ver
+     * $receivedDocumentsDefaultFrom/To en received-documents/index.blade.php -- así que en la
+     * práctica esto nunca pasa desde esa pantalla). Devuelve los datos crudos en JSON -- el
+     * frontend arma las celdas (ver received-documents/index.blade.php), el backend no arma HTML.
+     *
+     * @param  Request  $request  Query params opcionales: from, to (fecha "Y-m-d", sobre
+     *                             issue_date), provider_id (_id del ThirdParty elegido en el
+     *                             buscador -- ver providerSearch()), numeral, document_type
+     *                             (código DIAN), payment_form ("contado"|"credito").
+     */
+    public function data(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $query = $company->documentosRecibidos()->with('proveedor');
+
+        if ($request->filled('from')) {
+            $query->where('issue_date', '>=', Carbon::parse($request->query('from'))->startOfDay());
+        }
+
+        if ($request->filled('to')) {
+            $query->where('issue_date', '<=', Carbon::parse($request->query('to'))->endOfDay());
+        }
+
+        if ($numeral = trim((string) $request->query('numeral', ''))) {
+            $query->where('numeral', 'like', '%' . $numeral . '%');
+        }
+
+        if ($documentType = trim((string) $request->query('document_type', ''))) {
+            $query->where('tipo_documento', $documentType);
+        }
+
+        if ($paymentForm = $request->query('payment_form', '')) {
+            if ($paymentForm === 'credito') {
+                $query->where('payment_means_id', DocumentoRecibido::PAYMENT_MEANS_CREDIT);
+            } else {
+                $query->where('payment_means_id', '!=', DocumentoRecibido::PAYMENT_MEANS_CREDIT);
+            }
+        }
+
+        if ($providerId = trim((string) $request->query('provider_id', ''))) {
+            $query->where('proveedor_id', $providerId);
+        }
+
+        $documentos = $query->orderByDesc('created_at')->get();
+
+        $rows = $documentos->map(function (DocumentoRecibido $documento) {
+            $emisor = $documento->payload['accounting_supplier_party'] ?? [];
+
+            return [
+                'id' => (string) $documento->_id,
+                'issue_date' => optional($documento->issue_date)->format('Y-m-d'),
+                'numeral' => $documento->numeral,
+                'tipo_documento' => $documento->tipo_documento,
+                'provider_name' => $documento->proveedor->name ?? ($emisor['razon_social'] ?? null),
+                'provider_identification' => $emisor['identificacion'] ?? null,
+                'total_formatted' => $documento->total_formatted,
+                'status_label' => $documento->status_label,
+                'status_badge_classes' => $documento->status_badge_classes,
+                'payment_form' => $documento->is_credit ? 'credito' : 'contado',
+                'payment_form_label' => $documento->is_credit ? __('Credit') : __('Cash'),
+                'urls' => [
+                    'pdf' => route('received-documents.pdf', $documento->_id),
+                    'show' => route('received-documents.show', $documento->_id),
+                ],
+            ];
+        });
+
+        return response()->json([
+            'rows' => $rows,
+            'document_type_labels' => collect(self::DOCUMENT_TYPE_LABELS_KEYS)->mapWithKeys(fn ($labelKey, $code) => [$code => __($labelKey)]),
+        ]);
+    }
+
+    /**
+     * Endpoint AJAX: busca proveedores propios por nombre o identificación, para el buscador de
+     * proveedor del filtro de la bandeja -- mismo criterio que
+     * DocumentoEmitidoController::clientSearch() (ahí busca clientes, acá proveedores), no trae
+     * de una todos los proveedores de la empresa (puede haber miles).
+     */
+    public function providerSearch(Request $request)
+    {
+        $company = $this->currentCompany($request);
+
+        $query = trim((string) $request->query('q', ''));
+        if ($query === '') {
+            return response()->json(['providers' => []]);
+        }
+
+        $providers = $company->providers()
+            ->where(function ($builder) use ($query) {
+                $builder->where('name', 'like', '%' . $query . '%')
+                    ->orWhere('identificacion', 'like', '%' . $query . '%');
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'providers' => $providers->map(fn (ThirdParty $provider) => [
+                'id' => (string) $provider->_id,
+                'name' => $provider->name,
+                'identificacion' => $provider->identificacion,
+            ])->values(),
+        ]);
     }
 
     /**
@@ -63,8 +187,8 @@ class DocumentoRecibidoController extends Controller
 
                 $receptorNit = trim((string) ($parsed['payload']['accounting_customer_party']['identificacion'] ?? ''));
                 if ($receptorNit !== trim((string) $company->identificacion)) {
-                    $errores[] = __(':file: this document is not addressed to :company (its AccountingCustomerParty NIT is :nit).', [
-                        'file' => $file->getClientOriginalName(),
+                    $errores[] = __(':numeral: this document does not belong to :company, it belongs to identification :nit.', [
+                        'numeral' => $parsed['numeral'] ?: $file->getClientOriginalName(),
                         'company' => $company->name,
                         'nit' => $receptorNit ?: '—',
                     ]);
@@ -73,7 +197,7 @@ class DocumentoRecibidoController extends Controller
                 }
 
                 if (DocumentoRecibido::where('company_id', (string) $company->_id)->where('uuid', $parsed['uuid'])->where('uuid', '!=', '')->exists()) {
-                    $errores[] = __(':file: this document was already uploaded before (same UUID).', ['file' => $file->getClientOriginalName()]);
+                    $errores[] = __(':numeral: this document was already uploaded before (same UUID).', ['numeral' => $parsed['numeral'] ?: $file->getClientOriginalName()]);
 
                     continue;
                 }
