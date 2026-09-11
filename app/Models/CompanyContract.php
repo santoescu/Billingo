@@ -206,18 +206,28 @@ class CompanyContract extends Model
 
         $this->resetPeriodIfNeeded();
 
-        if (! $this->unlimited) {
-            [$limitField, $usedField] = $this->fieldsFor($module);
-            $limit = $this->{$limitField};
+        [$limitField, $usedField] = $this->fieldsFor($module);
+        $limit = $this->unlimited ? null : $this->{$limitField};
 
-            if ($limit !== null) {
-                $this->claimAggregateUsage($usedField, (int) $limit);
-            }
+        if ($limit !== null) {
+            $this->claimAggregateUsage($usedField, (int) $limit);
+        } else {
+            $this->incrementAggregateUsage($usedField);
         }
 
         if ($companyId) {
             static::where('_id', $this->_id)->increment("usage_by_company.{$companyId}.{$module}");
         }
+    }
+
+    /**
+     * Suma el contador de consumo sin tope contra el que compararlo (contrato ilimitado, o ese
+     * módulo específico sin límite configurado) -- puramente informativo, ver claimUsage().
+     */
+    private function incrementAggregateUsage(string $usedField): void
+    {
+        static::where('_id', $this->_id)->increment($usedField);
+        $this->{$usedField} = (int) $this->{$usedField} + 1;
     }
 
     /**
