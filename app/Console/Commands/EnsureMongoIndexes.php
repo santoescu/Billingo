@@ -35,17 +35,27 @@ class EnsureMongoIndexes extends Command
 
         $this->ensureIndexes('catalog_links', [
             ['key' => ['token' => 1]],
+            // Listado de links de una empresa (ver QuotationController::create()).
+            ['key' => ['company_id' => 1, 'created_at' => 1]],
         ]);
 
         $this->ensureIndexes('documentos_emitidos', [
             ['key' => ['company_id' => 1, 'ambiente' => 1, 'created_at' => 1]],
-            ['key' => ['ambiente' => 1, 'tipo_documento' => 1, 'status' => 1, 'numeral' => 1]],
             ['key' => ['company_id' => 1, 'numeral' => 1]],
         ]);
 
         $this->ensureIndexes('documentos_pos', [
             ['key' => ['company_id' => 1, 'created_at' => 1]],
             ['key' => ['company_id' => 1, 'numeral' => 1]],
+        ]);
+
+        $this->ensureIndexes('documentos_recibidos', [
+            ['key' => ['company_id' => 1, 'created_at' => 1]],
+            // Chequeo de duplicados (ver ReceivedDocumentIngestionService::ingest()) -- corre en
+            // cada documento que se sube a mano o llega por el correo de recepción.
+            ['key' => ['company_id' => 1, 'uuid' => 1]],
+            // Buscador de proveedor de la bandeja (ver DocumentoRecibidoController::data()).
+            ['key' => ['company_id' => 1, 'proveedor_id' => 1]],
         ]);
 
         $this->ensureIndexes('quotations', [
@@ -67,6 +77,53 @@ class EnsureMongoIndexes extends Command
 
         $this->ensureIndexes('stock_movements', [
             ['key' => ['product_id' => 1, 'created_at' => 1]],
+        ]);
+
+        $this->ensureIndexes('companies', [
+            // Se busca por estos dos en CADA request: el primero en toda llamada a la API (ver
+            // AuthenticateCompanyApiToken), el segundo en cada correo que llega al webhook de
+            // SES (ver SesInboundWebhookController::resolveCompanyFromRecipient()).
+            ['key' => ['api_token' => 1]],
+            ['key' => ['reception_email_token' => 1]],
+        ]);
+
+        $this->ensureIndexes('company_members', [
+            // La consulta más caliente de toda la app: corre en CADA request que pasa por
+            // EnsureCompanyRole/EnsureCompanyRoleAny (casi cualquier página autenticada), pero
+            // esta colección nunca había tenido ni un solo índice.
+            ['key' => ['company_id' => 1, 'user_id' => 1]],
+            // "¿A qué empresas pertenece este usuario?" (ver User::memberships(), usado al hacer
+            // login y en el selector de empresa) -- filtra solo por user_id, un índice compuesto
+            // con company_id primero no sirve para esa consulta.
+            ['key' => ['user_id' => 1]],
+        ]);
+
+        $this->ensureIndexes('email_logs', [
+            // Cada evento que manda SES (entregado/abierto/rebotado/spam) busca por esto (ver
+            // SesEventWebhookController::handle()).
+            ['key' => ['ses_message_id' => 1]],
+            // Historial de correos de un documento (ver DocumentoEmitidoController::show()/emailLogs()).
+            ['key' => ['documento_id' => 1]],
+        ]);
+
+        $this->ensureIndexes('activity_logs', [
+            ['key' => ['company_id' => 1, 'created_at' => 1]],
+        ]);
+
+        $this->ensureIndexes('support_tickets', [
+            ['key' => ['company_id' => 1, 'updated_at' => 1]],
+        ]);
+
+        $this->ensureIndexes('payment_methods', [
+            ['key' => ['company_id' => 1]],
+        ]);
+
+        $this->ensureIndexes('sellers', [
+            ['key' => ['company_id' => 1]],
+        ]);
+
+        $this->ensureIndexes('warehouses', [
+            ['key' => ['company_id' => 1]],
         ]);
 
         return self::SUCCESS;
