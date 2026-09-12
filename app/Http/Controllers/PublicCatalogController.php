@@ -252,7 +252,16 @@ class PublicCatalogController extends Controller
             'department_code' => ['nullable', 'string', 'max:10'],
             'city_code' => ['nullable', 'string', 'max:10'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
+            // El cliente puede traer varios correos separados por coma (mismo criterio que
+            // ThirdPartyController::validatedData()) -- el campo de chips de arriba
+            // (public/catalog.blade.php) guarda una lista, no un solo valor.
+            'email' => ['nullable', 'string', 'max:1000', function ($attribute, $value, $fail) {
+                foreach (array_filter(array_map('trim', explode(',', (string) $value))) as $email) {
+                    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $fail(__(':email is not a valid email address.', ['email' => $email]));
+                    }
+                }
+            }],
         ]);
 
         $existing = $company->clients()->where('identificacion', $data['identificacion'])->first();

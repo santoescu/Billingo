@@ -115,7 +115,16 @@
                             nameInput.value = data.name;
                         }
                         if (data.email && emailInput) {
-                            emailInput.value = data.email;
+                            // "emailInput" puede ser el input suelto de siempre
+                            // (documents/create.blade.php, un solo correo) o el contenedor de
+                            // chips de third-parties/partials/form-panel.blade.php (varios
+                            // correos) -- ahí no alcanza con pisar ".value", hay que avisarle por
+                            // evento para que agregue un chip nuevo solo si no estaba ya.
+                            if (emailInput.tagName === 'INPUT') {
+                                emailInput.value = data.email;
+                            } else {
+                                emailInput.dispatchEvent(new CustomEvent('add-email-chip', { detail: { email: data.email } }));
+                            }
                         }
                     } catch (error) {
                         if (token !== lookupToken) {

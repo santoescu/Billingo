@@ -124,13 +124,11 @@
                     </div>
                 </div>
                 <div>
-                    <label for="tp-email" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Email') }}</label>
-                    <div class="relative">
-                        <input type="email" id="tp-email" name="email" value="{{ old('email') }}" data-dian-lookup-email class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
-                        <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
-                            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                        </div>
+                    <label for="tp-email-chip-input" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Email') }}</label>
+                    <div id="tp-email-chips" data-dian-lookup-email class="flex flex-wrap items-center gap-1.5 w-full min-h-10 bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 rounded-lg text-base sm:text-sm shadow-xs py-1.5 px-2 focus-within:ring-2 focus-within:ring-accent">
+                        <input type="text" id="tp-email-chip-input" autocomplete="off" class="flex-1 min-w-24 border-0 bg-transparent p-1 text-zinc-700 dark:text-zinc-300 focus:outline-hidden focus:ring-0" placeholder="{{ __('Type an email and press Enter') }}">
                     </div>
+                    <input type="hidden" name="email" id="tp-email" value="{{ old('email') }}">
                 </div>
             </div>
 

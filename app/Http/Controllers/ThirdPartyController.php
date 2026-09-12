@@ -156,7 +156,16 @@ class ThirdPartyController extends Controller
             'department_code' => 'nullable|string|max:10',
             'city_code' => 'nullable|string|max:10',
             'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
+            // "email" guarda una o varias direcciones separadas por coma (mismo criterio que
+            // DocumentoEmitidoController::sendEmail()) -- por eso no alcanza la regla nativa
+            // "email" (que solo valida un único correo), se valida cada parte por separado.
+            'email' => ['nullable', 'string', 'max:1000', function ($attribute, $value, $fail) {
+                foreach (array_filter(array_map('trim', explode(',', (string) $value))) as $email) {
+                    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $fail(__(':email is not a valid email address.', ['email' => $email]));
+                    }
+                }
+            }],
         ]);
 
         $data['fiscal_responsibilities'] = implode(';', $data['fiscal_responsibilities'] ?? []);

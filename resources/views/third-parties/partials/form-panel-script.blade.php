@@ -24,6 +24,133 @@
             }
         }
 
+        let tpChipEmails = [];
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            })[char]);
+        }
+
+        /**
+         * El correo del tercero se guarda como una lista separada por coma en un solo campo
+         * (mismo criterio que DocumentoEmitidoController::sendEmail()), pero se ve como "chips"
+         * (un badge removible por cada correo) -- mismo patrón que
+         * documents/partials/send-email-modal.blade.php. "tpChipEmails" es la lista en memoria;
+         * el <input type="hidden" id="tp-email"> es lo único que de verdad manda el formulario.
+         * @returns {void}
+         */
+        function tpRenderEmailChips() {
+            const container = document.getElementById('tp-email-chips');
+            const textInput = document.getElementById('tp-email-chip-input');
+            const hiddenInput = document.getElementById('tp-email');
+            if (! container || ! textInput || ! hiddenInput) return;
+
+            container.querySelectorAll('[data-chip]').forEach((chip) => chip.remove());
+
+            tpChipEmails.forEach((email, index) => {
+                const chip = document.createElement('span');
+                chip.dataset.chip = 'true';
+                chip.className = 'inline-flex items-center gap-1 rounded-md bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 text-xs font-medium';
+                chip.innerHTML = `${escapeHtml(email)}<button type="button" class="hover:opacity-70" data-index="${index}" aria-label="{{ __('Remove') }}">
+                    <svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                </button>`;
+                container.insertBefore(chip, textInput);
+            });
+
+            hiddenInput.value = tpChipEmails.join(',');
+        }
+
+        /**
+         * Agrega el texto que el usuario escribió como chip nuevo, si parece un correo válido y
+         * no está repetido -- un correo con formato inválido se deja tal cual en el input (no se
+         * limpia) para que el usuario lo corrija, en vez de perderlo en silencio.
+         * @returns {void}
+         */
+        function tpCommitEmailChipInput() {
+            const textInput = document.getElementById('tp-email-chip-input');
+            if (! textInput) return;
+
+            const email = textInput.value.trim().replace(/,+$/, '');
+            if (! email || ! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+
+            if (! tpChipEmails.includes(email)) {
+                tpChipEmails.push(email);
+                tpRenderEmailChips();
+            }
+
+            textInput.value = '';
+        }
+
+        /**
+         * Reemplaza toda la lista de chips por la que venga en "csv" (separada por coma) --
+         * usado al abrir el panel para editar un tercero ya existente (ver openThirdPartyPanel())
+         * y al recargar la página con errores de validación (ver el bloque de errores más abajo,
+         * que ya deja "old('email')" en el input oculto).
+         * @param {string} csv
+         * @returns {void}
+         */
+        window.setThirdPartyEmailChips = function (csv) {
+            tpChipEmails = (csv || '').split(',').map((email) => email.trim()).filter(Boolean);
+            const textInput = document.getElementById('tp-email-chip-input');
+            if (textInput) textInput.value = '';
+            tpRenderEmailChips();
+        };
+
+        /**
+         * Igual que initDianAcquirerLookups() (documents/components/dian-acquirer-lookup-script.blade.php):
+         * se re-ejecuta completo en cada navegación Livewire, así que la guardia va sobre el
+         * elemento en sí (fresco en cada navegación), no sobre "document.body" -- si no, después
+         * de la primera visita a esta página en la sesión, los chips de una visita posterior se
+         * quedarían sin ningún listener.
+         * @returns {void}
+         */
+        function initThirdPartyEmailChips() {
+            const container = document.getElementById('tp-email-chips');
+            if (! container || container.dataset.bound === 'true') return;
+            container.dataset.bound = 'true';
+
+            // El valor inicial (old('email') tras un error de validación, o vacío en un panel
+            // nuevo) ya viene puesto en el input oculto desde el servidor -- se arranca la lista
+            // de chips a partir de ahí, en vez de vacía.
+            tpChipEmails = (document.getElementById('tp-email')?.value || '').split(',').map((email) => email.trim()).filter(Boolean);
+
+            const textInput = document.getElementById('tp-email-chip-input');
+
+            textInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ',') {
+                    event.preventDefault();
+                    tpCommitEmailChipInput();
+                } else if (event.key === 'Backspace' && textInput.value === '' && tpChipEmails.length) {
+                    tpChipEmails.pop();
+                    tpRenderEmailChips();
+                }
+            });
+
+            textInput.addEventListener('blur', tpCommitEmailChipInput);
+
+            container.addEventListener('click', function (event) {
+                const removeBtn = event.target.closest('button[data-index]');
+                if (! removeBtn) return;
+
+                tpChipEmails.splice(Number(removeBtn.dataset.index), 1);
+                tpRenderEmailChips();
+            });
+
+            // El buscador de la DIAN (ver dian-acquirer-lookup-script.blade.php) dispara este
+            // evento en vez de pisar un input de texto directo -- si ya está entre los chips no
+            // agrega nada de nuevo (evita duplicar lo que el usuario ya había escrito a mano).
+            container.addEventListener('add-email-chip', function (event) {
+                const email = event.detail?.email?.trim();
+                if (email && ! tpChipEmails.includes(email)) {
+                    tpChipEmails.push(email);
+                    tpRenderEmailChips();
+                }
+            });
+
+            tpRenderEmailChips();
+        }
+
         function rebuildCitySelect(citySelect, departmentCode, selectedCityCode = '') {
             const instance = window.HSSelect && HSSelect.getInstance(citySelect);
             if (instance && typeof instance.destroy === 'function') {
@@ -75,7 +202,7 @@
             setSelectValue('tp-department_code', thirdParty?.department_code);
             rebuildCitySelect(document.getElementById('tp-city_code'), thirdParty?.department_code ?? '', thirdParty?.city_code ?? '');
             document.getElementById('tp-phone').value = thirdParty?.phone ?? '';
-            document.getElementById('tp-email').value = thirdParty?.email ?? '';
+            window.setThirdPartyEmailChips(thirdParty?.email ?? '');
 
             @if (isset($updateRouteBase))
                 if (thirdParty?.id) {
@@ -99,12 +226,19 @@
             }
             departmentSelect.dataset.bound = 'true';
 
+            initThirdPartyEmailChips();
+
             rebuildCitySelect(document.getElementById('tp-city_code'), departmentSelect.value, '{{ old('city_code') }}');
             departmentSelect.addEventListener('change', () => {
                 rebuildCitySelect(document.getElementById('tp-city_code'), departmentSelect.value);
             });
 
             document.getElementById('thirdPartyForm').addEventListener('submit', async function (event) {
+                // Antes que nada, tanto si el submit sigue normal como si se intercepta por
+                // AJAX abajo: si el usuario escribió un correo y le dio directo a "Guardar" sin
+                // pasar por Enter/coma, que no se pierda.
+                tpCommitEmailChipInput();
+
                 if (typeof window.thirdPartyPanelOnSave !== 'function') {
                     return;
                 }

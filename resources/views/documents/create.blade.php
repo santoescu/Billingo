@@ -309,13 +309,11 @@
                         </div>
                     </div>
                     <div>
-                        <label for="doc-cliente_email" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Email') }}</label>
-                        <div class="relative">
-                            <input type="email" id="doc-cliente_email" name="cliente_email" value="{{ old('cliente_email') }}" data-dian-lookup-email class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
-                            <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
-                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                            </div>
+                        <label for="doc-cliente_email-chip-input" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Email') }}</label>
+                        <div id="doc-cliente_email-chips" data-dian-lookup-email class="flex flex-wrap items-center gap-1.5 w-full min-h-10 bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 rounded-lg text-base sm:text-sm shadow-xs py-1.5 px-2 focus-within:ring-2 focus-within:ring-accent">
+                            <input type="text" id="doc-cliente_email-chip-input" autocomplete="off" class="flex-1 min-w-24 border-0 bg-transparent p-1 text-zinc-700 dark:text-zinc-300 focus:outline-hidden focus:ring-0" placeholder="{{ __('Type an email and press Enter') }}">
                         </div>
+                        <input type="hidden" name="cliente_email" id="doc-cliente_email" value="{{ old('cliente_email') }}">
                     </div>
                 </div>
             </div>
@@ -1582,6 +1580,118 @@
                         });
                 }
 
+                let docClienteChipEmails = [];
+
+                /**
+                 * Sincroniza los chips del correo del cliente (ver el campo "Email" de arriba)
+                 * con el input oculto que de verdad manda el formulario -- mismo patrón que
+                 * third-parties/partials/form-panel-script.blade.php (duplicado a propósito acá:
+                 * son dos formularios distintos, cada uno con su propio estado en memoria).
+                 * @returns {void}
+                 */
+                function renderDocClienteEmailChips() {
+                    const container = document.getElementById('doc-cliente_email-chips');
+                    const textInput = document.getElementById('doc-cliente_email-chip-input');
+                    const hiddenInput = document.getElementById('doc-cliente_email');
+                    if (! container || ! textInput || ! hiddenInput) return;
+
+                    container.querySelectorAll('[data-chip]').forEach((chip) => chip.remove());
+
+                    docClienteChipEmails.forEach((email, index) => {
+                        const chip = document.createElement('span');
+                        chip.dataset.chip = 'true';
+                        chip.className = 'inline-flex items-center gap-1 rounded-md bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 text-xs font-medium';
+                        chip.innerHTML = `${dianEscapeHtml(email)}<button type="button" class="hover:opacity-70" data-index="${index}" aria-label="{{ __('Remove') }}">
+                            <svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                        </button>`;
+                        container.insertBefore(chip, textInput);
+                    });
+
+                    hiddenInput.value = docClienteChipEmails.join(',');
+                }
+
+                /**
+                 * Agrega el texto que el usuario escribió como chip nuevo, si parece un correo
+                 * válido y no está repetido -- un correo con formato inválido se deja tal cual en
+                 * el input (no se limpia) para que el usuario lo corrija.
+                 * @returns {void}
+                 */
+                function commitDocClienteEmailChipInput() {
+                    const textInput = document.getElementById('doc-cliente_email-chip-input');
+                    if (! textInput) return;
+
+                    const email = textInput.value.trim().replace(/,+$/, '');
+                    if (! email || ! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+
+                    if (! docClienteChipEmails.includes(email)) {
+                        docClienteChipEmails.push(email);
+                        renderDocClienteEmailChips();
+                    }
+
+                    textInput.value = '';
+                }
+
+                /**
+                 * Reemplaza toda la lista de chips por la que venga en "csv" (separada por coma)
+                 * -- usado al elegir un cliente ya existente (ver applyClientToFields()).
+                 * @param {string} csv
+                 * @returns {void}
+                 */
+                function setDocClienteEmailChips(csv) {
+                    docClienteChipEmails = (csv || '').split(',').map((email) => email.trim()).filter(Boolean);
+                    const textInput = document.getElementById('doc-cliente_email-chip-input');
+                    if (textInput) textInput.value = '';
+                    renderDocClienteEmailChips();
+                }
+
+                /**
+                 * Engancha el campo de chips de correo del cliente -- el buscador de la DIAN
+                 * (ver components/dian-acquirer-lookup-script.blade.php) dispara
+                 * "add-email-chip" en vez de pisar el valor directo, así que si el correo que
+                 * trae ya está entre los chips no agrega nada de nuevo, y si no está lo suma al
+                 * resto en vez de reemplazarlos.
+                 * @returns {void}
+                 */
+                function initDocClienteEmailChips() {
+                    const container = document.getElementById('doc-cliente_email-chips');
+                    if (! container || container.dataset.bound === 'true') return;
+                    container.dataset.bound = 'true';
+
+                    docClienteChipEmails = (document.getElementById('doc-cliente_email')?.value || '').split(',').map((email) => email.trim()).filter(Boolean);
+
+                    const textInput = document.getElementById('doc-cliente_email-chip-input');
+
+                    textInput.addEventListener('keydown', function (event) {
+                        if (event.key === 'Enter' || event.key === ',') {
+                            event.preventDefault();
+                            commitDocClienteEmailChipInput();
+                        } else if (event.key === 'Backspace' && textInput.value === '' && docClienteChipEmails.length) {
+                            docClienteChipEmails.pop();
+                            renderDocClienteEmailChips();
+                        }
+                    });
+
+                    textInput.addEventListener('blur', commitDocClienteEmailChipInput);
+
+                    container.addEventListener('click', function (event) {
+                        const removeBtn = event.target.closest('button[data-index]');
+                        if (! removeBtn) return;
+
+                        docClienteChipEmails.splice(Number(removeBtn.dataset.index), 1);
+                        renderDocClienteEmailChips();
+                    });
+
+                    container.addEventListener('add-email-chip', function (event) {
+                        const email = event.detail?.email?.trim();
+                        if (email && ! docClienteChipEmails.includes(email)) {
+                            docClienteChipEmails.push(email);
+                            renderDocClienteEmailChips();
+                        }
+                    });
+
+                    renderDocClienteEmailChips();
+                }
+
                 function applyClientToFields(client, departmentSelect) {
                     setSelectValue(document.getElementById('doc-cliente_tipo_identificacion'), client.identification_type);
                     document.getElementById('doc-cliente_identificacion').value = client.identificacion || '';
@@ -1599,7 +1709,13 @@
                     setSelectValue(departmentSelect, client.department_code);
                     rebuildCitySelect(document.getElementById('doc-cliente_ciudad_codigo'), client.department_code || '', client.city_code || '');
                     document.getElementById('doc-cliente_telefono').value = client.phone || '';
-                    document.getElementById('doc-cliente_email').value = client.email || '';
+                    // El cliente puede tener varios correos guardados (separados por coma -- ver
+                    // third-parties/partials/form-panel.blade.php) -- se muestran todos como
+                    // chips, igual que en esa pantalla, y se mandan todos juntos (separados por
+                    // coma) al AccountingCustomerParty del XML que se manda a la DIAN (ver
+                    // DocumentoEmitidoController::buildDocumentJson()), que sí acepta varios
+                    // correos en el mismo campo.
+                    setDocClienteEmailChips(client.email || '');
 
                     const lookupRoot = document.querySelector('[data-dian-lookup]');
                     if (lookupRoot && lookupRoot.dianLookupTrigger) {
@@ -2283,6 +2399,11 @@
                  * @returns {FormData}
                  */
                 function buildDocumentFormData(form) {
+                    // Antes que nada: si el usuario escribió un correo del cliente y le dio
+                    // directo a "Emitir" sin pasar por Enter/coma, que no se pierda -- el
+                    // FormData de abajo solo ve lo que ya esté en el input oculto.
+                    commitDocClienteEmailChipInput();
+
                     const formData = new FormData(form);
                     const emptyLineIndexes = [];
 
@@ -3518,6 +3639,7 @@
                     });
 
                     initClientSearch(departmentSelect);
+                    initDocClienteEmailChips();
 
                     const posEfectivoDisplay = document.getElementById('pos-efectivo-display');
                     const posEfectivoHidden = document.getElementById('pos-efectivo-hidden');

@@ -1522,7 +1522,7 @@
                     body.append('cliente_departamento_codigo', client.department_code || '');
                     body.append('cliente_ciudad_codigo', client.city_code || '');
                     body.append('cliente_telefono', client.phone || '');
-                    body.append('cliente_email', client.email || '');
+                    body.append('cliente_email', (client.email || '').split(',')[0].trim());
                     if (ticket.sellerId) {
                         body.append('seller_id', ticket.sellerId);
                     }
@@ -1611,7 +1611,7 @@
                     body.append('cliente_departamento_codigo', client.department_code || '');
                     body.append('cliente_ciudad_codigo', client.city_code || '');
                     body.append('cliente_telefono', client.phone || '');
-                    body.append('cliente_email', client.email || '');
+                    body.append('cliente_email', (client.email || '').split(',')[0].trim());
                     if (ticket.sellerId) {
                         body.append('seller_id', ticket.sellerId);
                     }

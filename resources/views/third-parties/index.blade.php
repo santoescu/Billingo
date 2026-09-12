@@ -59,7 +59,18 @@
                                     <tr>
                                         <td class="px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200">{{ $thirdParty->name }}</td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $thirdParty->identificacion }}{{ $thirdParty->dv ? '-'.$thirdParty->dv : '' }}</td>
-                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $thirdParty->email ?? '—' }}</td>
+                                        <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                                            @php $thirdPartyEmails = array_filter(array_map('trim', explode(',', $thirdParty->email ?? ''))); @endphp
+                                            @if (empty($thirdPartyEmails))
+                                                —
+                                            @else
+                                                <div class="flex flex-wrap gap-1">
+                                                    @foreach ($thirdPartyEmails as $thirdPartyEmail)
+                                                        <span class="inline-flex items-center rounded-md bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 text-xs font-medium">{{ $thirdPartyEmail }}</span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $thirdParty->phone ?? '—' }}</td>
                                         <td class="px-4 py-4 text-right">
                                             <div class="flex justify-end gap-1">

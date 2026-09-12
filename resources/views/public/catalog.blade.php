@@ -159,12 +159,9 @@
                             </div>
                         </div>
                         <div>
-                            <label for="catalog-client-new-email" class="block mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Email') }}</label>
-                            <div class="relative">
-                                <input type="email" id="catalog-client-new-email" class="ps-10 pe-3 py-2 h-10 block w-full border rounded-lg text-base sm:text-sm shadow-xs appearance-none bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-400 border-zinc-200 border-b-zinc-300/80 dark:border-white/10 focus:outline-hidden focus:ring-2 focus:ring-accent">
-                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-zinc-400 dark:text-white/60">
-                                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                                </div>
+                            <label for="catalog-client-new-email-chip-input" class="block mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Email') }}</label>
+                            <div id="catalog-client-new-email-chips" class="flex flex-wrap items-center gap-1.5 w-full min-h-10 bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 rounded-lg text-base sm:text-sm shadow-xs py-1.5 px-2 focus-within:ring-2 focus-within:ring-accent">
+                                <input type="text" id="catalog-client-new-email-chip-input" autocomplete="off" class="flex-1 min-w-24 border-0 bg-transparent p-1 text-zinc-700 dark:text-zinc-300 focus:outline-hidden focus:ring-0" placeholder="{{ __('Type an email and press Enter') }}">
                             </div>
                         </div>
                         <flux:button type="button" variant="primary" id="catalog-client-create-btn">{{ __('Create client') }}</flux:button>
@@ -322,12 +319,86 @@
                     }
                 }
 
+                let catalogClientChipEmails = [];
+
+                /**
+                 * Chips de correo del cliente nuevo -- mismo patrón que
+                 * third-parties/partials/form-panel-script.blade.php (duplicado a propósito acá:
+                 * esta página pública no comparte JS con el panel de administración).
+                 * @returns {void}
+                 */
+                function renderCatalogClientEmailChips() {
+                    const container = document.getElementById('catalog-client-new-email-chips');
+                    const textInput = document.getElementById('catalog-client-new-email-chip-input');
+                    if (! container || ! textInput) return;
+
+                    container.querySelectorAll('[data-chip]').forEach((chip) => chip.remove());
+
+                    catalogClientChipEmails.forEach((email, index) => {
+                        const chip = document.createElement('span');
+                        chip.dataset.chip = 'true';
+                        chip.className = 'inline-flex items-center gap-1 rounded-md bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 text-xs font-medium';
+                        chip.innerHTML = `${escapeHtml(email)}<button type="button" class="hover:opacity-70" data-index="${index}" aria-label="{{ __('Remove') }}">
+                            <svg class="size-3 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                        </button>`;
+                        container.insertBefore(chip, textInput);
+                    });
+                }
+
+                /**
+                 * Agrega el texto escrito como chip nuevo si parece un correo válido y no está
+                 * repetido -- uno con formato inválido se deja tal cual para que se corrija.
+                 * @returns {void}
+                 */
+                function commitCatalogClientEmailChipInput() {
+                    const textInput = document.getElementById('catalog-client-new-email-chip-input');
+                    if (! textInput) return;
+
+                    const email = textInput.value.trim().replace(/,+$/, '');
+                    if (! email || ! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+
+                    if (! catalogClientChipEmails.includes(email)) {
+                        catalogClientChipEmails.push(email);
+                        renderCatalogClientEmailChips();
+                    }
+
+                    textInput.value = '';
+                }
+
+                function bindCatalogClientEmailChips() {
+                    const container = document.getElementById('catalog-client-new-email-chips');
+                    const textInput = document.getElementById('catalog-client-new-email-chip-input');
+                    if (! container || ! textInput) return;
+
+                    textInput.addEventListener('keydown', function (event) {
+                        if (event.key === 'Enter' || event.key === ',') {
+                            event.preventDefault();
+                            commitCatalogClientEmailChipInput();
+                        } else if (event.key === 'Backspace' && textInput.value === '' && catalogClientChipEmails.length) {
+                            catalogClientChipEmails.pop();
+                            renderCatalogClientEmailChips();
+                        }
+                    });
+
+                    textInput.addEventListener('blur', commitCatalogClientEmailChipInput);
+
+                    container.addEventListener('click', function (event) {
+                        const removeBtn = event.target.closest('button[data-index]');
+                        if (! removeBtn) return;
+
+                        catalogClientChipEmails.splice(Number(removeBtn.dataset.index), 1);
+                        renderCatalogClientEmailChips();
+                    });
+                }
+
                 function bindClientStep() {
                     const departmentSelect = document.getElementById('catalog-client-new-department');
                     const citySelect = document.getElementById('catalog-client-new-city');
                     rebuildCitySelect(citySelect, departmentSelect.value);
                     departmentSelect.addEventListener('change', () => rebuildCitySelect(citySelect, departmentSelect.value));
                     departmentSelect.addEventListener('change.hs.select', () => rebuildCitySelect(citySelect, departmentSelect.value));
+
+                    bindCatalogClientEmailChips();
 
                     document.getElementById('catalog-client-search-btn').addEventListener('click', async () => {
                         const identificacion = document.getElementById('catalog-client-identificacion').value.trim();
@@ -354,6 +425,8 @@
                             return;
                         }
 
+                        commitCatalogClientEmailChipInput();
+
                         const body = new URLSearchParams();
                         body.append('identification_type', document.getElementById('catalog-client-new-type').value || '13');
                         body.append('identificacion', identificacion);
@@ -366,7 +439,7 @@
                         body.append('department_code', document.getElementById('catalog-client-new-department').value);
                         body.append('city_code', document.getElementById('catalog-client-new-city').value);
                         body.append('phone', document.getElementById('catalog-client-new-phone').value.trim());
-                        body.append('email', document.getElementById('catalog-client-new-email').value.trim());
+                        body.append('email', catalogClientChipEmails.join(','));
 
                         try {
                             const response = await fetch(clientStoreUrl, {
@@ -401,6 +474,9 @@
                     document.getElementById('catalog-client-modal-error').classList.add('hidden');
                     document.getElementById('catalog-client-new-form').classList.add('hidden');
                     document.getElementById('catalog-client-identificacion').value = '';
+                    catalogClientChipEmails = [];
+                    document.getElementById('catalog-client-new-email-chip-input').value = '';
+                    renderCatalogClientEmailChips();
                     if (window.HSOverlay) {
                         HSOverlay.autoInit();
                         HSOverlay.open('#catalog-client-modal');
