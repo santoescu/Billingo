@@ -88,6 +88,39 @@
         </tr>
     </table>
 
+    @php
+        $paymentMeansList = $documento->payload['payment_means_list'] ?? [];
+        $paymentFormLabels = ['1' => __('Cash'), '2' => __('Credit')];
+        $paymentMeansCodeCatalog = \App\Models\PaymentMeansCode::all()->keyBy('codigo');
+        $notas = $documento->payload['notas'] ?? [];
+    @endphp
+
+    @if (! empty($paymentMeansList))
+        <table class="items" style="margin-top: 14px;">
+            <tr class="items-head">
+                <td>{{ __('Payment form') }}</td>
+                <td>{{ __('Payment method') }}</td>
+                <td class="end">{{ __('Due date') }}</td>
+            </tr>
+            @foreach ($paymentMeansList as $pago)
+                <tr class="items-row">
+                    <td>{{ $paymentFormLabels[$pago['id'] ?? ''] ?? $pago['id'] ?? '—' }}</td>
+                    <td>{{ $paymentMeansCodeCatalog[$pago['codigo'] ?? '']->medio ?? $pago['codigo'] ?? '—' }}</td>
+                    <td class="end">{{ $pago['fecha_vencimiento'] ?? '—' }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    @if (! empty($notas))
+        <div class="info-box">
+            <p class="info-label">{{ __('Notes') }}</p>
+            @foreach ($notas as $nota)
+                <p class="info-value">{{ $nota }}</p>
+            @endforeach
+        </div>
+    @endif
+
     <p class="footer-note">{{ __('This is not the graphic representation the provider generated -- they did not send one. Billingo built this page from the data in the XML they sent.') }}</p>
 </body>
 </html>

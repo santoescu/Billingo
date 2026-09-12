@@ -200,6 +200,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('{documento}/invoice-preview', [DocumentoEmitidoController::class, 'invoicePreview'])->name('invoice-preview');
             Route::post('{documento}/toggle-paid', [DocumentoEmitidoController::class, 'togglePaid'])->name('toggle-paid');
             Route::post('{documento}/retry', [DocumentoEmitidoController::class, 'retry'])->name('retry');
+            Route::post('{documento}/send-email', [DocumentoEmitidoController::class, 'sendEmail'])->name('send-email');
+            Route::get('{documento}/email-logs', [DocumentoEmitidoController::class, 'emailLogs'])->name('email-logs');
         });
 
     Route::middleware(['company.selected', 'company.role:pos,administrador,cajero,auditor'])

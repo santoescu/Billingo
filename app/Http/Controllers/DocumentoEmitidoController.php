@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DocumentIssuedMail;
 use App\Models\CashShift;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
+use App\Models\EmailLog;
 use App\Models\FiscalResponsibility;
 use App\Models\MeasurementUnit;
 use App\Models\PaymentMeansCode;
@@ -26,6 +28,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
@@ -65,10 +68,20 @@ class DocumentoEmitidoController extends Controller
     ];
 
     /**
-     * Lista los documentos emitidos por la empresa activa en su ambiente
-     * DIAN actual (habilitación o producción), más recientes primero. Devuelve
-     * los datos crudos en JSON -- el frontend arma las celdas (ver
-     * documents/index.blade.php), el backend no arma HTML.
+     * Lista los documentos emitidos por la empresa activa en su ambiente DIAN actual
+     * (habilitación o producción), más recientes primero, filtrados directamente en la consulta
+     * (no en el navegador) -- mismo criterio que DocumentoRecibidoController::data(): con
+     * potencialmente decenas de miles de documentos por empresa, traer todo de una para filtrar
+     * del lado del cliente no escala. Todos los filtros son opcionales; sin ninguno, trae el
+     * historial completo (el frontend siempre manda al menos "from"/"to" con el rango por
+     * defecto -- ver $documentsDefaultFrom/To en documents/index.blade.php -- así que en la
+     * práctica esto nunca pasa desde esa pantalla). Devuelve los datos crudos en JSON -- el
+     * frontend arma las celdas (ver documents/index.blade.php), el backend no arma HTML.
+     *
+     * @param  Request  $request  Query params opcionales: from, to (fecha "Y-m-d", sobre
+     *                             issue_date), customer_id (_id del ThirdParty elegido en el
+     *                             buscador -- ver clientSearch()), numeral, document_type
+     *                             (código DIAN), payment_form ("contado"|"credito").
      */
     public function data(Request $request)
     {
@@ -76,10 +89,37 @@ class DocumentoEmitidoController extends Controller
         $environment = $company->dian_environment ?? Company::DIAN_AMBIENTE_PRUEBAS;
         $nitIdentificationType = '31';
 
-        $documentos = $company->documentosEmitidos()
-            ->where('ambiente', $environment)
-            ->orderByDesc('created_at')
-            ->get();
+        $query = $company->documentosEmitidos()->where('ambiente', $environment);
+
+        if ($request->filled('from')) {
+            $query->where('issue_date', '>=', \Carbon\Carbon::parse($request->query('from'))->startOfDay());
+        }
+
+        if ($request->filled('to')) {
+            $query->where('issue_date', '<=', \Carbon\Carbon::parse($request->query('to'))->endOfDay());
+        }
+
+        if ($numeral = trim((string) $request->query('numeral', ''))) {
+            $query->where('numeral', 'like', '%' . $numeral . '%');
+        }
+
+        if ($documentType = trim((string) $request->query('document_type', ''))) {
+            $query->where('tipo_documento', $documentType);
+        }
+
+        if ($paymentForm = $request->query('payment_form', '')) {
+            if ($paymentForm === 'credito') {
+                $query->where('payment_means_id', DocumentoEmitido::PAYMENT_MEANS_CREDIT);
+            } else {
+                $query->where('payment_means_id', '!=', DocumentoEmitido::PAYMENT_MEANS_CREDIT);
+            }
+        }
+
+        if ($customerId = trim((string) $request->query('customer_id', ''))) {
+            $query->where('cliente_id', $customerId);
+        }
+
+        $documentos = $query->orderByDesc('created_at')->get();
 
         $rows = $documentos->map(function (DocumentoEmitido $documento) use ($nitIdentificationType) {
             $customerParty = $documento->payload['accounting_customer_party'] ?? [];
@@ -96,6 +136,7 @@ class DocumentoEmitidoController extends Controller
                 'customer_name' => $customerName,
                 'customer_identification' => $customerIdentification,
                 'customer_dv' => $customerDv,
+                'customer_email' => $documento->cliente?->email ?? ($customerParty['email'] ?? null),
                 'total_formatted' => $documento->total_formatted,
                 'status' => $documento->status,
                 'status_label' => $documento->status_label,
@@ -108,6 +149,8 @@ class DocumentoEmitidoController extends Controller
                     'show' => route('documents.show', $documento->_id),
                     'retry' => route('documents.retry', $documento->_id),
                     'edit' => route('documents.create', ['edit_document_id' => $documento->_id]),
+                    'sendEmail' => route('documents.send-email', $documento->_id),
+                    'emailLogs' => route('documents.email-logs', $documento->_id),
                 ],
             ];
         });
@@ -732,7 +775,16 @@ class DocumentoEmitidoController extends Controller
             'cliente_departamento_codigo' => ['required', 'string', 'max:10'],
             'cliente_ciudad_codigo' => ['required', 'string', 'max:10'],
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
-            'cliente_email' => ['nullable', 'email', 'max:255'],
+            // El cliente puede traer varios correos separados por coma (mismo criterio que
+            // ThirdPartyController::validatedData(): el chip de correo en documents/create.blade.php
+            // guarda una lista, no un solo valor) -- por eso no alcanza la regla nativa "email".
+            'cliente_email' => ['nullable', 'string', 'max:1000', function ($attribute, $value, $fail) {
+                foreach (array_filter(array_map('trim', explode(',', (string) $value))) as $email) {
+                    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $fail(__(':email is not a valid email address.', ['email' => $email]));
+                    }
+                }
+            }],
 
             'payment_means_id' => ['nullable', 'array'],
             'payment_means_id.*' => ['nullable', 'string', 'in:1,2'],
@@ -1122,7 +1174,17 @@ class DocumentoEmitidoController extends Controller
             'cliente_departamento_codigo' => ['nullable', 'string', 'max:10'],
             'cliente_ciudad_codigo' => ['nullable', 'string', 'max:10'],
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
-            'cliente_email' => ['nullable', 'email', 'max:255'],
+            // El cliente puede traer varios correos separados por coma (mismo criterio que en
+            // buildDocumentFromRequest()) -- una cotización ni siquiera tiene la restricción de
+            // un solo correo que sí aplica al XML de la DIAN, así que no hay motivo para quedarse
+            // con uno solo.
+            'cliente_email' => ['nullable', 'string', 'max:1000', function ($attribute, $value, $fail) {
+                foreach (array_filter(array_map('trim', explode(',', (string) $value))) as $email) {
+                    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $fail(__(':email is not a valid email address.', ['email' => $email]));
+                    }
+                }
+            }],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.codigo' => ['required', 'string', 'max:50'],
@@ -1176,6 +1238,10 @@ class DocumentoEmitidoController extends Controller
                 'cityCode' => $data['cliente_ciudad_codigo'] ?? null,
                 'CountrySubentityCode' => $data['cliente_departamento_codigo'] ?? null,
                 'telefono' => $data['cliente_telefono'] ?? null,
+                // Este campo va tal cual al cac:Contact/cbc:ElectronicMail del XML que se firma y
+                // se manda a la DIAN (ver UblDocumentBuilder::buildContact()) -- si el cliente
+                // tiene varios correos (separados por coma, ver el campo de arriba), se mandan
+                // todos juntos en el mismo campo, así es como la DIAN los acepta.
                 'email' => $data['cliente_email'] ?? null,
             ],
             'Lines' => array_map(
@@ -1640,6 +1706,8 @@ class DocumentoEmitidoController extends Controller
 
         $warehouseNames = $company->warehouses()->get()->mapWithKeys(fn ($warehouse) => [(string) $warehouse->_id => $warehouse->name]);
 
+        $emailLogs = EmailLog::where('documento_id', (string) $documento->_id)->orderByDesc('sent_at')->get();
+
         return view('documents.show', compact(
             'company',
             'documento',
@@ -1647,6 +1715,7 @@ class DocumentoEmitidoController extends Controller
             'customerDepartmentName',
             'customerCityName',
             'warehouseNames',
+            'emailLogs',
         ));
     }
 
@@ -1786,6 +1855,116 @@ class DocumentoEmitidoController extends Controller
         ))->setPaper('letter', 'portrait');
 
         return $pdf->stream($documento->numeral . '.pdf');
+    }
+
+    /**
+     * Endpoint AJAX: trae el historial de correos de un documento directo de la base, sin cache
+     * ni nada precargado -- se llama cada vez que se abre el modal de seguimiento (ver
+     * documents/index.blade.php), a propósito, para que siempre se vea el estado más actual
+     * (recién mandado un correo, por ejemplo) sin tener que refrescar toda la tabla.
+     */
+    public function emailLogs(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+
+        $logs = EmailLog::where('documento_id', (string) $documento->_id)
+            ->orderByDesc('sent_at')
+            ->get()
+            ->map(fn (EmailLog $log) => [
+                'to' => $log->to,
+                'sent_at' => optional($log->sent_at)->format('Y-m-d H:i'),
+                'delivered_at' => optional($log->delivered_at)->format('Y-m-d H:i'),
+                'opened_at' => optional($log->opened_at)->format('Y-m-d H:i'),
+                'bounced_at' => optional($log->bounced_at)->format('Y-m-d H:i'),
+                'complained_at' => optional($log->complained_at)->format('Y-m-d H:i'),
+                'bounce_reason' => $log->bounce_reason,
+            ])
+            ->values();
+
+        return response()->json(['logs' => $logs]);
+    }
+
+    /**
+     * Manda el documento por correo (PDF + XML firmado adjuntos, ver DocumentIssuedMail) a una o
+     * varias direcciones separadas por coma -- precargado con el del cliente guardado, pero
+     * editable por si hay que mandarlo a otras direcciones puntuales (contabilidad, un correo
+     * distinto al registrado, etc.), sin que eso cambie el correo guardado del cliente. Manda un
+     * correo POR SEPARADO a cada destinatario (no uno solo con varios "To") -- así cada uno
+     * queda con su propio Message-ID de SES y su propio EmailLog, y el seguimiento de
+     * entregado/abierto/rebotado de cada destinatario se puede ver por separado en vez de
+     * mezclarse en un solo registro. Solo aplica a documentos ya autorizados por la DIAN --
+     * mismo criterio que invoicePreview().
+     */
+    public function sendEmail(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+        // Solo documentos ya autorizados por la DIAN -- uno pendiente o rechazado todavía no es
+        // una factura válida para mandarle al cliente, aunque ya tenga UUID asignado.
+        abort_unless($documento->status === DocumentoEmitido::STATUS_ACCEPTED, 422);
+
+        $data = $request->validate([
+            'email' => ['required', 'string'],
+        ]);
+
+        $emails = collect(explode(',', $data['email']))
+            ->map(fn ($email) => trim($email))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $invalid = $emails->reject(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL) !== false);
+        abort_if($invalid->isNotEmpty(), 422, __(':email is not a valid email address.', ['email' => $invalid->first()]));
+        abort_if($emails->isEmpty(), 422);
+
+        foreach ($emails as $email) {
+            // Una instancia nueva de Mailable por destinatario, a propósito: Mailable::to()
+            // ACUMULA direcciones en vez de reemplazarlas (ver Mailable::setAddress()), así que
+            // reusar la misma instancia entre vueltas del loop terminaría mandando cada correo a
+            // todos los destinatarios ya procesados, no solo al de esa vuelta.
+            $mailable = new DocumentIssuedMail($company, $documento);
+            $sent = Mail::to($email)->send($mailable);
+
+            // El "Message-ID" real que asigna SES (el que va a venir en los eventos de
+            // entrega/apertura/rebote que manda por SNS -- ver SesEventWebhookController) no es
+            // el "Message-ID" que Symfony genera por su cuenta: SesTransport lo agrega aparte
+            // como header "X-SES-Message-ID" después de mandarlo (ver
+            // vendor/laravel/framework/.../Mail/Transport/SesTransport.php). Sin MAIL_MAILER=ses
+            // (ej. en desarrollo, con MAIL_MAILER=log) ese header no existe, así que el tracking
+            // de eventos simplemente no aplica -- el correo igual queda registrado como "enviado".
+            $sesMessageId = $sent?->getOriginalMessage()->getHeaders()->get('X-SES-Message-ID')?->getBodyAsString();
+
+            EmailLog::create([
+                'company_id' => (string) $company->_id,
+                'documento_id' => (string) $documento->_id,
+                'to' => $email,
+                'subject' => $mailable->envelope()->subject,
+                'ses_message_id' => $sesMessageId,
+                'sent_at' => now(),
+            ]);
+        }
+
+        $documento->update([
+            'emailed_at' => now(),
+            'emailed_to' => $emails->implode(', '),
+        ]);
+
+        // Siempre JSON, nunca redirect -- el formulario del modal lo manda por fetch() (ver
+        // documents/partials/send-email-modal.blade.php) justamente para no recargar la tabla ni
+        // la página completa; el toast lo dispara el JS del modal con este mensaje, no una
+        // sesión flash (que solo se pinta en el próximo render de página completo).
+        return response()->json([
+            'message' => $emails->count() > 1
+                ? __('Document sent to :count recipients.', ['count' => $emails->count()])
+                : __('Document sent to :email.', ['email' => $emails->first()]),
+        ]);
     }
 
     /**

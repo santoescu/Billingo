@@ -157,6 +157,45 @@
                 </div>
             @endif
 
+            @if ($emailLogs->isNotEmpty())
+                <div id="doc-show-email-history" class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                        <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Email history') }}</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                            <thead class="bg-gray-50 dark:bg-neutral-700">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Recipient email') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Sent') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Delivered') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Opened') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Bounced') }}</th>
+                                    <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Spam') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                                @foreach ($emailLogs as $log)
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200 truncate">{{ $log->to }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->sent_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->delivered_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->opened_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
+                                            {{ optional($log->bounced_at)->format('Y-m-d H:i') ?? '—' }}
+                                            @if ($log->bounced_at && $log->bounce_reason)
+                                                <div class="text-xs text-red-600 dark:text-red-400">{{ $log->bounce_reason }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->complained_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
             @if (filled($notas))
                 <div id="doc-show-notes" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
@@ -277,6 +316,12 @@
                                 {{ __('View PDF') }}
                             </flux:button>
                         </a>
+
+                        @if ($documento->status === \App\Models\DocumentoEmitido::STATUS_ACCEPTED)
+                            <flux:button type="button" variant="filled" icon="envelope" class="document-send-email-btn" data-url="{{ route('documents.send-email', $documento->_id) }}" data-email="{{ $customer['email'] ?? '' }}">
+                                {{ __('Send by email') }}
+                            </flux:button>
+                        @endif
                     @endif
 
                     <a
@@ -303,5 +348,6 @@
         </div>
     </div>
 
+    @include('documents.partials.send-email-modal')
     @include('documents.partials.retry-modal')
 </x-layouts.app>

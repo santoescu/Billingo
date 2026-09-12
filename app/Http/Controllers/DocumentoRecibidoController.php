@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Company;
 use App\Models\DocumentoRecibido;
 use App\Models\ThirdParty;
-use App\Services\Dian\ReceivedDocumentParser;
+use App\Services\Dian\ReceivedDocumentIngestionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -33,6 +32,13 @@ class DocumentoRecibidoController extends Controller
     public function index(Request $request)
     {
         $company = $this->currentCompany($request);
+
+        // Solo genera el token (y por lo tanto el alias) si el canal por correo ya está
+        // configurado -- mientras no haya dominio de recepción, no tiene sentido guardarle un
+        // token a cada empresa que visite la bandeja.
+        if (config('services.ses.inbound_domain') && ! $company->reception_email_token) {
+            $company->ensureReceptionEmailToken();
+        }
 
         $documentos = collect();
 
@@ -168,7 +174,7 @@ class DocumentoRecibidoController extends Controller
      * SOAP: si el código de validación es "02" (documento validado), el documento queda aceptado;
      * si no, queda pendiente de revisión manual.
      */
-    public function store(Request $request, ReceivedDocumentParser $parser)
+    public function store(Request $request, ReceivedDocumentIngestionService $ingestionService)
     {
         $company = $this->currentCompany($request);
 
@@ -183,64 +189,11 @@ class DocumentoRecibidoController extends Controller
         foreach ($data['files'] as $file) {
             try {
                 $extension = strtolower($file->getClientOriginalExtension());
-                $parsed = $parser->parseUploadedFile($file->getRealPath(), $extension);
-
-                $receptorNit = trim((string) ($parsed['payload']['accounting_customer_party']['identificacion'] ?? ''));
-                if ($receptorNit !== trim((string) $company->identificacion)) {
-                    $errores[] = __(':numeral: this document does not belong to :company, it belongs to identification :nit.', [
-                        'numeral' => $parsed['numeral'] ?: $file->getClientOriginalName(),
-                        'company' => $company->name,
-                        'nit' => $receptorNit ?: '—',
-                    ]);
-
-                    continue;
-                }
-
-                if (DocumentoRecibido::where('company_id', (string) $company->_id)->where('uuid', $parsed['uuid'])->where('uuid', '!=', '')->exists()) {
-                    $errores[] = __(':numeral: this document was already uploaded before (same UUID).', ['numeral' => $parsed['numeral'] ?: $file->getClientOriginalName()]);
-
-                    continue;
-                }
-
-                $this->consumeContractQuota($company, 'receiving');
-
-                $emisor = $parsed['payload']['accounting_supplier_party'];
-                $proveedor = $this->resolveProveedor($company, $emisor);
-
-                [$status, $statusMessage] = $this->resolveDianValidationStatus($parsed['dian_validation']);
-
-                $payload = $parsed['payload'];
-                $payload['lineas'] = $parsed['lineas'];
-                $primerPago = $payload['payment_means_list'][0] ?? null;
-
-                DocumentoRecibido::create([
-                    'company_id' => (string) $company->_id,
-                    'proveedor_id' => $proveedor ? (string) $proveedor->_id : null,
-                    'uploaded_by' => (string) $request->user()->_id,
-                    'tipo_documento' => $parsed['tipo_documento'],
-                    'prefix' => $parsed['prefix'],
-                    'numeral' => $parsed['numeral'],
-                    'secuencial' => $parsed['secuencial'],
-                    'payload' => $payload,
-                    'xml' => $parsed['xml'],
-                    'pdf' => $parsed['pdf'],
-                    'file_name' => $file->getClientOriginalName(),
-                    'uuid' => $parsed['uuid'],
-                    'status' => $status,
-                    'status_message' => $statusMessage,
-                    'issue_date' => $parsed['issue_date'] ?: null,
-                    'due_date' => $parsed['due_date'] ?: null,
-                    'subtotal' => $parsed['subtotal'],
-                    'tax_total' => $parsed['tax_total'],
-                    'total' => $parsed['total'],
-                    'currency' => $parsed['currency'],
-                    'payment_means_id' => $primerPago['id'] ?? null,
-                    'payment_means_code' => $primerPago['codigo'] ?? null,
-                ]);
+                $ingestionService->ingest($company, $file->getRealPath(), $extension, $file->getClientOriginalName(), (string) $request->user()->_id);
 
                 $creados++;
             } catch (InvalidArgumentException|RuntimeException $e) {
-                $errores[] = $file->getClientOriginalName() . ': ' . $e->getMessage();
+                $errores[] = $e->getMessage();
             }
         }
 
@@ -256,97 +209,6 @@ class DocumentoRecibidoController extends Controller
         }
 
         return redirect()->route('received-documents.index');
-    }
-
-    /**
-     * Busca un proveedor existente por identificación (mismo NIT que en emisión, sin importar
-     * el rol que ya tenga) y le agrega el rol "proveedor" si no lo tenía; si no existe ninguno,
-     * lo crea con los datos que vinieron en el XML. Si el documento no trae identificación (XML
-     * mal formado), no crea nada y el documento queda sin proveedor enlazado.
-     */
-    private function resolveProveedor(Company $company, array $emisor): ?ThirdParty
-    {
-        $identificacion = $emisor['identificacion'] ?? '';
-
-        if ($identificacion === '') {
-            return null;
-        }
-
-        $proveedor = ThirdParty::where('company_id', (string) $company->_id)
-            ->where('identificacion', $identificacion)
-            ->first();
-
-        if ($proveedor) {
-            $proveedor->update([
-                'roles' => collect($proveedor->roles ?? [])->push('proveedor')->unique()->values()->all(),
-            ]);
-
-            return $proveedor;
-        }
-
-        return ThirdParty::create([
-            'company_id' => (string) $company->_id,
-            'identification_type' => '31',
-            'identificacion' => $identificacion,
-            'dv' => $emisor['dv'] ?: null,
-            'person_type' => '2',
-            'name' => $emisor['razon_social'] ?: $identificacion,
-            'address' => $emisor['direccion'] ?: null,
-            'city_code' => $emisor['ciudad_codigo'] ?: null,
-            'department_code' => $emisor['departamento_codigo'] ?: null,
-            'phone' => $emisor['telefono'] ?: null,
-            'email' => $emisor['email'] ?: null,
-            'roles' => ['proveedor'],
-            'status' => 'active',
-        ]);
-    }
-
-    /**
-     * Reclama un documento contra el cupo del contrato de la empresa para el módulo
-     * "receiving" -- mismo criterio que IssueDocumentService::consumeContractQuota() para
-     * invoicing/pos/cotizaciones, uno por documento subido (no por lote).
-     *
-     * @throws RuntimeException Si la empresa no tiene contrato vigente para este módulo, o si ya no queda cupo.
-     */
-    private function consumeContractQuota(Company $company, string $module): void
-    {
-        $contract = $company->activeContractFor($module);
-
-        if (! $contract) {
-            throw new RuntimeException(__('This company has no active contract covering this module.'));
-        }
-
-        $contract->claimUsage($module, (string) $company->_id);
-    }
-
-    /**
-     * Traduce la validación de la DIAN que ya viene en el AttachedDocument (ver
-     * ReceivedDocumentParser::extractDianValidation()) al status/status_message que se guardan en
-     * DocumentoRecibido -- mismo shape ("resumen"/"reglas") que usa DocumentoEmitido para el
-     * mensaje de la DIAN, así ambas pantallas .show() lo pintan igual. Si el XML subido no traía
-     * ninguna validación (era el documento suelto, sin el sobre AttachedDocument, o la DIAN
-     * todavía no había respondido cuando se armó el correo), el documento queda pendiente sin
-     * mensaje -- no es un error, solo no hay con qué confirmarlo todavía.
-     *
-     * @param  array|null  $dianValidation
-     * @return array{0: int, 1: array|null} [DocumentoRecibido::STATUS_*, status_message].
-     */
-    private function resolveDianValidationStatus(?array $dianValidation): array
-    {
-        if (! $dianValidation) {
-            return [DocumentoRecibido::STATUS_PENDING, null];
-        }
-
-        $status = $dianValidation['es_valido']
-            ? DocumentoRecibido::STATUS_ACCEPTED
-            : DocumentoRecibido::STATUS_PENDING;
-
-        $statusMessage = [
-            'resumen' => $dianValidation['response_description'] ?: $dianValidation['response_code'],
-            'reglas' => $dianValidation['reglas'],
-        ];
-
-        return [$status, $statusMessage];
     }
 
     /**

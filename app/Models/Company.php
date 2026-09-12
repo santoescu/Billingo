@@ -39,6 +39,7 @@ class Company extends Model
         'api_features',
         'logo_data',
         'logo_mime',
+        'reception_email_token',
     ];
 
     const DIAN_AMBIENTE_PRODUCCION = '1';
@@ -108,6 +109,61 @@ class Company extends Model
     public static function findByApiToken(string $plainTextToken): ?self
     {
         return self::where('api_token', hash('sha256', $plainTextToken))->first();
+    }
+
+    /**
+     * Alias de correo al que los proveedores (o la propia empresa, reenviando) le mandan las
+     * facturas para que Billingo las reciba solas -- ver SesInboundWebhookController. A
+     * diferencia de "api_token", este NO se guarda hasheado: tiene que poder mostrarse tal cual
+     * para que la empresa lo use, y hace falta poder resolverlo de vuelta a la empresa cuando
+     * llega un correo (no alcanza con comparar un hash sin saber antes cuál es el texto plano).
+     * Se genera una sola vez, la primera vez que se pide (ver ensureReceptionEmailToken()) --
+     * no es secreto en el sentido de una contraseña, pero sí lo suficientemente largo/aleatorio
+     * como para que nadie lo adivine y mande facturas ajenas a la bandeja de otra empresa.
+     *
+     * @return string|null Alias completo (ej. "recepcion-8f3a1c9d@recepcion.<dominio>"), o null
+     *                      si todavía no se generó el token y no hay dominio configurado.
+     */
+    public function getReceptionEmailAliasAttribute(): ?string
+    {
+        $domain = config('services.ses.inbound_domain');
+
+        if (! $this->reception_email_token || ! $domain) {
+            return null;
+        }
+
+        return "recepcion-{$this->reception_email_token}@{$domain}";
+    }
+
+    /**
+     * Genera (una sola vez) el token aleatorio detrás del alias de recepción de esta empresa --
+     * si ya tenía uno, no lo reemplaza (a diferencia de generateApiToken(), acá no hay motivo
+     * para rotarlo: ya se lo dieron a los proveedores, cambiarlo les rompería el envío).
+     *
+     * @return string El token (no el alias completo).
+     */
+    public function ensureReceptionEmailToken(): string
+    {
+        if ($this->reception_email_token) {
+            return $this->reception_email_token;
+        }
+
+        $token = bin2hex(random_bytes(6));
+        $this->update(['reception_email_token' => $token]);
+
+        return $token;
+    }
+
+    /**
+     * Resuelve la empresa dueña de un token de recepción de correo -- ver
+     * SesInboundWebhookController, que lo saca del alias al que llegó el correo.
+     *
+     * @param  string  $token
+     * @return self|null
+     */
+    public static function findByReceptionEmailToken(string $token): ?self
+    {
+        return self::where('reception_email_token', $token)->first();
     }
 
     /**
