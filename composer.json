@@ -10,6 +10,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "aws/aws-php-sns-message-validator": "^1.10",
+        "aws/aws-sdk-php": "^3.394",
         "barryvdh/laravel-dompdf": "^3.1",
         "blade-ui-kit/blade-heroicons": "^2.7",
         "endroid/qr-code": "^6.0",
@@ -19,7 +21,8 @@
         "livewire/volt": "^1.6.7",
         "mongodb/laravel-mongodb": "^5.4",
         "phpoffice/phpspreadsheet": "^5.9",
-        "robrichards/xmlseclibs": "^3.1"
+        "robrichards/xmlseclibs": "^3.1",
+        "zbateson/mail-mime-parser": "^4.0"
     },
     "require-dev": {
         "laravel/pail": "^1.2.2",
