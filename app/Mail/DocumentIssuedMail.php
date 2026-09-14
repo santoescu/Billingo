@@ -91,7 +91,7 @@ class DocumentIssuedMail extends Mailable
             $qrDataUri = (new PngWriter())->write($qrCode)->getDataUri();
         }
 
-        return Pdf::loadView('documents.invoice-pdf', [
+        return Pdf::loadView($this->company->resolvePdfView('invoice-pdf'), [
             'company' => $this->company,
             'documento' => $this->documento,
             'paymentMeansCode' => $paymentMeansCode,

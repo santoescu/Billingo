@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use Illuminate\Support\Facades\View;
 use MongoDB\Laravel\Eloquent\Model;
 
 class Company extends Model
@@ -417,6 +418,29 @@ class Company extends Model
         }
 
         return 'data:' . $this->logo_mime . ';base64,' . $this->logo_data;
+    }
+
+    /**
+     * Vista Blade a usar para una representación gráfica de esta empresa -- factura, recibo del
+     * POS (angosto o carta), cotización, o la genérica de un documento recibido sin PDF propio --
+     * "custom.<identificación>.<$baseView>" si existe (un diseño a la medida, que se cobra aparte
+     * y se agrega a mano, un deploy por cliente -- no hay forma de auto-servicio todavía), o si
+     * no "custom.general.<$baseView>" (la plantilla estándar, que vive en esa misma carpeta para
+     * que agregar una personalizada sea copiar y ajustar, no armar desde cero). Un solo árbol
+     * "resources/views/custom/" para todas las categorías de PDF (no una carpeta por categoría
+     * dentro de "documents/" o "received-documents/") porque el nombre de $baseView ya identifica
+     * de cuál se trata sin ambigüedad. Se resuelve por identificación y no por _id porque el
+     * nombre de la carpeta lo pone quien arma la plantilla a mano, y el NIT es el dato estable
+     * que un humano puede reconocer sin tener que ir a buscar el _id en Mongo.
+     *
+     * @param  string  $baseView  "invoice-pdf", "pos-pdf", "pos-pdf-letter", "quotation-pdf" o
+     *                            "received-pdf" (documentos recibidos sin PDF propio).
+     */
+    public function resolvePdfView(string $baseView): string
+    {
+        $customView = 'custom.' . $this->identificacion . '.' . $baseView;
+
+        return View::exists($customView) ? $customView : 'custom.general.' . $baseView;
     }
 
     public function documentosEmitidos()

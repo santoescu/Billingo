@@ -370,7 +370,7 @@ class PublicCatalogController extends Controller
         $warehouseIds = collect($documento->payload['lineas'] ?? [])->pluck('bodega_id')->filter()->unique()->values()->all();
         $warehousesById = Warehouse::whereIn('_id', $warehouseIds)->get()->keyBy(fn (Warehouse $w) => (string) $w->_id);
 
-        $pdf = Pdf::loadView('quotations.pdf', compact('company', 'documento', 'warehousesById'))
+        $pdf = Pdf::loadView($company->resolvePdfView('quotation-pdf'), compact('company', 'documento', 'warehousesById'))
             ->setPaper('letter', 'portrait');
 
         return $pdf->stream('cotizacion-' . $documento->numeral . '.pdf');

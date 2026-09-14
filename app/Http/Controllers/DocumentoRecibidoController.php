@@ -248,8 +248,8 @@ class DocumentoRecibidoController extends Controller
      * Representación en PDF del documento: el PDF que trajo el proveedor si venía en el .zip que
      * subieron (la mayoría de las veces), o si no, una representación genérica armada por
      * Billingo con los datos que sí se alcanzaron a parsear del XML (proveedor y totales, sin
-     * líneas -- ver received-documents/generated-pdf.blade.php) -- el PDF es opcional en la
-     * subida, nunca bloquea guardar el documento.
+     * líneas -- ver Company::resolvePdfView() y custom/general/received-pdf.blade.php) -- el
+     * PDF es opcional en la subida, nunca bloquea guardar el documento.
      */
     public function pdf(Request $request, string $documento)
     {
@@ -266,7 +266,7 @@ class DocumentoRecibidoController extends Controller
             ]);
         }
 
-        $pdf = Pdf::loadView('received-documents.generated-pdf', compact('documento'))->setPaper('letter', 'portrait');
+        $pdf = Pdf::loadView($company->resolvePdfView('received-pdf'), compact('documento'))->setPaper('letter', 'portrait');
 
         return $pdf->stream($documento->numeral . '.pdf');
     }

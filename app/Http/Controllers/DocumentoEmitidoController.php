@@ -875,7 +875,7 @@ class DocumentoEmitidoController extends Controller
             ? PaymentMeansCode::where('codigo', $documento->payment_means_code)->first()
             : null;
 
-        $pdf = Pdf::loadView('documents.invoice-pdf', [
+        $pdf = Pdf::loadView($company->resolvePdfView('invoice-pdf'), [
             'company' => $company,
             'documento' => $documento,
             'paymentMeansCode' => $paymentMeansCode,
@@ -1805,14 +1805,14 @@ class DocumentoEmitidoController extends Controller
         $isElectronic = true;
         $uuid = $documento->uuid;
 
-        $pdf = Pdf::loadView('documents.receipt-pdf', compact(
+        $pdf = Pdf::loadView($company->resolvePdfView('pos-pdf'), compact(
             'company',
             'documento',
             'paymentMeansCode',
             'cashReceived',
             'isElectronic',
             'uuid',
-        ))->setPaper([0, 0, 226.77, 800], 'portrait'); 
+        ))->setPaper([0, 0, 226.77, 800], 'portrait');
 
         return $pdf->download('recibo-' . $documento->numeral . '.pdf');
     }
@@ -1847,7 +1847,7 @@ class DocumentoEmitidoController extends Controller
             $qrDataUri = (new PngWriter())->write($qrCode)->getDataUri();
         }
 
-        $pdf = Pdf::loadView('documents.invoice-pdf', compact(
+        $pdf = Pdf::loadView($company->resolvePdfView('invoice-pdf'), compact(
             'company',
             'documento',
             'paymentMeansCode',

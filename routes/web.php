@@ -215,6 +215,8 @@ Route::middleware(['auth'])->group(function () {
             Route::put('sales/{sale}', [PosController::class, 'updateSale'])->name('sales.update');
             Route::get('sales/{sale}/receipt.pdf', [PosController::class, 'receiptPdf'])->name('sales.receipt-pdf');
             Route::get('sales/{sale}/receipt-preview', [PosController::class, 'receiptPreview'])->name('sales.receipt-preview');
+            Route::get('sales/{sale}/receipt-letter.pdf', [PosController::class, 'receiptPdfLetter'])->name('sales.receipt-letter-pdf');
+            Route::get('sales/{sale}/receipt-letter-preview', [PosController::class, 'receiptPreviewLetter'])->name('sales.receipt-letter-preview');
             Route::post('sales/{sale}/issue-electronic', [PosController::class, 'issueElectronic'])->name('sales.issue-electronic');
             Route::post('shifts', [CashShiftController::class, 'store'])->name('shifts.store');
             Route::get('shifts/{shift}', [CashShiftController::class, 'show'])->name('shifts.show');

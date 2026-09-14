@@ -156,6 +156,9 @@
             <a id="sale-show-download-btn" href="{{ route('pos.sales.receipt-pdf', $documento->_id) }}">
                 <flux:button type="button" variant="filled" icon="arrow-down-tray" class="w-full">{{ __('Download receipt') }}</flux:button>
             </a>
+            <a id="sale-show-download-letter-btn" href="{{ route('pos.sales.receipt-letter-pdf', $documento->_id) }}">
+                <flux:button type="button" variant="ghost" icon="document-text" class="w-full">{{ __('Download letter-size PDF') }}</flux:button>
+            </a>
         </div>
     </div>
 

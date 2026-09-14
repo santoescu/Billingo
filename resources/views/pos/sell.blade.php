@@ -241,6 +241,7 @@
                     </div>
                     <flux:button type="button" variant="filled" icon="printer" onclick="window.posPrintReceipt()">{{ __('Print') }}</flux:button>
                     <flux:button type="button" variant="filled" icon="arrow-down-tray" onclick="window.posDownloadReceipt()">{{ __('Download') }}</flux:button>
+                    <flux:button type="button" variant="ghost" icon="document-text" class="col-span-2" onclick="window.posDownloadReceiptLetter()">{{ __('Download letter-size PDF') }}</flux:button>
                     <flux:button type="button" variant="filled" icon="receipt-percent" class="col-span-2" onclick="window.posGoToSales()">{{ __('Go to sales') }}</flux:button>
                     <flux:button type="button" variant="primary" class="col-span-2" onclick="window.posNewSale()">{{ __('New sale') }}</flux:button>
                 </div>
@@ -1740,6 +1741,12 @@
                 window.posDownloadReceipt = function () {
                     if (currentSale) {
                         window.location.href = currentSale.receipt_url;
+                    }
+                };
+
+                window.posDownloadReceiptLetter = function () {
+                    if (currentSale) {
+                        window.location.href = currentSale.receipt_letter_url;
                     }
                 };
 

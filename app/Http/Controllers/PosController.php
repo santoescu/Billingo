@@ -12,6 +12,7 @@ use App\Models\FiscalResponsibility;
 use App\Models\PaymentMeansCode;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Dian\IssueDocumentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -299,6 +300,8 @@ class PosController extends Controller
             'can_issue_electronic' => (bool) $shift->invoicing_resolution_id && $company->hasModule('invoicing'),
             'receipt_url' => route('pos.sales.receipt-pdf', $documentoPos->_id),
             'receipt_preview_url' => route('pos.sales.receipt-preview', $documentoPos->_id),
+            'receipt_letter_url' => route('pos.sales.receipt-letter-pdf', $documentoPos->_id),
+            'receipt_letter_preview_url' => route('pos.sales.receipt-letter-preview', $documentoPos->_id),
             'show_url' => route('pos.sales.show', $documentoPos->_id),
             'issue_electronic_url' => route('pos.sales.issue-electronic', $documentoPos->_id),
         ]);
@@ -526,12 +529,35 @@ class PosController extends Controller
     }
 
     /**
-     * Arma el recibo de la venta, compartido entre receiptPdf() (descarga) y
-     * receiptPreview() (embebido).
+     * Igual que receiptPdf(), pero en tamaño carta (documents/custom/general/pos-pdf-letter.blade.php)
+     * en vez del recibo angosto pensado para impresora térmica -- para el cliente que
+     * imprime en una impresora normal, o simplemente prefiere un formato más legible.
+     */
+    public function receiptPdfLetter(Request $request, string $sale)
+    {
+        [$pdf, $filename] = $this->buildReceiptPdf($request, $sale, letter: true);
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Igual que receiptPdfLetter(), pero embebido en vez de descargado.
+     */
+    public function receiptPreviewLetter(Request $request, string $sale)
+    {
+        [$pdf, $filename] = $this->buildReceiptPdf($request, $sale, letter: true);
+
+        return $pdf->stream($filename);
+    }
+
+    /**
+     * Arma el recibo de la venta, compartido entre receiptPdf()/receiptPreview() (tirilla
+     * térmica) y receiptPdfLetter()/receiptPreviewLetter() (tamaño carta) -- mismos datos,
+     * solo cambia la plantilla y el tamaño de página.
      *
      * @return array{0: \Barryvdh\DomPDF\PDF, 1: string} PDF armado y nombre de archivo sugerido.
      */
-    private function buildReceiptPdf(Request $request, string $sale): array
+    private function buildReceiptPdf(Request $request, string $sale, bool $letter = false): array
     {
         $company = $this->currentCompany($request);
 
@@ -547,14 +573,31 @@ class PosController extends Controller
         $isElectronic = (bool) $documento->documento_emitido_id;
         $uuid = $documento->documentoEmitido?->uuid;
 
-        $pdf = Pdf::loadView('documents.receipt-pdf', compact(
+        if (! $letter) {
+            $pdf = Pdf::loadView($company->resolvePdfView('pos-pdf'), compact(
+                'company',
+                'documento',
+                'paymentMeansCode',
+                'cashReceived',
+                'isElectronic',
+                'uuid',
+            ))->setPaper([0, 0, 226.77, 800], 'portrait');
+
+            return [$pdf, 'recibo-' . $documento->numeral . '.pdf'];
+        }
+
+        $warehouseIds = collect($documento->payload['lineas'] ?? [])->pluck('bodega_id')->filter()->unique()->values()->all();
+        $warehousesById = Warehouse::whereIn('_id', $warehouseIds)->get()->keyBy(fn (Warehouse $w) => (string) $w->_id);
+
+        $pdf = Pdf::loadView($company->resolvePdfView('pos-pdf-letter'), compact(
             'company',
             'documento',
             'paymentMeansCode',
             'cashReceived',
             'isElectronic',
             'uuid',
-        ))->setPaper([0, 0, 226.77, 800], 'portrait');
+            'warehousesById',
+        ))->setPaper('letter', 'portrait');
 
         return [$pdf, 'recibo-' . $documento->numeral . '.pdf'];
     }
