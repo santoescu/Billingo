@@ -1,8 +1,9 @@
 {
     "Sequential": "Secuencial",
     "Filters": "Filtros",
-    "Download letter-size PDF": "Descargar PDF tamaño carta",
     "SALES INVOICE": "FACTURA DE VENTA",
+    "View receipt": "Ver recibo",
+    "View the sales receipt as a PDF, either the narrow ticket format or letter size.": "Ve el recibo de venta en PDF, en formato tirilla angosta o tamaño carta.",
     "REMISION": "REMISIÓN",
     "Not an electronic invoice": "No es factura electrónica",
     "Tracking": "Seguimiento",
@@ -169,7 +170,6 @@
     "This sale was also issued as a real electronic invoice.": "Esta venta también se emitió como una factura electrónica real.",
     "View electronic invoice": "Ver factura electrónica",
     "This sale was not issued as an electronic invoice.": "Esta venta no se emitió como factura electrónica.",
-    "Download receipt": "Descargar recibo",
     "Sales invoice resolution": "Resolución de factura de venta",
     "Electronic invoice resolution": "Resolución de factura electrónica",
     "You must choose a valid sales invoice resolution.": "Debes elegir una resolución de factura de venta válida.",

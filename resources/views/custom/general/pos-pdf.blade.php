@@ -28,7 +28,7 @@
         <p class="bold">{{ $documento->numeral }}</p>
         <p class="muted">{{ optional($documento->issue_date)->format('Y-m-d H:i') }}</p>
         @unless ($isElectronic)
-            <p class="bold" style="margin-top: 4px;">{{ __('REMISION - not an electronic invoice') }}</p>
+            <p class="bold" style="margin-top: 4px;">{{ __('SALES INVOICE') }}</p>
         @endunless
     </div>
 
@@ -112,8 +112,6 @@
     @if ($isElectronic)
         <p class="center muted">CUFE</p>
         <p class="center" style="word-break: break-all; font-size: 7px;">{{ $uuid }}</p>
-    @else
-        <p class="center muted">{{ __('REMISION - not an electronic invoice') }}</p>
     @endif
 
     <p class="center muted" style="margin-top: 8px;">{{ __('Thank you for your purchase!') }}</p>

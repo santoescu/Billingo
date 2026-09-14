@@ -300,7 +300,6 @@ class PosController extends Controller
             'can_issue_electronic' => (bool) $shift->invoicing_resolution_id && $company->hasModule('invoicing'),
             'receipt_url' => route('pos.sales.receipt-pdf', $documentoPos->_id),
             'receipt_preview_url' => route('pos.sales.receipt-preview', $documentoPos->_id),
-            'receipt_letter_url' => route('pos.sales.receipt-letter-pdf', $documentoPos->_id),
             'receipt_letter_preview_url' => route('pos.sales.receipt-letter-preview', $documentoPos->_id),
             'show_url' => route('pos.sales.show', $documentoPos->_id),
             'issue_electronic_url' => route('pos.sales.issue-electronic', $documentoPos->_id),

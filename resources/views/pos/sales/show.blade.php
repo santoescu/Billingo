@@ -153,12 +153,19 @@
                 </div>
             </div>
 
-            <a id="sale-show-download-btn" href="{{ route('pos.sales.receipt-pdf', $documento->_id) }}">
-                <flux:button type="button" variant="filled" icon="arrow-down-tray" class="w-full">{{ __('Download receipt') }}</flux:button>
-            </a>
-            <a id="sale-show-download-letter-btn" href="{{ route('pos.sales.receipt-letter-pdf', $documento->_id) }}">
-                <flux:button type="button" variant="ghost" icon="document-text" class="w-full">{{ __('Download letter-size PDF') }}</flux:button>
-            </a>
+            <div id="sale-show-downloads" class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Downloads') }}</h3>
+                </div>
+                <div class="p-4 flex flex-row flex-wrap gap-3">
+                    <a id="sale-show-view-receipt-btn" href="{{ route('pos.sales.receipt-preview', $documento->_id) }}" target="_blank">
+                        <flux:button type="button" variant="filled" icon="document-text">{{ __('View receipt') }}</flux:button>
+                    </a>
+                    <a id="sale-show-view-letter-btn" href="{{ route('pos.sales.receipt-letter-preview', $documento->_id) }}" target="_blank">
+                        <flux:button type="button" variant="filled" icon="document-text">{{ __('View PDF') }}</flux:button>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 

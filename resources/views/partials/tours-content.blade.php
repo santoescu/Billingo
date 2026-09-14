@@ -1296,9 +1296,9 @@
                     'description' => __('If it hasn\'t been issued as an electronic invoice yet and the client has valid billing data, issue it right from here.'),
                 ],
                 [
-                    'selector' => '#sale-show-download-btn',
-                    'title' => __('Download receipt'),
-                    'description' => __('Download the sales receipt as a PDF.'),
+                    'selector' => '#sale-show-downloads',
+                    'title' => __('Downloads'),
+                    'description' => __('View the sales receipt as a PDF, either the narrow ticket format or letter size.'),
                 ],
             ],
         ],
