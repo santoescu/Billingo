@@ -1,6 +1,10 @@
 {
     "Sequential": "Secuencial",
     "Filters": "Filtros",
+    "Download letter-size PDF": "Descargar PDF tamaño carta",
+    "SALES INVOICE": "FACTURA DE VENTA",
+    "REMISION": "REMISIÓN",
+    "Not an electronic invoice": "No es factura electrónica",
     "Tracking": "Seguimiento",
     "Separate multiple addresses with commas.": "Separa varias direcciones con comas.",
     ":email is not a valid email address.": ":email no es una dirección de correo válida.",
