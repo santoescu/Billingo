@@ -971,6 +971,8 @@
     "All documents for this company (invoices, notes, test batches) go to whichever environment is selected here.": "Todos los documentos de esta empresa (facturas, notas, lotes de prueba) se envían al ambiente que se seleccione aquí.",
     "Document type": "Tipo de documento",
     "Invoice": "Factura",
+    "Issued by": "Emitido por",
+    "Sent via": "Enviado por",
     "Credit note": "Nota crédito",
     "Debit note": "Nota débito",
     "DIAN fixed test": "Fija de pruebas DIAN",
