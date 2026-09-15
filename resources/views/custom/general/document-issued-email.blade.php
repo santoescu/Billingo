@@ -8,7 +8,6 @@
         '92' => __('Debit note'),
     ];
     $customer = $documento->payload['accounting_customer_party'] ?? [];
-    $isNote = in_array($documento->tipo_documento, ['91', '92'], true);
 @endphp
 <!DOCTYPE html>
 <html>
@@ -22,18 +21,26 @@
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
 
-                    {{-- Encabezado: wordmark en texto (no imagen) a propósito -- muchos
-                         clientes de correo bloquean imágenes por defecto, y un logo roto se ve
-                         peor que un wordmark bien tipografiado con el color de marca. --}}
+                    {{-- Encabezado: logo real de Billingo + wordmark, y el tipo de documento
+                         real (no solo "Factura"/"Nota") a la derecha. --}}
                     <tr>
                         <td style="background-color: #166534; padding: 28px 32px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    <td style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff;">
-                                        Billingo
+                                    <td style="vertical-align: middle;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="vertical-align: middle; padding-right: 10px;">
+                                                    <img src="{{ asset('images/billingo-logo-email.png') }}" width="28" height="28" alt="Billingo" style="display: block; border: 0;">
+                                                </td>
+                                                <td style="vertical-align: middle; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff;">
+                                                    Billingo
+                                                </td>
+                                            </tr>
+                                        </table>
                                     </td>
-                                    <td align="right" style="font-size: 12px; font-weight: 600; color: #bbf7d0; text-transform: uppercase; letter-spacing: 0.08em;">
-                                        {{ $isNote ? __('Note') : __('Invoice') }}
+                                    <td align="right" style="vertical-align: middle; font-size: 12px; font-weight: 600; color: #bbf7d0; text-transform: uppercase; letter-spacing: 0.08em;">
+                                        {{ $documentTypeLabels[$documento->tipo_documento] ?? __('document') }}
                                     </td>
                                 </tr>
                             </table>
@@ -92,26 +99,8 @@
                         <td style="padding: 20px 32px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px;">
                                 <tr>
-                                    <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f0f0f0;">{{ __('Issue date') }}</td>
-                                    <td align="right" style="padding: 8px 0; color: #111827; font-weight: 600; border-bottom: 1px solid #f0f0f0;">{{ $documento->issue_date?->format('Y-m-d') ?? '—' }}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 8px 0; color: #6b7280;">{{ __('Document type') }}</td>
-                                    <td align="right" style="padding: 8px 0; color: #111827; font-weight: 600;">{{ $documentTypeLabels[$documento->tipo_documento] ?? __('document') }}</td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-
-                    {{-- Aviso de adjuntos -- que quede claro de una que el PDF/XML vienen
-                         pegados al correo, no hay que ir a buscarlos a ningún lado. --}}
-                    <tr>
-                        <td style="padding: 20px 32px 0;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; width: 100%;">
-                                <tr>
-                                    <td style="padding: 12px 16px; font-size: 12px; color: #6b7280;">
-                                        📎 {{ __('The PDF and the signed XML will be attached automatically in a single .zip file.') }}
-                                    </td>
+                                    <td style="padding: 8px 0; color: #6b7280;">{{ __('Issue date') }}</td>
+                                    <td align="right" style="padding: 8px 0; color: #111827; font-weight: 600;">{{ $documento->issue_date?->format('Y-m-d') ?? '—' }}</td>
                                 </tr>
                             </table>
                         </td>
@@ -130,7 +119,7 @@
                     <tr>
                         <td style="background-color: #f9fafb; border-top: 1px solid #e5e7eb; padding: 16px 32px; text-align: center;">
                             <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                                {{ __('Sent via') }} <span style="font-weight: 700; color: #166534;">Billingo</span>
+                                {{ __('Sent via') }} <a href="https://billingo.com.co" style="font-weight: 700; color: #166534; text-decoration: none;">Billingo</a>
                             </p>
                         </td>
                     </tr>
