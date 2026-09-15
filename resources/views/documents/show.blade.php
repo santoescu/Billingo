@@ -187,7 +187,12 @@
                                                 <div class="text-xs text-red-600 dark:text-red-400">{{ $log->bounce_reason }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
+                                            {{ $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
+                                            @if ($log->complained_at && $log->complaint_reason)
+                                                <div class="text-xs text-red-600 dark:text-red-400">{{ $log->complaint_reason }}</div>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

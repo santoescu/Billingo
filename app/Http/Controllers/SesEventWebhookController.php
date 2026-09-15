@@ -70,7 +70,13 @@ class SesEventWebhookController extends Controller
                     ?? $event['bounce']['bounceType']
                     ?? null,
             ]),
-            'Complaint' => $log->update(['complained_at' => now()]),
+            // "complaintFeedbackType" (ej. "abuse", "not-spam", "virus") solo viene cuando el
+            // proveedor de correo del destinatario lo reporta como parte del feedback loop -- no
+            // todos lo hacen, así que puede quedar en null aunque sí haya habido una queja.
+            'Complaint' => $log->update([
+                'complained_at' => now(),
+                'complaint_reason' => $event['complaint']['complaintFeedbackType'] ?? null,
+            ]),
             default => null,
         };
 

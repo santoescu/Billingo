@@ -22,6 +22,7 @@ class EmailLog extends Model
         'bounced_at',
         'bounce_reason',
         'complained_at',
+        'complaint_reason',
     ];
 
     protected function casts(): array

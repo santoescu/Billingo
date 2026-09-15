@@ -603,6 +603,10 @@
                                 ${escapeHtml(log.bounced_at ?? '—')}
                                 ${log.bounce_reason ? `<div class="text-xs text-red-600 dark:text-red-400 whitespace-normal">${escapeHtml(log.bounce_reason)}</div>` : ''}
                             </td>`;
+                        const complainedCell = `<td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
+                                ${escapeHtml(log.complained_at ?? '—')}
+                                ${log.complaint_reason ? `<div class="text-xs text-red-600 dark:text-red-400 whitespace-normal">${escapeHtml(log.complaint_reason)}</div>` : ''}
+                            </td>`;
 
                         row.innerHTML = `
                             <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200 truncate">${escapeHtml(log.to)}</td>
@@ -610,7 +614,7 @@
                             ${trackingCell(log.delivered_at)}
                             ${trackingCell(log.opened_at)}
                             ${bouncedCell}
-                            ${trackingCell(log.complained_at)}
+                            ${complainedCell}
                         `;
                         body.appendChild(row);
                     });

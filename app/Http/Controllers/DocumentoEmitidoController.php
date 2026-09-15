@@ -1882,6 +1882,7 @@ class DocumentoEmitidoController extends Controller
                 'bounced_at' => $log->bounced_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
                 'complained_at' => $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
                 'bounce_reason' => $log->bounce_reason,
+                'complaint_reason' => $log->complaint_reason,
             ])
             ->values();
 
