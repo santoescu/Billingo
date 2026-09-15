@@ -9,16 +9,19 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 
-// Sin ShouldQueue a propósito: si algún día se agrega, hay que confirmar primero que el worker
-// de colas corre siempre en producción (QUEUE_CONNECTION=database) -- si no, el correo se queda
-// pegado en la tabla "jobs" sin que nadie se entere. Mientras tanto, se manda sincrónico.
-class DocumentIssuedMail extends Mailable
+// Se manda en cola (ver DocumentoEmitidoController::sendEmail(), que llama ->queue() en vez de
+// ->send()) -- el worker de colas corre vía SQS + Cloud Scheduler (ver QueueWorkerController),
+// no la tabla "jobs" de Mongo, que no es compatible con el locking que necesita el driver
+// "database" de Laravel.
+class DocumentIssuedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -30,6 +33,14 @@ class DocumentIssuedMail extends Mailable
         '91' => 'Credit note',
         '92' => 'Debit note',
     ];
+
+    /**
+     * _id del EmailLog que ya se creó (antes de encolar este Mailable, ver
+     * DocumentoEmitidoController::sendEmail()) -- viaja como header del propio correo para que
+     * RecordSesMessageId pueda encontrar a qué EmailLog corresponde una vez que el job realmente
+     * corre y SES ya le asignó un Message-ID (que no existe todavía en el momento de encolar).
+     */
+    public ?string $emailLogId = null;
 
     public function __construct(public Company $company, public DocumentoEmitido $documento)
     {
@@ -43,6 +54,20 @@ class DocumentIssuedMail extends Mailable
                 'numeral' => $this->documento->numeral,
                 'company' => $this->company->name,
             ]),
+        );
+    }
+
+    public function withEmailLogId(string $emailLogId): static
+    {
+        $this->emailLogId = $emailLogId;
+
+        return $this;
+    }
+
+    public function headers(): Headers
+    {
+        return new Headers(
+            text: $this->emailLogId ? ['X-Billingo-Email-Log-Id' => $this->emailLogId] : [],
         );
     }
 

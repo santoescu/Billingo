@@ -1930,25 +1930,21 @@ class DocumentoEmitidoController extends Controller
             // reusar la misma instancia entre vueltas del loop terminaría mandando cada correo a
             // todos los destinatarios ya procesados, no solo al de esa vuelta.
             $mailable = new DocumentIssuedMail($company, $documento);
-            $sent = Mail::to($email)->send($mailable);
 
-            // El "Message-ID" real que asigna SES (el que va a venir en los eventos de
-            // entrega/apertura/rebote que manda por SNS -- ver SesEventWebhookController) no es
-            // el "Message-ID" que Symfony genera por su cuenta: SesTransport lo agrega aparte
-            // como header "X-SES-Message-ID" después de mandarlo (ver
-            // vendor/laravel/framework/.../Mail/Transport/SesTransport.php). Sin MAIL_MAILER=ses
-            // (ej. en desarrollo, con MAIL_MAILER=log) ese header no existe, así que el tracking
-            // de eventos simplemente no aplica -- el correo igual queda registrado como "enviado".
-            $sesMessageId = $sent?->getOriginalMessage()->getHeaders()->get('X-SES-Message-ID')?->getBodyAsString();
-
-            EmailLog::create([
+            // El EmailLog se crea ANTES de encolar (sent_at/ses_message_id todavía en null,
+            // "pendiente de enviar") porque DocumentIssuedMail implementa ShouldQueue -- en el
+            // momento de encolar todavía no existe el Message-ID real que le va a asignar SES,
+            // eso solo se sabe después de que el job corre de verdad. Su _id viaja como header
+            // del propio correo para que RecordSesMessageId (ver AppServiceProvider) sepa a cuál
+            // EmailLog actualizar una vez que el envío ya ocurrió.
+            $emailLog = EmailLog::create([
                 'company_id' => (string) $company->_id,
                 'documento_id' => (string) $documento->_id,
                 'to' => $email,
                 'subject' => $mailable->envelope()->subject,
-                'ses_message_id' => $sesMessageId,
-                'sent_at' => now(),
             ]);
+
+            Mail::to($email)->queue($mailable->withEmailLogId((string) $emailLog->_id));
         }
 
         $documento->update([
