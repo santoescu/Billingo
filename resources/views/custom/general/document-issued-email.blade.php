@@ -54,7 +54,7 @@
                                 {{ __('Hi :name,', ['name' => $customer['razon_social'] ?? __('customer')]) }}
                             </p>
                             <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #4b5563;">
-                                {{ __('We are sending you the :type with number :numeral, issued by :company. You will find the PDF and the signed XML attached to this email.', [
+                                {{ __('We are sending you the :type with number :numeral, issued by :company. You will find a .zip attached to this email with the PDF and the signed XML.', [
                                     'type' => $documentTypeLabels[$documento->tipo_documento] ?? __('document'),
                                     'numeral' => $documento->numeral,
                                     'company' => $company->name,
@@ -110,7 +110,7 @@
                             <table role="presentation" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 8px; width: 100%;">
                                 <tr>
                                     <td style="padding: 12px 16px; font-size: 12px; color: #6b7280;">
-                                        📎 {{ __('The PDF and the signed XML will be attached automatically.') }}
+                                        📎 {{ __('The PDF and the signed XML will be attached automatically in a single .zip file.') }}
                                     </td>
                                 </tr>
                             </table>

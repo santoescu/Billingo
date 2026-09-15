@@ -4,10 +4,7 @@ namespace App\Mail;
 
 use App\Models\Company;
 use App\Models\DocumentoEmitido;
-use App\Models\PaymentMeansCode;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
+use App\Services\Dian\DocumentAttachmentZipBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -88,44 +85,21 @@ class DocumentIssuedMail extends Mailable implements ShouldQueue
     }
 
     /**
-     * Adjunta el mismo PDF que se vería en documents.invoice-pdf (idéntica representación
-     * gráfica a la que el cliente vería si entrara a verla desde la app -- ver
-     * DocumentoEmitidoController::invoicePreview()) y el XML firmado, si ya lo tiene.
+     * Un solo adjunto .zip con el AttachedDocument y el PDF adentro -- así es como la DIAN
+     * dispone el envío de documentos electrónicos (Anexo Técnico 1.9), y es el mismo formato que
+     * mandan los proveedores de quienes recibimos documentos (ver ReceivedDocumentParser). Se
+     * arma con DocumentAttachmentZipBuilder -- mismo servicio que usa el botón de descarga manual
+     * en documents.show, para no tener esta lógica sensible a la normativa DIAN en dos lugares.
      *
      * @return array<int, Attachment>
      */
     public function attachments(): array
     {
-        $attachments = [
-            Attachment::fromData(fn () => $this->renderPdf(), $this->documento->numeral . '.pdf')
-                ->withMime('application/pdf'),
+        return [
+            Attachment::fromData(
+                fn () => (new DocumentAttachmentZipBuilder())->build($this->company, $this->documento),
+                $this->documento->numeral . '.zip',
+            )->withMime('application/zip'),
         ];
-
-        if ($this->documento->xml) {
-            $attachments[] = Attachment::fromData(fn () => $this->documento->xml, $this->documento->numeral . '.xml')
-                ->withMime('application/xml');
-        }
-
-        return $attachments;
-    }
-
-    private function renderPdf(): string
-    {
-        $paymentMeansCode = $this->documento->payment_means_code
-            ? PaymentMeansCode::where('codigo', $this->documento->payment_means_code)->first()
-            : null;
-
-        $qrDataUri = null;
-        if ($this->documento->qr_validation_url) {
-            $qrCode = new QrCode(data: $this->documento->qr_validation_url, size: 300, margin: 8);
-            $qrDataUri = (new PngWriter())->write($qrCode)->getDataUri();
-        }
-
-        return Pdf::loadView($this->company->resolvePdfView('invoice-pdf'), [
-            'company' => $this->company,
-            'documento' => $this->documento,
-            'paymentMeansCode' => $paymentMeansCode,
-            'qrDataUri' => $qrDataUri,
-        ])->setPaper('letter', 'portrait')->output();
     }
 }

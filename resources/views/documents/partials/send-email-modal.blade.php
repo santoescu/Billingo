@@ -24,7 +24,7 @@
                     </button>
                 </div>
                 <div class="p-4 space-y-3">
-                    <p class="text-sm text-gray-600 dark:text-neutral-400">{{ __('The PDF and the signed XML will be attached automatically.') }}</p>
+                    <p class="text-sm text-gray-600 dark:text-neutral-400">{{ __('The PDF and the signed XML will be attached automatically in a single .zip file.') }}</p>
 
                     <div>
                         <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2" for="doc-send-email-chip-input">{{ __('Recipient email') }}</label>
