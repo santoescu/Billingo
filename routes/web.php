@@ -203,6 +203,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('{documento}', [DocumentoEmitidoController::class, 'show'])->name('show');
             Route::get('{documento}/receipt.pdf', [DocumentoEmitidoController::class, 'receiptPdf'])->name('receipt-pdf');
             Route::get('{documento}/invoice-preview', [DocumentoEmitidoController::class, 'invoicePreview'])->name('invoice-preview');
+            Route::get('{documento}/attached-document', [DocumentoEmitidoController::class, 'downloadAttachedDocument'])->name('attached-document');
             Route::post('{documento}/toggle-paid', [DocumentoEmitidoController::class, 'togglePaid'])->name('toggle-paid');
             Route::post('{documento}/retry', [DocumentoEmitidoController::class, 'retry'])->name('retry');
             Route::post('{documento}/send-email', [DocumentoEmitidoController::class, 'sendEmail'])->name('send-email');

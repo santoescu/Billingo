@@ -347,6 +347,14 @@
                                 {{ __('XML RESPONSE') }}
                             </flux:button>
                         </a>
+
+                        @if ($documento->status === \App\Models\DocumentoEmitido::STATUS_ACCEPTED)
+                            <a href="{{ route('documents.attached-document', $documento->_id) }}">
+                                <flux:button type="button" variant="filled" icon="archive-box-arrow-down">
+                                    {{ __('AttachedDocument (.zip)') }}
+                                </flux:button>
+                            </a>
+                        @endif
                     @endif
                 </div>
             </div>

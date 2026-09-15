@@ -21,6 +21,7 @@ use App\Models\Tributo;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
+use App\Services\Dian\DocumentAttachmentZipBuilder;
 use App\Services\Dian\DocumentJsonMapper;
 use App\Services\Dian\DocumentTotalsCalculator;
 use App\Services\Dian\IssueDocumentService;
@@ -1855,6 +1856,29 @@ class DocumentoEmitidoController extends Controller
         ))->setPaper('letter', 'portrait');
 
         return $pdf->stream($documento->numeral . '.pdf');
+    }
+
+    /**
+     * Descarga el mismo .zip (AttachedDocument firmado + PDF) que se manda por correo -- ver
+     * DocumentIssuedMail, que usa el mismo DocumentAttachmentZipBuilder. Solo aplica a documentos
+     * ya aceptados por la DIAN, igual que sendEmail(): antes de eso no existe un
+     * ApplicationResponse con qué armar el sobre.
+     */
+    public function downloadAttachedDocument(Request $request, string $documento)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+        abort_unless($documento->status === DocumentoEmitido::STATUS_ACCEPTED, 422);
+
+        $zip = (new DocumentAttachmentZipBuilder())->build($company, $documento);
+
+        return response($zip, 200, [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => 'attachment; filename="' . $documento->numeral . '.zip"',
+        ]);
     }
 
     /**
