@@ -70,10 +70,16 @@ class DocumentIssuedMail extends Mailable implements ShouldQueue
         );
     }
 
+    /**
+     * "document-issued-email" en vez de una ruta fija -- ver Company::resolvePdfView() (mismo
+     * mecanismo que ya existía para los PDFs por empresa): si el cliente necesita un cuerpo de
+     * correo distinto al estándar, la plantilla se agrega en resources/views/custom/<NIT>/, sin
+     * tocar código.
+     */
     public function content(): Content
     {
         return new Content(
-            view: 'emails.documents.issued',
+            view: $this->company->resolvePdfView('document-issued-email'),
             with: [
                 'company' => $this->company,
                 'documento' => $this->documento,
