@@ -25,15 +25,6 @@ class DocumentIssuedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    private static array $documentTypeLabels = [
-        '01' => 'Electronic sales invoice',
-        '02' => 'Electronic sales invoice (export)',
-        '03' => 'Electronic transmission instrument (type 03)',
-        '04' => 'Electronic sales invoice (type 04)',
-        '91' => 'Credit note',
-        '92' => 'Debit note',
-    ];
-
     /**
      * _id del EmailLog que ya se creó (antes de encolar este Mailable, ver
      * DocumentoEmitidoController::sendEmail()) -- viaja como header del propio correo para que
@@ -46,13 +37,21 @@ class DocumentIssuedMail extends Mailable implements ShouldQueue
     {
     }
 
+    /**
+     * El asunto NO es libre: el Anexo Técnico 1.9 de la DIAN (sección 9.1) exige este formato
+     * exacto separado por ";" -- NIT del facturador, nombre del facturador, número del
+     * documento, código del tipo de documento, nombre comercial del facturador. Mismo patrón
+     * que se ve en los correos que mandan otros proveedores (ver SesInboundWebhookController).
+     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: __(':document :numeral from :company', [
-                'document' => __(self::$documentTypeLabels[$this->documento->tipo_documento] ?? 'Document'),
-                'numeral' => $this->documento->numeral,
-                'company' => $this->company->name,
+            subject: implode(';', [
+                $this->company->identificacion,
+                $this->company->name,
+                $this->documento->numeral,
+                $this->documento->tipo_documento,
+                $this->company->name,
             ]),
         );
     }
