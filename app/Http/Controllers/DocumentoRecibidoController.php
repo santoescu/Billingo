@@ -33,13 +33,6 @@ class DocumentoRecibidoController extends Controller
     {
         $company = $this->currentCompany($request);
 
-        // Solo genera el token (y por lo tanto el alias) si el canal por correo ya está
-        // configurado -- mientras no haya dominio de recepción, no tiene sentido guardarle un
-        // token a cada empresa que visite la bandeja.
-        if (config('services.ses.inbound_domain') && ! $company->reception_email_token) {
-            $company->ensureReceptionEmailToken();
-        }
-
         $documentos = collect();
 
         return view('received-documents.index', compact('company', 'documentos'));

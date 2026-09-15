@@ -10,10 +10,13 @@ return [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-        // Dominio donde se reciben las facturas por correo (ver Company::reception_email_alias
-        // y SesInboundWebhookController) -- ej. "recepcion.billingo.com.co". El bucket es donde
-        // SES deja el correo crudo antes de avisar por SNS.
+        // Dominio donde se reciben las facturas por correo (ver SesInboundWebhookController) --
+        // ej. "recepcion.billingo.com.co". El bucket es donde SES deja el correo crudo antes de
+        // avisar por SNS. Es una sola dirección compartida por todas las empresas -- cada
+        // adjunto se resuelve a su empresa leyendo el NIT del comprador dentro del propio XML,
+        // no hace falta un alias distinto por empresa.
         'inbound_domain' => env('AWS_SES_INBOUND_DOMAIN'),
+        'inbound_address' => env('AWS_SES_INBOUND_DOMAIN') ? 'documentos@'.env('AWS_SES_INBOUND_DOMAIN') : null,
         'inbound_bucket' => env('AWS_SES_INBOUND_BUCKET'),
         // "options" se manda tal cual en cada sendRawEmail() de Laravel (ver
         // Illuminate\Mail\MailManager::createSesTransport()) -- el Configuration Set es lo que

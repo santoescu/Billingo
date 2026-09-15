@@ -81,10 +81,10 @@ class EnsureMongoIndexes extends Command
 
         $this->ensureIndexes('companies', [
             // Se busca por estos dos en CADA request: el primero en toda llamada a la API (ver
-            // AuthenticateCompanyApiToken), el segundo en cada correo que llega al webhook de
-            // SES (ver SesInboundWebhookController::resolveCompanyFromRecipient()).
+            // AuthenticateCompanyApiToken), el segundo en cada adjunto que llega al webhook de
+            // SES (ver SesInboundWebhookController::resolveCompanyFromIdentificacion()).
             ['key' => ['api_token' => 1]],
-            ['key' => ['reception_email_token' => 1]],
+            ['key' => ['identificacion' => 1]],
         ]);
 
         $this->ensureIndexes('company_members', [

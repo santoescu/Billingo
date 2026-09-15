@@ -14,27 +14,29 @@
         </div>
     @endif
 
-    @if ($company->reception_email_alias)
+    @if (config('services.ses.inbound_address'))
         <div class="mb-6 rounded-md border border-gray-200 bg-gray-50 p-4 text-sm dark:border-neutral-700 dark:bg-neutral-800">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <div class="font-medium text-gray-800 dark:text-white">{{ __('Your reception email') }}</div>
-                    <div class="text-gray-600 dark:text-neutral-400">{{ __('Give this address to your providers, or forward their invoices here -- documents that arrive here show up in this inbox automatically.') }}</div>
+                    <div class="font-medium text-gray-800 dark:text-white">{{ __('Reception email') }}</div>
+                    <div class="text-gray-600 dark:text-neutral-400">{{ __('Give this address to your providers, or forward your already issued documents to this address. Documents sent here are matched to your company automatically by NIT and show up in this inbox.') }}</div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <code id="received-documents-reception-email" class="rounded-md bg-white px-3 py-1.5 font-mono text-xs text-gray-800 border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200">{{ $company->reception_email_alias }}</code>
-                    <button type="button" id="received-documents-reception-email-copy" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
-                        <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    <code id="received-documents-reception-email" class="rounded-md bg-white px-3 py-1.5 font-mono text-xs text-gray-800 border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200">{{ config('services.ses.inbound_address') }}</code>
+                    {{-- Mismo mecanismo que el link público de cotizaciones (quotations/index.blade.php):
+                         ClipboardJS real vía window.hsClipboardHelper, no navigator.clipboard a mano --
+                         funciona también en HTTP local, no solo en HTTPS. Se inicializa junto con el
+                         resto del @push('scripts') de abajo. --}}
+                    <button type="button" class="js-clipboard relative flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700"
+                        data-clipboard-target="#received-documents-reception-email"
+                        data-clipboard-action="copy"
+                        aria-label="{{ __('Copy') }}" title="{{ __('Copy') }}">
+                        <svg class="js-clipboard-default size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        <svg class="js-clipboard-success hidden size-4 shrink-0 text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                     </button>
                 </div>
             </div>
         </div>
-
-        <script>
-            document.getElementById('received-documents-reception-email-copy')?.addEventListener('click', function () {
-                navigator.clipboard.writeText(document.getElementById('received-documents-reception-email').textContent.trim());
-            });
-        </script>
     @endif
 
     @php
@@ -519,8 +521,14 @@
 
                 bindReceivedDocumentsFilters();
 
+                function initReceivedDocumentsClipboard() {
+                    window.hsClipboardHelper?.('.js-clipboard');
+                }
+
                 document.addEventListener('DOMContentLoaded', loadReceivedDocumentsTable);
                 document.addEventListener('livewire:navigated', loadReceivedDocumentsTable);
+                document.addEventListener('DOMContentLoaded', initReceivedDocumentsClipboard);
+                document.addEventListener('livewire:navigated', initReceivedDocumentsClipboard);
             })();
         </script>
     @endpush

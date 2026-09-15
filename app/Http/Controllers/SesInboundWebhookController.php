@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Services\Dian\ReceivedDocumentIngestionService;
+use App\Services\Dian\ReceivedDocumentParser;
 use Aws\S3\S3Client;
 use Aws\Sns\Message as SnsMessage;
 use Aws\Sns\MessageValidator;
@@ -12,18 +13,22 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
-use ZBateson\MailMimeParser\Header\HeaderConsts;
 use ZBateson\MailMimeParser\MailMimeParser;
 use ZBateson\MailMimeParser\Message\IMessagePart;
 
 class SesInboundWebhookController extends Controller
 {
     /**
-     * Recibe el aviso de SNS de que llegó un correo nuevo a la casilla de recepción (ver
-     * Company::reception_email_alias), lo baja de S3 (ahí es donde SES deja el correo crudo
-     * completo), saca los adjuntos XML/zip, y los procesa con el mismo servicio que usa la
-     * subida manual (ver ReceivedDocumentIngestionService::ingest()) -- así los dos caminos
-     * (subir a mano, o que llegue por correo) terminan guardando el documento exactamente igual.
+     * Recibe el aviso de SNS de que llegó un correo nuevo a la casilla de recepción compartida
+     * (una sola dirección para todas las empresas, ver config('services.ses.inbound_address')),
+     * lo baja de S3 (ahí es donde SES deja el correo crudo completo), y procesa cada adjunto
+     * XML/zip con el mismo servicio que usa la subida manual (ver
+     * ReceivedDocumentIngestionService::ingest()) -- así los dos caminos (subir a mano, o que
+     * llegue por correo) terminan guardando el documento exactamente igual.
+     *
+     * Como la dirección es compartida, la empresa dueña de cada adjunto se resuelve leyendo el
+     * NIT del comprador (accounting_customer_party) que ya viene dentro del propio XML -- no
+     * hace falta un alias distinto por empresa (ver resolveCompanyFromIdentificacion()).
      *
      * Dos tipos de mensaje de SNS llegan acá:
      * - "SubscriptionConfirmation": el primer aviso al suscribir esta URL al tópico de SNS -- hay
@@ -36,7 +41,7 @@ class SesInboundWebhookController extends Controller
      * envío si no recibe 200, y no queremos que reintente por errores de negocio (empresa no
      * encontrada, adjunto que no es un documento válido) que nunca se van a resolver solos.
      */
-    public function handle(Request $request, ReceivedDocumentIngestionService $ingestionService)
+    public function handle(Request $request, ReceivedDocumentIngestionService $ingestionService, ReceivedDocumentParser $parser)
     {
         try {
             $message = SnsMessage::fromJsonString($request->getContent());
@@ -70,14 +75,8 @@ class SesInboundWebhookController extends Controller
         $raw = $this->downloadRawEmail($bucket, $key);
         $email = (new MailMimeParser())->parse($raw, false);
 
-        $company = $this->resolveCompanyFromRecipient((string) $email->getHeaderValue(HeaderConsts::TO));
-
-        if (! $company) {
-            return response('', 200);
-        }
-
         foreach ($email->getAllAttachmentParts() as $attachment) {
-            $this->ingestAttachment($ingestionService, $company, $attachment);
+            $this->ingestAttachment($ingestionService, $parser, $attachment);
         }
 
         return response('', 200);
@@ -103,36 +102,36 @@ class SesInboundWebhookController extends Controller
     }
 
     /**
-     * Saca el token de recepción del alias al que llegó el correo (el "To": "recepcion-<token>@...")
-     * y resuelve a qué empresa le pertenece -- ver Company::ensureReceptionEmailToken().
+     * Lee el NIT del comprador (accounting_customer_party) directo del XML del adjunto y resuelve
+     * a qué empresa le pertenece -- la dirección de recepción es compartida entre todas las
+     * empresas, así que este NIT es la única forma de saber para quién es el documento.
      *
-     * @param  string  $to
+     * @param  string  $identificacion
      * @return Company|null
      */
-    private function resolveCompanyFromRecipient(string $to): ?Company
+    private function resolveCompanyFromIdentificacion(string $identificacion): ?Company
     {
-        if (! preg_match('/recepcion-([a-f0-9]+)@/i', $to, $matches)) {
-            Log::warning('Correo entrante SES: no se pudo sacar el alias de recepción del "To".', ['to' => $to]);
-
+        if ($identificacion === '') {
             return null;
         }
 
-        $company = Company::findByReceptionEmailToken(strtolower($matches[1]));
+        $company = Company::where('identificacion', $identificacion)->first();
 
         if (! $company) {
-            Log::warning('Correo entrante SES: no hay ninguna empresa con ese token de recepción.', ['token' => $matches[1]]);
+            Log::warning('Correo entrante SES: no hay ninguna empresa con ese NIT de comprador.', ['identificacion' => $identificacion]);
         }
 
         return $company;
     }
 
     /**
-     * Guarda el adjunto en un archivo temporal y lo procesa igual que un archivo subido a mano
-     * (ver ReceivedDocumentIngestionService::ingest()) -- ignora en silencio los adjuntos que no
-     * sean .xml/.zip (firmas de correo, logos incrustados, etc.), y deja un log (sin abortar el
-     * resto del correo) si el que sí parece un documento falla al procesarse.
+     * Guarda el adjunto en un archivo temporal, lo parsea para saber a qué empresa pertenece
+     * (por el NIT del comprador) y lo procesa igual que un archivo subido a mano (ver
+     * ReceivedDocumentIngestionService::ingest()) -- ignora en silencio los adjuntos que no sean
+     * .xml/.zip (firmas de correo, logos incrustados, etc.), y deja un log (sin abortar el resto
+     * del correo) si el que sí parece un documento falla al procesarse o resolverse.
      */
-    private function ingestAttachment(ReceivedDocumentIngestionService $ingestionService, Company $company, IMessagePart $attachment): void
+    private function ingestAttachment(ReceivedDocumentIngestionService $ingestionService, ReceivedDocumentParser $parser, IMessagePart $attachment): void
     {
         $filename = $attachment->getFilename() ?: 'documento';
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
@@ -145,10 +144,18 @@ class SesInboundWebhookController extends Controller
 
         try {
             file_put_contents($tempPath, $attachment->getBinaryContentStream()->getContents());
+
+            $parsed = $parser->parseUploadedFile($tempPath, $extension);
+            $identificacion = trim((string) ($parsed['payload']['accounting_customer_party']['identificacion'] ?? ''));
+            $company = $this->resolveCompanyFromIdentificacion($identificacion);
+
+            if (! $company) {
+                return;
+            }
+
             $ingestionService->ingest($company, $tempPath, $extension, $filename, null);
         } catch (InvalidArgumentException|RuntimeException $e) {
             Log::warning('Correo entrante SES: no se pudo procesar un adjunto.', [
-                'company_id' => (string) $company->_id,
                 'filename' => $filename,
                 'error' => $e->getMessage(),
             ]);
