@@ -186,6 +186,13 @@
                             <button type="button" id="auth-promo-tab-contact-btn" class="auth-promo-tab-btn shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white" onclick="window.showAuthPromoTab('contact')">
                                 {{ __('Contact us') }}
                             </button>
+                            {{-- Igual que "Documentation" más abajo: no es una
+                                 pestaña de panel (no tiene showAuthPromoTab ni
+                                 div asociado) -- abre el blog público en una
+                                 pestaña nueva del navegador. --}}
+                            <a href="{{ route('blog.index') }}" target="_blank" rel="noopener" class="shrink-0 border-b-2 border-transparent py-2 text-sm font-medium whitespace-nowrap text-neutral-400 hover:text-white">
+                                {{ __('Blog') }}
+                            </a>
                             {{-- No es una pestaña de panel como las demás (no
                                  tiene showAuthPromoTab ni div asociado) --
                                  abre la documentación pública de la API en
