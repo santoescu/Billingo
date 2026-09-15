@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\DocumentoController;
+use App\Http\Controllers\QueueWorkerController;
 use App\Http\Controllers\SesEventWebhookController;
 use App\Http\Controllers\SesInboundWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Route;
 // Billingo mandó.
 Route::post('webhooks/ses-inbound', [SesInboundWebhookController::class, 'handle'])->name('api.webhooks.ses-inbound');
 Route::post('webhooks/ses-events', [SesEventWebhookController::class, 'handle'])->name('api.webhooks.ses-events');
+
+// Sin servidor persistente (App Engine/Cloud Run), así que no hay dónde dejar corriendo un
+// "queue:work" -- Cloud Scheduler llama esto cada minuto para vaciar lo que haya pendiente (ver
+// QueueWorkerController).
+Route::post('internal/queue-work', [QueueWorkerController::class, 'run'])->name('api.internal.queue-work');
 
 Route::middleware(['company.api_token'])->group(function () {
     Route::post('documentos', [DocumentoController::class, 'store'])

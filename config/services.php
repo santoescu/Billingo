@@ -39,6 +39,12 @@ return [
         ],
     ],
 
+    // Secreto compartido con Cloud Scheduler para poder llamar a
+    // /api/internal/queue-work sin exponerlo públicamente (ver QueueWorkerController).
+    'queue_worker' => [
+        'secret' => env('QUEUE_WORKER_SECRET'),
+    ],
+
     'dian' => [
         
         'endpoint' => env('DIAN_ENDPOINT', 'https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc'),
