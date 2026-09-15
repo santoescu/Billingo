@@ -2,7 +2,7 @@
 
 namespace App\Services\Blog;
 
-use League\CommonMark\CommonMarkConverter;
+use League\CommonMark\GithubFlavoredMarkdownConverter;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -67,7 +67,7 @@ class BlogPostRepository
     {
         [$frontMatter, $body] = $this->splitFrontMatter($raw);
 
-        $converter = new CommonMarkConverter();
+        $converter = new GithubFlavoredMarkdownConverter();
 
         return new BlogPost(
             slug: $slug,

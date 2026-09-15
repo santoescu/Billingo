@@ -11,7 +11,11 @@
                 [&_a]:text-accent [&_a]:font-medium [&_a]:hover:underline
                 [&_strong]:font-semibold [&_strong]:text-gray-800 [&_strong]:dark:text-white
                 [&_hr]:my-8 [&_hr]:border-gray-200 [&_hr]:dark:border-neutral-700
-                [&_em]:italic">
+                [&_em]:italic
+                [&_table]:w-full [&_table]:mb-4 [&_table]:border-collapse [&_table]:text-sm
+                [&_th]:border [&_th]:border-gray-200 [&_th]:dark:border-neutral-700 [&_th]:bg-zinc-50 [&_th]:dark:bg-white/5 [&_th]:p-2 [&_th]:text-start [&_th]:font-semibold [&_th]:text-gray-800 [&_th]:dark:text-white
+                [&_td]:border [&_td]:border-gray-200 [&_td]:dark:border-neutral-700 [&_td]:p-2 [&_td]:text-zinc-600 [&_td]:dark:text-neutral-300
+                [&_table]:block [&_table]:overflow-x-auto">
             {!! $post->html !!}
         </article>
     </div>
