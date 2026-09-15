@@ -202,6 +202,12 @@
                     'url' => route('admin.activity-log.index'),
                     'current' => request()->routeIs('admin.activity-log.*'),
                 ],
+                [
+                    'name' => __('Inbound emails'),
+                    'icon' => 'envelope',
+                    'url' => route('admin.inbound-emails.index'),
+                    'current' => request()->routeIs('admin.inbound-emails.*'),
+                ],
             ] : [],
         ],
     ];

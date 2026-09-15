@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\AdminInboundEmailController;
 use App\Http\Controllers\ApiDocsController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CannedResponseController;
@@ -311,6 +312,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('canned-responses/{cannedResponse}', [CannedResponseController::class, 'destroy'])->name('canned-responses.destroy');
 
         Route::get('activity-log', [AdminActivityLogController::class, 'index'])->name('activity-log.index');
+
+        Route::get('inbound-emails', [AdminInboundEmailController::class, 'index'])->name('inbound-emails.index');
+        Route::get('inbound-emails/show', [AdminInboundEmailController::class, 'show'])->name('inbound-emails.show');
     });
 });
 
