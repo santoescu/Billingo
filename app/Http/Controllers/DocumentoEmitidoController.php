@@ -1876,11 +1876,11 @@ class DocumentoEmitidoController extends Controller
             ->get()
             ->map(fn (EmailLog $log) => [
                 'to' => $log->to,
-                'sent_at' => optional($log->sent_at)->format('Y-m-d H:i'),
-                'delivered_at' => optional($log->delivered_at)->format('Y-m-d H:i'),
-                'opened_at' => optional($log->opened_at)->format('Y-m-d H:i'),
-                'bounced_at' => optional($log->bounced_at)->format('Y-m-d H:i'),
-                'complained_at' => optional($log->complained_at)->format('Y-m-d H:i'),
+                'sent_at' => optional($log->sent_at)->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'delivered_at' => optional($log->delivered_at)->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'opened_at' => optional($log->opened_at)->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'bounced_at' => optional($log->bounced_at)->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'complained_at' => optional($log->complained_at)->setTimezone('America/Bogota')->format('Y-m-d H:i'),
                 'bounce_reason' => $log->bounce_reason,
             ])
             ->values();

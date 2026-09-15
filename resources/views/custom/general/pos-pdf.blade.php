@@ -26,7 +26,7 @@
         <h1>{{ $company->name }}</h1>
         <p class="muted">NIT {{ $company->identificacion }}{{ $company->dv ? '-' . $company->dv : '' }}</p>
         <p class="bold">{{ $documento->numeral }}</p>
-        <p class="muted">{{ optional($documento->issue_date)->format('Y-m-d H:i') }}</p>
+        <p class="muted">{{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</p>
         @unless ($isElectronic)
             <p class="bold" style="margin-top: 4px;">{{ __('SALES INVOICE') }}</p>
         @endunless

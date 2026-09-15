@@ -61,7 +61,7 @@
             <td class="end" style="width: 40%;">
                 <p class="quote-title">{{ __('QUOTATION') }}</p>
                 <p class="quote-numeral">{{ $documento->numeral }}</p>
-                <p class="quote-numeral">{{ optional($documento->issue_date)->format('Y-m-d H:i') }}</p>
+                <p class="quote-numeral">{{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</p>
             </td>
         </tr>
     </table>

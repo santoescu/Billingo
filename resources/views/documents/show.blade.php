@@ -178,16 +178,16 @@
                                 @foreach ($emailLogs as $log)
                                     <tr>
                                         <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200 truncate">{{ $log->to }}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->sent_at)->format('Y-m-d H:i') ?? '—' }}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->delivered_at)->format('Y-m-d H:i') ?? '—' }}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->opened_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->sent_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->delivered_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
-                                            {{ optional($log->bounced_at)->format('Y-m-d H:i') ?? '—' }}
+                                            {{ $log->bounced_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
                                             @if ($log->bounced_at && $log->bounce_reason)
                                                 <div class="text-xs text-red-600 dark:text-red-400">{{ $log->bounce_reason }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ optional($log->complained_at)->format('Y-m-d H:i') ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

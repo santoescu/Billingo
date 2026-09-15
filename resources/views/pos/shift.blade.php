@@ -95,7 +95,7 @@
                                     <span class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">{{ __('You') }}</span>
                                 @endif
                             </div>
-                            <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('Opened at') }} {{ $s->opened_at?->format('Y-m-d H:i') }}</p>
+                            <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('Opened at') }} {{ $s->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</p>
 
                             <div class="grid grid-cols-2 gap-3 text-sm">
                                 <div>

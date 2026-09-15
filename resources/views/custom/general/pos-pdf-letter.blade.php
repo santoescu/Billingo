@@ -73,7 +73,7 @@
             <td class="end" style="width: 54%;">
                 <p class="doc-title">{{ __('SALES INVOICE') }}</p>
                 <p class="doc-numeral">{{ $documento->numeral }}</p>
-                <p class="doc-numeral">{{ optional($documento->issue_date)->format('Y-m-d H:i') }}</p>
+                <p class="doc-numeral">{{ $documento->issue_date?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</p>
             </td>
         </tr>
     </table>

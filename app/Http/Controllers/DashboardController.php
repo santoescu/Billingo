@@ -156,11 +156,11 @@ class DashboardController extends Controller
         }
 
         /**
-         * La app guarda todo en UTC (config('app.timezone') = 'UTC', mismo
-         * patrón que el resto del código -- ver, p. ej.,
-         * IssueDocumentService o documents/show.blade.php, que siempre
-         * convierten a America/Bogota antes de mostrar una fecha). Sin
-         * esto, "hoy" empezaba a la medianoche UTC (7pm de ayer en
+         * Los datetime que vienen del driver de Mongo se hidratan en UTC sin
+         * importar config('app.timezone') -- mismo patrón que el resto del
+         * código, ver p. ej. IssueDocumentService o documents/show.blade.php,
+         * que siempre convierten a America/Bogota antes de mostrar una fecha.
+         * Sin esto, "hoy" empezaba a la medianoche UTC (7pm de ayer en
          * Colombia) y las horas de la gráfica de tendencia salían
          * corridas ~5 horas.
          */
