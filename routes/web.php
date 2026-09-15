@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\ApiDocsController;
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CannedResponseController;
 use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CatalogLinkController;
@@ -59,6 +60,9 @@ Route::post('contacto', [PublicContactController::class, 'store'])->name('public
 
 // Documentación pública de la API (OpenAPI 3.1 + Scalar) -- sin auth, para que quien se
 // vaya a integrar (o su desarrollador) la consulte sin necesitar cuenta en Billingo.
+Route::get('blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
+
 Route::get('api-docs', [ApiDocsController::class, 'index'])->name('api-docs.index');
 Route::get('api-docs/openapi.yaml', [ApiDocsController::class, 'openapi'])->name('api-docs.openapi');
 
