@@ -182,15 +182,17 @@
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->delivered_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">{{ $log->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
-                                            {{ $log->bounced_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
                                             @if ($log->bounced_at && $log->bounce_reason)
-                                                <div class="text-xs text-red-600 dark:text-red-400">{{ $log->bounce_reason }}</div>
+                                                <button type="button" class="text-red-600 dark:text-red-400 underline decoration-dotted" onclick="window.appConfirmDialog.notify(@json($log->bounce_reason), @json(__('Reason')))">{{ $log->bounced_at->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</button>
+                                            @else
+                                                {{ $log->bounced_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
-                                            {{ $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
                                             @if ($log->complained_at && $log->complaint_reason)
-                                                <div class="text-xs text-red-600 dark:text-red-400">{{ $log->complaint_reason }}</div>
+                                                <button type="button" class="text-red-600 dark:text-red-400 underline decoration-dotted" onclick="window.appConfirmDialog.notify(@json($log->complaint_reason), @json(__('Reason')))">{{ $log->complained_at->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</button>
+                                            @else
+                                                {{ $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') ?? '—' }}
                                             @endif
                                         </td>
                                     </tr>

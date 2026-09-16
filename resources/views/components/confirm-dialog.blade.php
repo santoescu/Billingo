@@ -137,7 +137,7 @@
         function show(message, isAlert, title, options = {}) {
             const variant = options.variant === 'primary' ? 'primary' : 'danger';
 
-            document.getElementById('app-confirm-dialog-title').textContent = title || '{{ __('Are you sure?') }}';
+            document.getElementById('app-confirm-dialog-title').textContent = title || (isAlert ? '{{ __('Notice') }}' : '{{ __('Are you sure?') }}');
             document.getElementById('app-confirm-dialog-message').textContent = message || '';
             document.getElementById('app-confirm-dialog-cancel-wrapper').classList.toggle('hidden', isAlert);
             document.getElementById('app-confirm-dialog-accept-danger-wrapper').classList.toggle('hidden', isAlert || variant !== 'danger');

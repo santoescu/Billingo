@@ -600,12 +600,14 @@
                     logs.forEach((log) => {
                         const row = document.createElement('tr');
                         const bouncedCell = `<td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
-                                ${escapeHtml(log.bounced_at ?? '—')}
-                                ${log.bounce_reason ? `<div class="text-xs text-red-600 dark:text-red-400 whitespace-normal">${escapeHtml(log.bounce_reason)}</div>` : ''}
+                                ${log.bounce_reason
+                                    ? `<button type="button" class="js-status-reason text-red-600 dark:text-red-400 underline decoration-dotted" data-reason="${escapeHtml(log.bounce_reason)}">${escapeHtml(log.bounced_at ?? '—')}</button>`
+                                    : escapeHtml(log.bounced_at ?? '—')}
                             </td>`;
                         const complainedCell = `<td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
-                                ${escapeHtml(log.complained_at ?? '—')}
-                                ${log.complaint_reason ? `<div class="text-xs text-red-600 dark:text-red-400 whitespace-normal">${escapeHtml(log.complaint_reason)}</div>` : ''}
+                                ${log.complaint_reason
+                                    ? `<button type="button" class="js-status-reason text-red-600 dark:text-red-400 underline decoration-dotted" data-reason="${escapeHtml(log.complaint_reason)}">${escapeHtml(log.complained_at ?? '—')}</button>`
+                                    : escapeHtml(log.complained_at ?? '—')}
                             </td>`;
 
                         row.innerHTML = `
@@ -626,9 +628,18 @@
 
                     document.addEventListener('click', function (event) {
                         const button = event.target.closest('.document-tracking-btn');
-                        if (! button) return;
+                        if (button) {
+                            openDocumentTrackingModal(button.dataset.url);
+                            return;
+                        }
 
-                        openDocumentTrackingModal(button.dataset.url);
+                        // Motivo de rebote/spam del modal de tracking -- notify() en vez de un
+                        // tooltip nativo (title), porque el texto de SES es largo/multilínea y un
+                        // tooltip no es confiable para eso.
+                        const reasonBtn = event.target.closest('.js-status-reason');
+                        if (reasonBtn) {
+                            window.appConfirmDialog.notify(reasonBtn.dataset.reason, @json(__('Reason')));
+                        }
                     });
                 }
 
