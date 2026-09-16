@@ -31,7 +31,7 @@
                                         <table role="presentation" cellpadding="0" cellspacing="0">
                                             <tr>
                                                 <td style="vertical-align: middle; padding-right: 10px;">
-                                                    <img src="{{ asset('images/billingo-logo-email.png') }}" width="28" height="28" alt="Billingo" style="display: block; border: 0;">
+                                                    <img src="{{ asset('images/billingo-logo-email.png') }}" width="44" height="44" alt="Billingo" style="display: block; border: 0;">
                                                 </td>
                                                 <td style="vertical-align: middle; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff;">
                                                     Billingo
