@@ -12,6 +12,7 @@
         <div class="rounded-lg border border-gray-200 dark:border-neutral-700 p-4">
             <div class="text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">{{ __('Delivered') }}</div>
             <div class="text-2xl font-bold text-gray-800 dark:text-white mt-1">{{ number_format($totalDelivered) }}</div>
+            <div class="text-xs text-neutral-400 mt-1">{{ $totalSent > 0 ? number_format($totalDelivered / $totalSent * 100, 1) : 0 }}% {{ __('of sent') }}</div>
         </div>
         <div class="rounded-lg border border-gray-200 dark:border-neutral-700 p-4">
             <div class="text-xs font-medium text-gray-500 dark:text-neutral-400 uppercase">{{ __('Opened') }}</div>
