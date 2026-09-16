@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminEmailEngagementController;
 use App\Http\Controllers\AdminInboundEmailController;
 use App\Http\Controllers\AdminLeadController;
+use App\Http\Controllers\AdminReferralController;
 use App\Http\Controllers\ApiDocsController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CannedResponseController;
@@ -60,6 +61,12 @@ Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
 // cuenta), llega al mismo panel de soporte del admin como un ticket sin
 // empresa.
 Route::post('contacto', [PublicContactController::class, 'store'])->name('public.contact.store');
+
+// Link de referido (ver User::generateReferralCode()) -- sin auth, se comparte fuera de la
+// plataforma igual que el link de catálogo público. Con límite de peticiones (a diferencia del
+// catálogo público, que no distribuye recompensa) para que no lo usen para probar códigos al
+// tanteo o inflar visitas artificialmente.
+Route::get('r/{code}', [ReferralController::class, 'visit'])->middleware('throttle:20,1')->name('referrals.visit');
 
 // Documentación pública de la API (OpenAPI 3.1 + Scalar) -- sin auth, para que quien se
 // vaya a integrar (o su desarrollador) la consulte sin necesitar cuenta en Billingo.
@@ -294,7 +301,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('users', [SuperadminController::class, 'users'])->name('users');
         Route::post('users/{userId}/toggle-superadmin', [SuperadminController::class, 'toggleSuperadmin'])->name('users.toggle-superadmin');
-        Route::post('users/{userId}/toggle-referrer', [SuperadminController::class, 'toggleReferrer'])->name('users.toggle-referrer');
+        Route::post('users/{userId}/toggle-can-refer', [SuperadminController::class, 'toggleCanRefer'])->name('users.toggle-can-refer');
 
         Route::get('notifications', [SuperadminController::class, 'notificationsCreate'])->name('notifications.create');
         Route::post('notifications', [SuperadminController::class, 'notificationsStore'])->name('notifications.store');
@@ -320,6 +327,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('inbound-emails/show', [AdminInboundEmailController::class, 'show'])->name('inbound-emails.show');
 
         Route::get('email-engagement', [AdminEmailEngagementController::class, 'index'])->name('email-engagement.index');
+        Route::get('referrals', [AdminReferralController::class, 'index'])->name('referrals.index');
 
         Route::get('leads', [AdminLeadController::class, 'index'])->name('leads.index');
         Route::get('leads/data', [AdminLeadController::class, 'data'])->name('leads.data');

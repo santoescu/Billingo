@@ -40,6 +40,11 @@ class CompanyContract extends Model
         // de un vendedor con comisión).
         'referrer_user_id',
         'commission_percentage',
+        // Beneficio para la EMPRESA referida (aparte de la comisión de arriba, que es para quien
+        // la refirió) -- "price" ya viene con el descuento aplicado a mano por el superadmin (no
+        // hay pasarela que lo cobre solo), este campo es solo para dejar registrado cuánto de
+        // ese precio es descuento por referido, no un cargo aparte.
+        'referral_discount_percentage',
     ];
 
     const QUOTA_MODE_PER_MODULE = 'per_module';
@@ -59,6 +64,7 @@ class CompanyContract extends Model
             'unlimited' => 'boolean',
             'period_started_at' => 'datetime',
             'commission_percentage' => 'float',
+            'referral_discount_percentage' => 'float',
         ];
     }
 
@@ -68,17 +74,46 @@ class CompanyContract extends Model
     }
 
     /**
-     * Cuánto se gana el vendedor de este contrato en particular -- null si
-     * no tiene vendedor o % de comisión asignado (no todo contrato viene de
-     * una venta con comisión).
+     * "price" es el valor completo del contrato (lo que costaría sin el descuento de
+     * referido) -- lo que la empresa realmente paga es "price" menos ese descuento. Sin
+     * descuento, coincide con "price".
      */
-    public function getCommissionAmountAttribute(): ?float
+    public function getNetPriceAttribute(): ?float
     {
-        if (! $this->referrer_user_id || ! $this->commission_percentage || ! $this->price) {
+        if ($this->price === null) {
             return null;
         }
 
-        return round($this->price * $this->commission_percentage / 100, 2);
+        return round($this->price - ($this->referral_discount_amount ?? 0), 2);
+    }
+
+    /**
+     * Cuánto se gana el vendedor de este contrato en particular -- null si no tiene vendedor o
+     * % de comisión asignado (no todo contrato viene de una venta con comisión). Se calcula
+     * sobre lo que la empresa REALMENTE pagó (net_price, ya con el descuento de referido
+     * restado si aplica), no sobre el valor completo del contrato -- la comisión es un % de la
+     * plata que de verdad entró, no del precio de lista.
+     */
+    public function getCommissionAmountAttribute(): ?float
+    {
+        if (! $this->referrer_user_id || ! $this->commission_percentage || ! $this->net_price) {
+            return null;
+        }
+
+        return round($this->net_price * $this->commission_percentage / 100, 2);
+    }
+
+    /**
+     * Cuánto de "price" es descuento por venir de un referido -- null si no aplica. Beneficio
+     * de la EMPRESA referida, no de quien la refirió (ver getCommissionAmountAttribute()).
+     */
+    public function getReferralDiscountAmountAttribute(): ?float
+    {
+        if (! $this->referral_discount_percentage || ! $this->price) {
+            return null;
+        }
+
+        return round($this->price * $this->referral_discount_percentage / 100, 2);
     }
 
     /**

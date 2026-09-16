@@ -40,6 +40,7 @@ class Company extends Model
         'api_features',
         'logo_data',
         'logo_mime',
+        'referred_by_user_id',
     ];
 
     const DIAN_AMBIENTE_PRODUCCION = '1';
@@ -64,6 +65,18 @@ class Company extends Model
             'dian_certificate_content' => 'encrypted',
             'dian_habilitado' => 'boolean',
         ];
+    }
+
+    /**
+     * Usuario que refirió a esta empresa (ver ReferralController::visit(), CompanyController::
+     * store(), User::referral_code) -- null si se registró sin pasar por un link de referido.
+     * Va por usuario y no por empresa a propósito: un mismo usuario puede administrar varias
+     * empresas, y una empresa puede tener varios usuarios -- la ganancia por referir es de la
+     * persona que compartió el link, no de "la empresa" en abstracto.
+     */
+    public function referredByUser()
+    {
+        return $this->belongsTo(User::class, 'referred_by_user_id');
     }
 
     /**

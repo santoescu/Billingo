@@ -28,7 +28,7 @@
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Email') }}</th>
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Companies') }}</th>
                                     <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Superadmin') }}</th>
-                                    <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Referrer') }}</th>
+                                    <th scope="col" class="px-4 py-3 text-start text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-500">{{ __('Can refer') }}</th>
                                     <th scope="col" class="px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -56,7 +56,7 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 text-sm">
-                                            @if ($listedUser->isReferrer())
+                                            @if ($listedUser->canRefer())
                                                 <span class="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">{{ __('Yes') }}</span>
                                             @else
                                                 <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">{{ __('No') }}</span>
@@ -72,10 +72,10 @@
                                                         </flux:button>
                                                     </form>
                                                     @unless ($listedUser->isGlobalAdmin())
-                                                        <form method="POST" action="{{ route('admin.users.toggle-referrer', $listedUser->_id) }}">
+                                                        <form method="POST" action="{{ route('admin.users.toggle-can-refer', $listedUser->_id) }}">
                                                             @csrf
-                                                            <flux:button type="submit" size="sm" variant="{{ $listedUser->isReferrer() ? 'danger' : 'filled' }}">
-                                                                {{ $listedUser->isReferrer() ? __('Remove referrer') : __('Make referrer') }}
+                                                            <flux:button type="submit" size="sm" variant="{{ $listedUser->can_refer ? 'danger' : 'filled' }}">
+                                                                {{ $listedUser->can_refer ? __('Disable referrals') : __('Enable referrals') }}
                                                             </flux:button>
                                                         </form>
                                                     @endunless

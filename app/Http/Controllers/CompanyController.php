@@ -31,6 +31,22 @@ class CompanyController extends Controller
         $data = $this->validatedCompanyData($request);
         $data['status'] = 'active';
 
+        // Usuario que la trajo (ver ReferralController::visit()) -- queda en sesión desde que
+        // se abrió el link de referido, se consume una sola vez acá (pull, no peek) para que
+        // crear una segunda empresa más adelante no la vuelva a atar por error. Se descarta si:
+        // (a) es el mismo usuario que está creando la empresa (abrió su propio link sin querer,
+        // o de prueba), o (b) el correo de quien crea la empresa (o el de la empresa misma)
+        // comparte dominio con el del referente -- forma común de auto-referirse: crear una
+        // segunda cuenta/empresa "de mentiras" con un correo distinto pero del mismo negocio.
+        $referralUserId = $request->session()->pull('referral_user_id');
+        $referrer = ($referralUserId && $referralUserId !== (string) $request->user()->_id)
+            ? User::find($referralUserId)
+            : null;
+
+        if ($referrer && ! $this->sharesEmailDomain($referrer->email, [$request->user()->email, $data['email'] ?? null])) {
+            $data['referred_by_user_id'] = (string) $referrer->_id;
+        }
+
         if (filled($data['dian_certificate_password'] ?? null) && $request->hasFile('dian_certificate')) {
             $this->assertCertificatePasswordMatches(
                 file_get_contents($request->file('dian_certificate')->getRealPath()),
@@ -420,6 +436,32 @@ class CompanyController extends Controller
             : null;
 
         return $data;
+    }
+
+    /**
+     * Si alguno de $candidateEmails comparte dominio con $referrerEmail -- señal común de
+     * auto-referido (crear una segunda cuenta/empresa con otro correo pero del mismo negocio).
+     * Los proveedores de correo gratuitos/masivos (gmail, hotmail, etc.) quedan afuera a
+     * propósito: comparten dominio miles de negocios sin ninguna relación entre sí, así que
+     * bloquear por ese dominio dejaría sin comisión a la mayoría de referidos reales.
+     */
+    private function sharesEmailDomain(?string $referrerEmail, array $candidateEmails): bool
+    {
+        $freeProviders = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'live.com', 'aol.com', 'protonmail.com'];
+
+        $referrerDomain = strtolower(trim(explode('@', $referrerEmail ?? '')[1] ?? ''));
+        if ($referrerDomain === '' || in_array($referrerDomain, $freeProviders, true)) {
+            return false;
+        }
+
+        foreach ($candidateEmails as $email) {
+            $domain = strtolower(trim(explode('@', $email ?? '')[1] ?? ''));
+            if ($domain !== '' && $domain === $referrerDomain) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

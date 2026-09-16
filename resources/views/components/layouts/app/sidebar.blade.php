@@ -1,5 +1,5 @@
 @php
-    
+
     $myModules = session('selected_company.modules', []);
     $hasInvoicing = array_key_exists('invoicing', $myModules);
     $hasPos = array_key_exists('pos', $myModules);
@@ -24,9 +24,13 @@
                     'url' => route('panel'),
                     'current' => request()->routeIs('panel'),
                 ] : null,
-                (auth()->user()?->isReferrer() || auth()->user()?->isGlobalAdmin()) ? [
+                // El link/comisión de referidos es por usuario, no por empresa (ver
+                // User::referral_code, Company::referredByUser()), pero por aprobación tuya (ver
+                // User::canRefer(), SuperadminController::toggleCanRefer()) -- no cualquier
+                // usuario ve esto, solo a quien se lo habilitaste (más vendedores/superadmin).
+                auth()->user()?->canRefer() ? [
                     'id' => 'sidebar-referrals',
-                    'name' => __('My commissions'),
+                    'name' => __('Referrals'),
                     'icon' => 'banknotes',
                     'url' => route('referrals.index'),
                     'current' => request()->routeIs('referrals.*'),
@@ -213,6 +217,12 @@
                     'icon' => 'cursor-arrow-rays',
                     'url' => route('admin.email-engagement.index'),
                     'current' => request()->routeIs('admin.email-engagement.*'),
+                ],
+                [
+                    'name' => __('Referral program'),
+                    'icon' => 'banknotes',
+                    'url' => route('admin.referrals.index'),
+                    'current' => request()->routeIs('admin.referrals.*'),
                 ],
                 [
                     'name' => __('Leads'),

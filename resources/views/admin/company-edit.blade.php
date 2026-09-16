@@ -17,6 +17,12 @@
         'subheading' => __('Manage this company\'s active modules and members.'),
     ])
 
+    @if ($referredByUser)
+        <div class="mb-4 rounded-md border border-accent/30 bg-accent/5 p-3 text-sm text-gray-700 dark:text-neutral-300">
+            {{ __('Referred by :name. When creating this company\'s contract, remember to attribute the commission to them.', ['name' => $referredByUser->name]) }}
+        </div>
+    @endif
+
     <!-- Tab Nav -->
     <div class="border-b border-gray-200 dark:border-neutral-700">
         <nav class="flex gap-x-1" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
@@ -222,6 +228,7 @@
                                         'company_ids' => collect($contract->company_ids ?? [])->reject(fn ($id) => (string) $id === (string) $company->_id)->values(),
                                         'referrer_user_id' => $contract->referrer_user_id,
                                         'commission_percentage' => $contract->commission_percentage,
+                                        'referral_discount_percentage' => $contract->referral_discount_percentage,
                                     ]) }})"
                                 >
                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
@@ -288,7 +295,12 @@
                                 <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 text-sm text-gray-600 dark:border-neutral-700 dark:text-neutral-400">
                                     <span class="inline-flex items-center gap-1.5 font-medium text-gray-800 dark:text-neutral-200">
                                         <svg class="size-4 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                                        {{ $contract->price !== null ? number_format($contract->price, 2, '.', ',') : '—' }}
+                                        @if ($contract->referral_discount_percentage)
+                                            <span class="line-through text-neutral-400 font-normal">{{ number_format($contract->price, 2, '.', ',') }}</span>
+                                            {{ number_format($contract->net_price, 2, '.', ',') }}
+                                        @else
+                                            {{ $contract->price !== null ? number_format($contract->price, 2, '.', ',') : '—' }}
+                                        @endif
                                     </span>
                                     <span class="inline-flex items-center gap-1.5 text-xs">
                                         <svg class="size-3.5 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>
@@ -304,9 +316,21 @@
                                         </span>
                                         @if ($contract->commission_percentage)
                                             <span class="rounded-md bg-indigo-100 px-2 py-0.5 font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                                {{ rtrim(rtrim(number_format($contract->commission_percentage, 2), '0'), '.') }}% · {{ $contract->commission_amount !== null ? number_format($contract->commission_amount, 2, '.', ',') : '—' }}
+                                                {{ __('Commission') }}: {{ rtrim(rtrim(number_format($contract->commission_percentage, 2), '0'), '.') }}% · {{ $contract->commission_amount !== null ? number_format($contract->commission_amount, 2, '.', ',') : '—' }}
                                             </span>
                                         @endif
+                                    </div>
+                                @endif
+
+                                @if ($contract->referral_discount_percentage)
+                                    <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600 dark:border-neutral-700 dark:text-neutral-400">
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <svg class="size-3.5 shrink-0 text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4Z"/></svg>
+                                            {{ __('Referral discount for this company') }}
+                                        </span>
+                                        <span class="rounded-md bg-green-100 px-2 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                            {{ rtrim(rtrim(number_format($contract->referral_discount_percentage, 2), '0'), '.') }}% · {{ $contract->referral_discount_amount !== null ? number_format($contract->referral_discount_amount, 2, '.', ',') : '—' }}
+                                        </span>
                                     </div>
                                 @endif
 
@@ -390,7 +414,7 @@
                             <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API token') }}</h3>
                         </div>
                         <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
-                            {{ __('Used by companies that integrate directly with the API (POST /api/documentos), instead of using this dashboard. Send it once, out of band, to whoever builds the integration -- it is never shown again after this.') }}
+                            {{ __('Used by companies that integrate directly with the API (POST /api/documentos), instead of using this dashboard. Send it once, out of band, to whoever builds the integration. It is never shown again after this.') }}
                         </p>
 
                         <div class="mt-3 flex items-center gap-2">
@@ -414,7 +438,7 @@
                             <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API documentation') }}</h3>
                         </div>
                         <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
-                            {{ __('Share this link with whoever builds the integration -- it explains every endpoint, no login needed to view it.') }}
+                            {{ __('Share this link with whoever builds the integration. It explains every endpoint, no login needed to view it.') }}
                         </p>
 
                         <div class="mt-3 flex items-stretch rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 focus-within:ring-2 focus-within:ring-accent/40">
@@ -442,7 +466,7 @@
                         <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('API endpoints') }}</h3>
                     </div>
                     <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">
-                        {{ __('Which of the API endpoints below this company can call. Having the module active is not enough by itself -- each one also needs to be turned on here.') }}
+                        {{ __('Which of the API endpoints below this company can call. Having the module active is not enough by itself. Each one also needs to be turned on here.') }}
                     </p>
 
                     <form method="POST" action="{{ route('admin.companies.api-features.update', $company->_id) }}" class="mt-4 space-y-4">
@@ -465,7 +489,7 @@
 
                                 @unless ($moduleActive)
                                     <p class="border-b border-gray-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-neutral-700 dark:bg-amber-900/10 dark:text-amber-400">
-                                        {{ __('This company does not have this module active -- marking any of these will have no effect until it does.') }}
+                                        {{ __('This company does not have this module active. Marking any of these will have no effect until it does.') }}
                                     </p>
                                 @endunless
 
@@ -555,20 +579,26 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Referrer') }}</label>
-                        <select name="referrer_user_id" id="contract-referrer" data-hs-select='{!! $referrerSelectConfig !!}' class="hidden">
-                            <option value="">{{ __('No referrer') }}</option>
-                            @foreach ($referrers as $referrer)
-                                <option value="{{ $referrer->_id }}">{{ $referrer->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="contract-commission" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Commission %') }}</label>
-                        <input type="number" min="0" max="100" step="0.01" name="commission_percentage" id="contract-commission" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
-                    </div>
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Referrer') }}</label>
+                    <select name="referrer_user_id" id="contract-referrer" data-hs-select='{!! $referrerSelectConfig !!}' class="hidden">
+                        <option value="">{{ __('No referrer') }}</option>
+                        @foreach ($referrers as $referrer)
+                            <option value="{{ $referrer->_id }}">{{ $referrer->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label for="contract-commission" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Commission %') }}</label>
+                    <input type="number" min="0" max="100" step="0.01" name="commission_percentage" id="contract-commission" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
+                    <p class="mt-1 text-xs text-neutral-400">{{ __('What the referrer earns from this contract.') }}</p>
+                </div>
+
+                <div>
+                    <label for="contract-referral-discount" class="block mb-2 text-sm font-medium text-zinc-800 dark:text-white">{{ __('Referral discount %') }}</label>
+                    <input type="number" min="0" max="100" step="0.01" name="referral_discount_percentage" id="contract-referral-discount" class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-base sm:text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
+                    <p class="mt-1 text-xs text-neutral-400">{{ __('Discount on "Price" for the company; commission is calculated after it.') }}</p>
                 </div>
 
                 <div>
@@ -583,7 +613,7 @@
                             <option value="{{ $otherCompany->_id }}">{{ $otherCompany->name }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-neutral-400">{{ __('This company (:name) is always included -- pick others here if the same client has several companies sharing one quota.', ['name' => $company->name]) }}</p>
+                    <p class="mt-1 text-xs text-neutral-400">{{ __('This company (:name) is always included. Pick others here if the same client has several companies sharing one quota.', ['name' => $company->name]) }}</p>
                 </div>
 
                 <div>
@@ -983,6 +1013,7 @@
                 setSelectValue('contract-quota-mode', contract?.quota_mode ?? '{{ \App\Models\CompanyContract::QUOTA_MODE_PER_MODULE }}');
                 setSelectValue('contract-referrer', contract?.referrer_user_id ?? '');
                 document.getElementById('contract-commission').value = contract?.commission_percentage ?? '';
+                document.getElementById('contract-referral-discount').value = contract?.referral_discount_percentage ?? '';
 
                 const companyIdsEl = document.getElementById('contract-company-ids');
                 const companyIdsInstance = window.HSSelect && HSSelect.getInstance(companyIdsEl);

@@ -18,11 +18,10 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
     use Authenticatable, Notifiable, CanResetPassword;
 
     protected $table = 'users'; 
-    protected $fillable = ['name', 'email', 'password', 'locale', 'appearance', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'locale', 'appearance', 'role', 'referral_code', 'can_refer'];
     protected $hidden = ['password', 'remember_token'];
 
     public const GLOBAL_ADMIN_ROLES = ['superadmin'];
-    public const ROLE_REFERRER = 'referrer';
 
     /**
      * Get the attributes that should be cast.
@@ -34,6 +33,7 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'can_refer' => 'boolean',
         ];
     }
 
@@ -43,14 +43,15 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
     }
 
     /**
-     * "Vendedor" de Billingo: alguien del equipo que puede quedar asignado
-     * como referido en un CompanyContract (ver commission_percentage) y
-     * entrar a ver sus propias ventas/comisiones -- no es lo mismo que
-     * superadmin, no ve el resto del panel.
+     * Si puede compartir su link de referido y ganar comisión (ver ReferralController) -- por
+     * aprobación de superadmin (ver SuperadminController::toggleCanRefer()), no abierto a
+     * cualquiera: superadmin ya puede por su rol; cualquier otro usuario (antes había un rol
+     * "vendedor" aparte para esto, pero es el mismo concepto que referir, así que se unificó)
+     * necesita que se le habilite "can_refer" a mano.
      */
-    public function isReferrer(): bool
+    public function canRefer(): bool
     {
-        return $this->role === self::ROLE_REFERRER;
+        return $this->isGlobalAdmin() || (bool) $this->can_refer;
     }
 
     /**
@@ -63,6 +64,44 @@ class User extends Eloquent implements AuthenticatableContract, CanResetPassword
             ->take(2)
             ->map(fn ($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+    /**
+     * Mismo patrón que CatalogLink::generateToken() -- único a nivel global. El código de
+     * referido es del USUARIO, no de una empresa puntual (ver Company::referredByUser()): un
+     * usuario puede administrar varias empresas y una empresa puede tener varios usuarios, así
+     * que la ganancia por referir tiene que quedar atada a la persona que compartió el link, no
+     * a "una" de sus empresas.
+     */
+    public static function generateReferralCode(): string
+    {
+        do {
+            $code = bin2hex(random_bytes(6));
+        } while (self::where('referral_code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Cuentas creadas antes de este cambio no traen referral_code -- se genera y guarda la
+     * primera vez que hace falta (ver ReferralController::index()), en vez de correr una
+     * migración de datos aparte.
+     */
+    public function ensureReferralCode(): string
+    {
+        if (empty($this->referral_code)) {
+            $this->update(['referral_code' => self::generateReferralCode()]);
+        }
+
+        return $this->referral_code;
+    }
+
+    /**
+     * Empresas que se registraron a través del link de referido de este usuario.
+     */
+    public function referredCompanies()
+    {
+        return $this->hasMany(Company::class, 'referred_by_user_id');
     }
 
     public function memberships()

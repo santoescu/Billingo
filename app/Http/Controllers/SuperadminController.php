@@ -78,12 +78,19 @@ class SuperadminController extends Controller
         // contrato puede cubrir varias empresas del mismo cliente, ver CompanyContract).
         $otherCompanies = Company::where('_id', '!=', $companyId)->orderBy('name')->get();
 
-        // Para el selector de "vendedor" del contrato -- solo gente del
-        // equipo (superadmin o con el rol 'referrer'), no cualquier usuario
-        // del sistema.
-        $referrers = User::whereIn('role', [User::ROLE_REFERRER, ...User::GLOBAL_ADMIN_ROLES])->orderBy('name')->get();
+        // Para el selector de "vendedor" del contrato -- superadmin más cualquier usuario
+        // habilitado para referir (ver User::canRefer()); no hay un rol "vendedor" aparte
+        // (era el mismo concepto que referir, se unificó). Si esta empresa vino de un link de
+        // referido (ver Company::referredByUser()), se agrega también quien la refirió aunque
+        // ya no tenga el permiso habilitado, para no perder la atribución.
+        $referrers = User::where('role', 'superadmin')->orWhere('can_refer', true)->orderBy('name')->get();
 
-        return view('admin.company-edit', compact('company', 'members', 'contracts', 'otherCompanies', 'referrers'));
+        $referredByUser = $company->referred_by_user_id ? User::find($company->referred_by_user_id) : null;
+        if ($referredByUser) {
+            $referrers = $referrers->push($referredByUser)->unique(fn (User $user) => (string) $user->_id)->sortBy('name')->values();
+        }
+
+        return view('admin.company-edit', compact('company', 'members', 'contracts', 'otherCompanies', 'referrers', 'referredByUser'));
     }
 
     /**
@@ -165,6 +172,7 @@ class SuperadminController extends Controller
             'receiving_used' => 0,
             'referrer_user_id' => $data['referrer_user_id'] ?? null,
             'commission_percentage' => $data['commission_percentage'] ?? null,
+            'referral_discount_percentage' => $data['referral_discount_percentage'] ?? null,
         ]);
 
         session()->flash('toast', [
@@ -203,6 +211,7 @@ class SuperadminController extends Controller
             'receiving_limit' => $data['receiving_limit'] ?? null,
             'referrer_user_id' => $data['referrer_user_id'] ?? null,
             'commission_percentage' => $data['commission_percentage'] ?? null,
+            'referral_discount_percentage' => $data['referral_discount_percentage'] ?? null,
         ]);
 
         session()->flash('toast', [
@@ -226,7 +235,7 @@ class SuperadminController extends Controller
         // deja en blanco -- 'nullable' no los convierte a null por sí solo, solo se salta el
         // resto de reglas, así que sin este paso "date"/"integer" fallarían o, peor, se
         // guardaría '' tal cual (Carbon la interpreta como "ahora").
-        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit', 'receiving_limit', 'referrer_user_id', 'commission_percentage']))
+        $request->merge(collect($request->only(['ends_at', 'shared_limit', 'invoicing_limit', 'pos_limit', 'cotizaciones_limit', 'receiving_limit', 'referrer_user_id', 'commission_percentage', 'referral_discount_percentage']))
             ->map(fn ($value) => $value === '' ? null : $value)
             ->all());
 
@@ -250,6 +259,7 @@ class SuperadminController extends Controller
             'company_ids.*' => ['string'],
             'referrer_user_id' => ['nullable', 'string'],
             'commission_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'referral_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
     }
 
@@ -514,22 +524,15 @@ class SuperadminController extends Controller
     }
 
     /**
-     * Otorgar o quitar el rol de vendedor ("referrer") a un usuario -- a
-     * diferencia del superadmin, no da acceso al panel de administración,
-     * solo deja que ese usuario entre a ver sus propias ventas/comisiones
-     * (ver ReferralController). No se puede tocar sobre un superadmin (el
-     * campo "role" solo guarda un valor a la vez): primero hay que quitarle
-     * el superadmin.
+     * Habilitar o quitar que un usuario (cliente, no superadmin) pueda compartir su link de
+     * referido y ganar comisión (ver User::canRefer(), ReferralController) -- por aprobación
+     * tuya, uno por uno, no abierto por defecto.
      */
-    public function toggleReferrer(string $userId)
+    public function toggleCanRefer(string $userId)
     {
         $user = User::findOrFail($userId);
 
-        if ($user->isGlobalAdmin()) {
-            abort(403, __('This user is already a superadmin.'));
-        }
-
-        $user->update(['role' => $user->isReferrer() ? null : User::ROLE_REFERRER]);
+        $user->update(['can_refer' => ! $user->can_refer]);
 
         session()->flash('toast', [
             'type' => 'success',
