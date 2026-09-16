@@ -65,6 +65,15 @@ class AdminLeadController extends Controller
                 LeadOutreachMail::VARIANT_FOLLOWUP => __('Follow-up'),
                 LeadOutreachMail::VARIANT_BREAKUP => __('Breakup (last touch)'),
             ],
+            'statuses' => [
+                'not_contacted' => __('Not contacted'),
+                'sent' => __('Sent'),
+                'delivered' => __('Delivered'),
+                'opened' => __('Opened'),
+                'clicked' => __('Clicked'),
+                'bounced' => __('Bounced'),
+                'spam' => __('Spam'),
+            ],
         ]);
     }
 
@@ -93,8 +102,10 @@ class AdminLeadController extends Controller
                 'nit' => $lead->nit,
                 'email' => $lead->email,
                 'city' => $lead->city,
+                'status_code' => $this->statusCode($lastLog),
                 'status_label' => $lastLog?->status_label ?? __('Not contacted'),
                 'status_badge_classes' => $lastLog?->status_badge_classes ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
+                'status_reason' => $lastLog?->bounce_reason ?? $lastLog?->complaint_reason,
                 'sent_at' => $lastLog?->sent_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
                 'urls' => [
                     'destroy' => route('admin.leads.destroy', $lead->_id),
@@ -103,6 +114,25 @@ class AdminLeadController extends Controller
         });
 
         return response()->json(['rows' => $rows]);
+    }
+
+    /**
+     * Código en inglés sin acentos (a diferencia de status_label, que ya viene traducido) para
+     * que el filtro de estado del front (ver admin/leads/index.blade.php) compare por valor
+     * estable en vez de por el texto visible -- misma prioridad que
+     * LeadEmailLog::getStatusLabelAttribute().
+     */
+    private function statusCode(?LeadEmailLog $lastLog): string
+    {
+        return match (true) {
+            ! $lastLog => 'not_contacted',
+            (bool) $lastLog->complained_at => 'spam',
+            (bool) $lastLog->bounced_at => 'bounced',
+            (bool) $lastLog->clicked_at => 'clicked',
+            (bool) $lastLog->opened_at => 'opened',
+            (bool) $lastLog->delivered_at => 'delivered',
+            default => 'sent',
+        };
     }
 
     /**
@@ -174,6 +204,33 @@ class AdminLeadController extends Controller
         }
 
         return back()->with('leads-imported', ['created' => $created, 'skipped' => $skipped]);
+    }
+
+    /**
+     * Asunto + cuerpo real que se va a mandar, para mostrarlo en el modal de confirmación antes
+     * de enviar (ver admin/leads/index.blade.php) -- usa el primer lead seleccionado para que la
+     * vista previa refleje el nombre de contacto y el pitch_note reales, no un ejemplo genérico.
+     */
+    public function preview(Request $request)
+    {
+        $data = $request->validate([
+            'variant' => ['required', 'string', 'in:' . implode(',', [
+                LeadOutreachMail::VARIANT_INITIAL,
+                LeadOutreachMail::VARIANT_FOLLOWUP,
+                LeadOutreachMail::VARIANT_BREAKUP,
+            ])],
+            'lead_id' => ['nullable', 'string'],
+        ]);
+
+        $lead = ! empty($data['lead_id']) ? Lead::find($data['lead_id']) : null;
+        $lead ??= new Lead(['razon_social' => __('Example company'), 'email' => 'ejemplo@empresa.com']);
+
+        $mailable = new LeadOutreachMail($lead, $data['variant'], 'preview@billingo.com.co');
+
+        return response()->json([
+            'subject' => $mailable->envelope()->subject,
+            'body' => trim(view('emails.leads.outreach-text', ['lead' => $lead, 'variant' => $data['variant']])->render()),
+        ]);
     }
 
     /**

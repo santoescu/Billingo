@@ -32,7 +32,7 @@
         </flux:button>
     </div>
 
-    <form action="{{ route('admin.leads.send') }}" method="POST" id="leads-send-form" onsubmit="return window.appConfirmDialog.open(event, this, '{{ __('Send this email to all checked leads?') }}', { variant: 'primary', label: '{{ __('Send') }}' });">
+    <form action="{{ route('admin.leads.send') }}" method="POST" id="leads-send-form">
         @csrf
         <div class="mb-4 flex flex-wrap items-end gap-3">
             <div class="w-56">
@@ -51,10 +51,25 @@
         </div>
 
         <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-            <div class="py-3 px-4 flex justify-between items-center gap-4">
+            <div class="py-3 px-4 flex flex-wrap justify-between items-center gap-4">
                 <div class="relative max-w-xs">
                     <label class="sr-only">{{ __('Search') }}</label>
                     <flux:input type="text" id="leads-search" placeholder="{{ __('Search') }}" autocomplete="off" />
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="w-48">
+                        <select id="leads-status-filter" class="hidden" data-hs-select='{!! \App\Support\SelectConfig::basic(__('All statuses')) !!}'>
+                            <option value="">{{ __('All statuses') }}</option>
+                            @foreach ($statuses as $code => $label)
+                                <option value="{{ $code }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <button type="button" id="leads-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="window.loadLeadsTable()">
+                        <svg id="leads-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    </button>
                 </div>
             </div>
 
@@ -212,6 +227,9 @@
                     if (row.sent_at) {
                         html += `<div class="text-xs text-neutral-400 mt-1">${escapeHtml(row.sent_at)}</div>`;
                     }
+                    if (row.status_reason) {
+                        html += `<div class="text-xs text-red-600 dark:text-red-400 mt-1">${escapeHtml(row.status_reason)}</div>`;
+                    }
 
                     return html;
                 }
@@ -237,14 +255,33 @@
                             { data: 'city', className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data) => escapeHtml(data ?? '—') },
                             { data: null, className: 'px-4 py-3 text-sm', render: (data, type, row) => renderStatus(row) },
                             { data: null, orderable: false, className: 'px-4 py-3 text-end text-sm', render: (data, type, row) => renderActions(row) },
+                            { data: 'status_code', visible: false },
                         ],
                     });
                     leadsTable.order([]).draw();
                 }
 
+                /**
+                 * Filtro de estado (no contactado/enviado/entregado/abierto/click/rebotado/spam)
+                 * -- compara contra la columna oculta "status_code" (índice 7, ver
+                 * initLeadsTable()) con match exacto, no la columna visible que muestra el label
+                 * ya traducido.
+                 */
+                function bindLeadsStatusFilter() {
+                    document.getElementById('leads-status-filter')?.addEventListener('change', function () {
+                        const value = this.value;
+                        leadsTable?.column(7).search(value ? `^${value}$` : '', true, false).draw();
+                    });
+                }
+
                 function loadLeadsTable() {
                     const tbody = document.querySelector('#leadsTable tbody');
                     if (! tbody) return;
+
+                    const refreshBtn = document.getElementById('leads-refresh-btn');
+                    const refreshIcon = document.getElementById('leads-refresh-icon');
+                    if (refreshBtn) refreshBtn.disabled = true;
+                    if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
                     fetch('{{ route('admin.leads.data') }}', { headers: { Accept: 'application/json' } })
                         .then((response) => response.json())
@@ -258,6 +295,10 @@
                             leadsTable.order([]).draw();
 
                             if (window.HSOverlay) HSOverlay.autoInit();
+                        })
+                        .finally(() => {
+                            if (refreshBtn) refreshBtn.disabled = false;
+                            if (refreshIcon) refreshIcon.classList.remove('animate-spin');
                         });
                 }
 
@@ -270,7 +311,50 @@
                     });
                 });
 
+                /**
+                 * Antes de mandar, se pide el asunto+cuerpo real que va a recibir el primer lead
+                 * seleccionado (ver AdminLeadController::preview()) y se muestra dentro del mismo
+                 * modal de confirmación -- así se ve exactamente lo que se está por enviar, no
+                 * solo un mensaje genérico de "¿enviar?".
+                 */
+                function bindLeadsSendForm() {
+                    const form = document.getElementById('leads-send-form');
+                    if (! form) return;
+
+                    form.addEventListener('submit', function (event) {
+                        event.preventDefault();
+
+                        const checked = form.querySelectorAll('.lead-checkbox:checked');
+                        if (! checked.length) {
+                            window.appConfirmDialog.notify(@json(__('Select at least one lead.')));
+                            return;
+                        }
+
+                        const variant = form.querySelector('select[name="variant"]').value;
+                        const leadId = checked[0].value;
+
+                        fetch(`{{ route('admin.leads.preview') }}?variant=${encodeURIComponent(variant)}&lead_id=${encodeURIComponent(leadId)}`, { headers: { Accept: 'application/json' } })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                const intro = checked.length === 1
+                                    ? @json(__('Send this email to :count lead?'))
+                                    : @json(__('Send this email to :count leads?'));
+                                const message = intro.replace(':count', checked.length)
+                                    + '\n\n' + @json(__('Subject')) + ': ' + data.subject
+                                    + '\n\n' + data.body;
+
+                                window.appConfirmDialog.ask(message, @json(__('Confirm before sending')), { variant: 'primary', label: @json(__('Send')) })
+                                    .then((ok) => {
+                                        if (ok) form.submit();
+                                    });
+                            });
+                    });
+                }
+
                 window.loadLeadsTable = loadLeadsTable;
+
+                bindLeadsSendForm();
+                bindLeadsStatusFilter();
 
                 document.addEventListener('DOMContentLoaded', loadLeadsTable);
                 document.addEventListener('livewire:navigated', loadLeadsTable);

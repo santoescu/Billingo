@@ -323,6 +323,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('leads', [AdminLeadController::class, 'index'])->name('leads.index');
         Route::get('leads/data', [AdminLeadController::class, 'data'])->name('leads.data');
+        Route::get('leads/preview', [AdminLeadController::class, 'preview'])->name('leads.preview');
         Route::post('leads/import', [AdminLeadController::class, 'import'])->name('leads.import');
         Route::post('leads/send', [AdminLeadController::class, 'send'])->name('leads.send');
         Route::delete('leads/{lead}', [AdminLeadController::class, 'destroy'])->name('leads.destroy');
