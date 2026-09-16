@@ -51,13 +51,17 @@ class LeadOutreachMail extends Mailable
     }
 
     /**
-     * Solo texto plano, sin vista HTML -- la skill de cold-email es explícita en que un correo
-     * en frío con HTML/imágenes se ve como plantilla de marketing, no como algo que escribió una
-     * persona. Mismo criterio para los links: cero, salvo el que va en el correo de despedida.
+     * Manda texto Y una versión HTML mínima (mismo texto, sin logo/colores/plantilla) -- la skill
+     * de cold-email pide que un correo en frío se vea como algo que escribió una persona, no como
+     * marketing, así que la versión HTML no tiene ningún diseño encima, solo el link real como
+     * <a> en vez de una URL suelta. Es necesario mandar HTML aunque sea mínimo porque SES solo
+     * puede reescribir links para hacer click-tracking (ver SesEventWebhookController) dentro de
+     * contenido HTML -- un correo 100% texto plano nunca genera eventos "Click" en SES.
      */
     public function content(): Content
     {
         return new Content(
+            view: 'emails.leads.outreach-html',
             text: 'emails.leads.outreach-text',
             with: [
                 'lead' => $this->lead,

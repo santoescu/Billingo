@@ -10,7 +10,7 @@ Hola {{ $name }},
 @endif
 Por lo que he visto, la mayoría de negocios así terminan facturando en un sistema, vendiendo en otro, y llevando cotizaciones en Excel o WhatsApp -- cada uno con su propio listado de clientes. El resultado casi siempre es el mismo: digitar el mismo cliente varias veces, y enterarse de un rechazo de la DIAN cuando ya es tarde para corregirlo.
 
-Armamos Billingo para que facturación, punto de venta, cotizaciones y recepción de documentos compartan el mismo cliente e inventario desde el día uno -- y la factura se valida ante la DIAN antes de mandarse, no después. Lo usamos nosotros mismos todos los días para operar.
+Armamos Billingo (https://billingo.com.co) para que facturación, punto de venta, cotizaciones y recepción de documentos compartan el mismo cliente e inventario desde el día uno -- y la factura se valida ante la DIAN antes de mandarse, no después. Lo usamos nosotros mismos todos los días para operar.
 
 ¿Te interesaría ver cómo se vería para {{ $lead->razon_social }}?
 
@@ -19,7 +19,7 @@ Hola {{ $name }},
 
 Una cosa que veo seguido: un negocio manda una factura, la DIAN la rechaza horas o días después, y para cuando se enteran ya tienen que rehacer todo el proceso con el cliente.
 
-Billingo valida el documento contra las reglas de la DIAN antes de enviarlo, así que ese tipo de sorpresa no pasa.
+Billingo (https://billingo.com.co) valida el documento contra las reglas de la DIAN antes de enviarlo, así que ese tipo de sorpresa no pasa.
 
 ¿Vale la pena que te muestre cómo funciona con un ejemplo real?
 
