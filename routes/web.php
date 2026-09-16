@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\AdminEmailEngagementController;
 use App\Http\Controllers\AdminInboundEmailController;
 use App\Http\Controllers\ApiDocsController;
 use App\Http\Controllers\BlogController;
@@ -316,6 +317,8 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('inbound-emails', [AdminInboundEmailController::class, 'index'])->name('inbound-emails.index');
         Route::get('inbound-emails/show', [AdminInboundEmailController::class, 'show'])->name('inbound-emails.show');
+
+        Route::get('email-engagement', [AdminEmailEngagementController::class, 'index'])->name('email-engagement.index');
     });
 });
 

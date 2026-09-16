@@ -208,6 +208,12 @@
                     'url' => route('admin.inbound-emails.index'),
                     'current' => request()->routeIs('admin.inbound-emails.*'),
                 ],
+                [
+                    'name' => __('Email engagement'),
+                    'icon' => 'cursor-arrow-rays',
+                    'url' => route('admin.email-engagement.index'),
+                    'current' => request()->routeIs('admin.email-engagement.*'),
+                ],
             ] : [],
         ],
     ];
