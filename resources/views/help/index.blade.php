@@ -137,7 +137,7 @@
                 ],
                 [
                     'label' => __('View a document'),
-                    'description' => __('Find a document you already issued and see its full detail -- also covers marking a credit invoice as paid.'),
+                    'description' => __('Find a document you already issued and see its full detail. Also covers marking a credit invoice as paid.'),
                     'url' => route('help.index', ['tour' => 'documents-search']),
                 ],
             ])) : [],
@@ -172,7 +172,7 @@
                 ],
                 [
                     'label' => __('View a sale'),
-                    'description' => __('Find a sale you already charged and see its full detail -- also covers issuing it as an electronic invoice.'),
+                    'description' => __('Find a sale you already charged and see its full detail. Also covers issuing it as an electronic invoice.'),
                     'url' => route('help.index', ['tour' => 'pos-sales-search']),
                 ],
             ])) : [],
@@ -187,7 +187,7 @@
                 ],
                 [
                     'label' => __('View a quotation'),
-                    'description' => __('Find a quotation you already issued and see its full detail -- also covers converting it into a POS sale or an electronic invoice.'),
+                    'description' => __('Find a quotation you already issued and see its full detail. Also covers converting it into a POS sale or an electronic invoice.'),
                     'url' => route('help.index', ['tour' => 'quotations-search']),
                 ],
                 [

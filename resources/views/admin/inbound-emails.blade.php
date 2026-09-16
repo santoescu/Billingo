@@ -1,7 +1,7 @@
 <x-layouts.app :title="__('Inbound emails')">
     @include('partials.tittle', [
         'title' => __('Inbound emails'),
-        'subheading' => __('Raw emails SES has stored in the reception bucket -- useful to read confirmation codes or debug why a document was not ingested.'),
+        'subheading' => __('Raw emails SES has stored in the reception bucket. Useful to read confirmation codes or debug why a document was not ingested.'),
     ])
 
     @if (! $bucket)

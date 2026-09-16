@@ -17,7 +17,7 @@
                 [
                     'selector' => '#tp-identification_type-field',
                     'title' => __('Identification type and DV'),
-                    'description' => __('The kind of ID this client has -- for a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
+                    'description' => __('The kind of ID this client has. For a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
                 ],
                 [
                     'selector' => '#tp-identificacion',
@@ -37,27 +37,27 @@
                 [
                     'selector' => '#tp-fiscal_responsibilities-field',
                     'title' => __('Fiscal responsibilities'),
-                    'description' => __('The DIAN tax responsibility codes that apply to this client -- required for the electronic documents you issue to them to go out correctly.'),
+                    'description' => __('The DIAN tax responsibility codes that apply to this client. Required for the electronic documents you issue to them to go out correctly.'),
                 ],
                 [
                     'selector' => '#tp-address',
                     'title' => __('Address'),
-                    'description' => __('Required by the DIAN on every electronic document -- without it, a document issued to this client is rejected.'),
+                    'description' => __('Required by the DIAN on every electronic document. Without it, a document issued to this client is rejected.'),
                 ],
                 [
                     'selector' => '#tp-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#tp-phone-field',
                     'title' => __('Phone and email'),
-                    'description' => __('Optional contact info -- also required if you plan to email this client their documents.'),
+                    'description' => __('Optional contact info. Also required if you plan to email this client their documents.'),
                 ],
                 [
                     'selector' => '#thirdPartyForm button[type="submit"]',
                     'title' => __('Save'),
-                    'description' => __('That\'s it -- the client is now ready to be invoiced, sold to, or quoted.'),
+                    'description' => __('That\'s it. The client is now ready to be invoiced, sold to, or quoted.'),
                 ],
             ],
         ],
@@ -77,13 +77,13 @@
                 [
                     'selector' => '.third-party-edit-btn',
                     'title' => __('Edit'),
-                    'description' => __('Opens the same form used to create it, already filled in -- change whatever you need and save.'),
+                    'description' => __('Opens the same form used to create it, already filled in. Change whatever you need and save.'),
                     'panel' => '#third-party-panel',
                 ],
                 [
                     'selector' => '#tp-identification_type-field',
                     'title' => __('Identification type and DV'),
-                    'description' => __('The kind of ID this client has -- for a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
+                    'description' => __('The kind of ID this client has. For a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
                 ],
                 [
                     'selector' => '#tp-identificacion',
@@ -103,22 +103,22 @@
                 [
                     'selector' => '#tp-fiscal_responsibilities-field',
                     'title' => __('Fiscal responsibilities'),
-                    'description' => __('The DIAN tax responsibility codes that apply to this client -- required for the electronic documents you issue to them to go out correctly.'),
+                    'description' => __('The DIAN tax responsibility codes that apply to this client. Required for the electronic documents you issue to them to go out correctly.'),
                 ],
                 [
                     'selector' => '#tp-address',
                     'title' => __('Address'),
-                    'description' => __('Required by the DIAN on every electronic document -- without it, a document issued to this client is rejected.'),
+                    'description' => __('Required by the DIAN on every electronic document. Without it, a document issued to this client is rejected.'),
                 ],
                 [
                     'selector' => '#tp-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#tp-phone-field',
                     'title' => __('Phone and email'),
-                    'description' => __('Optional contact info -- also required if you plan to email this client their documents.'),
+                    'description' => __('Optional contact info. Also required if you plan to email this client their documents.'),
                 ],
                 [
                     'selector' => '#thirdPartyForm button[type="submit"]',
@@ -144,7 +144,7 @@
                 [
                     'selector' => '#tp-identification_type-field',
                     'title' => __('Identification type and DV'),
-                    'description' => __('The kind of ID this provider has -- for a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
+                    'description' => __('The kind of ID this provider has. For a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
                 ],
                 [
                     'selector' => '#tp-identificacion',
@@ -174,7 +174,7 @@
                 [
                     'selector' => '#tp-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#tp-phone-field',
@@ -184,7 +184,7 @@
                 [
                     'selector' => '#thirdPartyForm button[type="submit"]',
                     'title' => __('Save'),
-                    'description' => __('That\'s it -- the provider is now ready to associate with received documents.'),
+                    'description' => __('That\'s it. The provider is now ready to associate with received documents.'),
                 ],
             ],
         ],
@@ -204,13 +204,13 @@
                 [
                     'selector' => '.third-party-edit-btn',
                     'title' => __('Edit'),
-                    'description' => __('Opens the same form used to create it, already filled in -- change whatever you need and save.'),
+                    'description' => __('Opens the same form used to create it, already filled in. Change whatever you need and save.'),
                     'panel' => '#third-party-panel',
                 ],
                 [
                     'selector' => '#tp-identification_type-field',
                     'title' => __('Identification type and DV'),
-                    'description' => __('The kind of ID this provider has -- for a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
+                    'description' => __('The kind of ID this provider has. For a NIT, the check digit (DV) fills in on its own once the DIAN lookup finds a match.'),
                 ],
                 [
                     'selector' => '#tp-identificacion',
@@ -240,7 +240,7 @@
                 [
                     'selector' => '#tp-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#tp-phone-field',
@@ -271,22 +271,22 @@
                 [
                     'selector' => '#doc-tipo_documento-field',
                     'title' => __('Document type'),
-                    'description' => __('An invoice for a new sale, or a credit/debit note to correct one you already issued -- picking a note shows the "Referenced invoice" section to link it to the original.'),
+                    'description' => __('An invoice for a new sale, or a credit/debit note to correct one you already issued. Picking a note shows the "Referenced invoice" section to link it to the original.'),
                 ],
                 [
                     'selector' => '#doc-resolution-field',
                     'title' => __('Resolution'),
-                    'description' => __('The DIAN-authorized numbering range you\'re issuing under -- the prefix and consecutive fill in on their own once you pick it.'),
+                    'description' => __('The DIAN-authorized numbering range you\'re issuing under. The prefix and consecutive fill in on their own once you pick it.'),
                 ],
                 [
                     'selector' => '#doc-cliente-search',
                     'title' => __('Search existing client'),
-                    'description' => __("Search by name or ID -- picking one fills in their data. If they're not registered yet, fill in the fields below by hand."),
+                    'description' => __("Search by name or ID. Picking one fills in their data. If they're not registered yet, fill in the fields below by hand."),
                 ],
                 [
                     'selector' => '#doc-cliente_identificacion',
                     'title' => __('Identification'),
-                    'description' => __('The client\'s ID number -- if it\'s registered with the DIAN, their name and other fields fill in automatically once you tab out of this field.'),
+                    'description' => __('The client\'s ID number. If it\'s registered with the DIAN, their name and other fields fill in automatically once you tab out of this field.'),
                 ],
                 [
                     'selector' => '#doc-cliente_nombre',
@@ -296,12 +296,12 @@
                 [
                     'selector' => '#doc-cliente_direccion',
                     'title' => __('Address, department and city'),
-                    'description' => __('Required by the DIAN on every electronic document -- without it, the document is rejected.'),
+                    'description' => __('Required by the DIAN on every electronic document. Without it, the document is rejected.'),
                 ],
                 [
                     'selector' => '.line-product-search',
                     'title' => __('Add a line'),
-                    'description' => __('Search a product by code, barcode or description to add it as a line -- a new empty line appears automatically for the next one. Each line lets you change quantity, unit price, warehouse, discount and taxes.'),
+                    'description' => __('Search a product by code, barcode or description to add it as a line. A new empty line appears automatically for the next one. Each line lets you change quantity, unit price, warehouse, discount and taxes.'),
                 ],
                 [
                     'selector' => '#documentLinesTotal',
@@ -311,7 +311,7 @@
                 [
                     'selector' => '#documentSubmitBtn',
                     'title' => __('Issue document'),
-                    'description' => __('Validates and sends it to the DIAN right away -- once issued, it can\'t be edited, only corrected with a credit or debit note.'),
+                    'description' => __('Validates and sends it to the DIAN right away. Once issued, it can\'t be edited, only corrected with a credit or debit note.'),
                 ],
             ],
         ],
@@ -320,7 +320,7 @@
                 [
                     'selector' => '#sidebar-pos-sell',
                     'title' => __('Sell'),
-                    'description' => __('Click "Sell" in the sidebar, under "Point of sale" -- if you don\'t have an open shift yet, you land here automatically instead of the selling screen.'),
+                    'description' => __('Click "Sell" in the sidebar, under "Point of sale". If you don\'t have an open shift yet, you land here automatically instead of the selling screen.'),
                     'realNav' => true,
                 ],
                 [
@@ -328,12 +328,12 @@
                     'title' => __('Cash register'),
                     'description' => __('Click here to switch to the cash register tab.'),
                     'realNav' => true,
-                    'resumeMissingMessage' => __('You already have an open shift, so "Sell" took you straight to the selling screen -- close your current shift first to see this guide.'),
+                    'resumeMissingMessage' => __('You already have an open shift, so "Sell" took you straight to the selling screen. Close your current shift first to see this guide.'),
                 ],
                 [
                     'selector' => '#opening-balance-display',
                     'title' => __('Opening balance'),
-                    'description' => __('How much cash you\'re starting the shift with -- used later to compare against what you actually count when you close it.'),
+                    'description' => __('How much cash you\'re starting the shift with. Used later to compare against what you actually count when you close it.'),
                 ],
                 [
                     'selector' => '#shift-fv-resolution-field',
@@ -348,7 +348,7 @@
                 [
                     'selector' => '#shift-open-btn',
                     'title' => __('Open shift'),
-                    'description' => __('Once it\'s open you can start selling -- you won\'t be able to sell without an open shift.'),
+                    'description' => __('Once it\'s open you can start selling. You won\'t be able to sell without an open shift.'),
                 ],
             ],
         ],
@@ -357,7 +357,7 @@
                 [
                     'selector' => '#sidebar-pos-sell',
                     'title' => __('Sell'),
-                    'description' => __('Click "Sell" in the sidebar, under "Point of sale" -- with an open shift, the "Cash" tab at the top takes you to this screen.'),
+                    'description' => __('Click "Sell" in the sidebar, under "Point of sale". With an open shift, the "Cash" tab at the top takes you to this screen.'),
                     'realNav' => true,
                 ],
                 [
@@ -365,7 +365,7 @@
                     'title' => __('Cash register'),
                     'description' => __('Click here to switch to the cash register tab.'),
                     'realNav' => true,
-                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first -- open a shift, then come back to this guide.'),
+                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first. Open a shift, then come back to this guide.'),
                 ],
                 [
                     'selector' => '.shift-close-btn',
@@ -376,12 +376,12 @@
                 [
                     'selector' => '#admin-close-counted-display',
                     'title' => __('Counted cash'),
-                    'description' => __('What you actually count in the drawer -- compare it against "Expected cash" above to spot any difference.'),
+                    'description' => __('What you actually count in the drawer. Compare it against "Expected cash" above to spot any difference.'),
                 ],
                 [
                     'selector' => '#admin-close-shift-form button[type="submit"]',
                     'title' => __('Close shift'),
-                    'description' => __('That\'s it -- the shift closes with whatever you counted, and you\'ll need to open a new one to keep selling.'),
+                    'description' => __('That\'s it. The shift closes with whatever you counted, and you\'ll need to open a new one to keep selling.'),
                 ],
             ],
         ],
@@ -390,24 +390,24 @@
                 [
                     'selector' => '#sidebar-pos-sell',
                     'title' => __('Sell'),
-                    'description' => __('Click "Sell" in the sidebar, under "Point of sale", any time you need to come back here -- you need an open shift first (see the "Open shift" guide).'),
+                    'description' => __('Click "Sell" in the sidebar, under "Point of sale", any time you need to come back here. You need an open shift first (see the "Open shift" guide).'),
                     'realNav' => true,
                 ],
                 [
                     'selector' => '#pos-ticket-add-btn',
-                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first -- open a shift, then come back to this guide.'),
+                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first. Open a shift, then come back to this guide.'),
                     'title' => __('Pre-bills'),
-                    'description' => __('Open a new tab to attend a different client without losing the cart you already had going -- each tab keeps its own cart and client.'),
+                    'description' => __('Open a new tab to attend a different client without losing the cart you already had going. Each tab keeps its own cart and client.'),
                 ],
                 [
                     'selector' => '#pos-product-search',
                     'title' => __('Search a product'),
-                    'description' => __('Search by code, barcode or description -- click a card in the grid below to add it to the cart.'),
+                    'description' => __('Search by code, barcode or description. Click a card in the grid below to add it to the cart.'),
                 ],
                 [
                     'selector' => '#pos-cart-body',
                     'title' => __('Cart'),
-                    'description' => __('Every product you\'ve added -- change the quantity or remove a line right here.'),
+                    'description' => __('Every product you\'ve added. Change the quantity or remove a line right here.'),
                 ],
                 [
                     'selector' => '#pos-client-search',
@@ -422,7 +422,7 @@
                 [
                     'selector' => '#pos-checkout-btn',
                     'title' => __('Charge sale'),
-                    'description' => __('Opens the payment screen -- once charged you can print the receipt or, if the module is active, also issue it as an electronic invoice.'),
+                    'description' => __('Opens the payment screen. Once charged you can print the receipt or, if the module is active, also issue it as an electronic invoice.'),
                 ],
             ],
         ],
@@ -437,17 +437,17 @@
                 [
                     'selector' => '#quote-ticket-add-btn',
                     'title' => __('Pre-quotations'),
-                    'description' => __('Open a new tab to start a different quotation without losing the cart you already had going -- each tab keeps its own cart and client.'),
+                    'description' => __('Open a new tab to start a different quotation without losing the cart you already had going. Each tab keeps its own cart and client.'),
                 ],
                 [
                     'selector' => '#quote-product-search',
                     'title' => __('Search a product'),
-                    'description' => __('Search by code, barcode or description -- click a card in the grid below to add it to the cart.'),
+                    'description' => __('Search by code, barcode or description. Click a card in the grid below to add it to the cart.'),
                 ],
                 [
                     'selector' => '#quote-cart-body',
                     'title' => __('Cart'),
-                    'description' => __('Every product you\'ve added -- change the quantity or remove a line right here.'),
+                    'description' => __('Every product you\'ve added. Change the quantity or remove a line right here.'),
                 ],
                 [
                     'selector' => '#quote-client-search',
@@ -462,7 +462,7 @@
                 [
                     'selector' => '#quote-submit-btn',
                     'title' => __('Issue quotation'),
-                    'description' => __('Generates the quotation PDF -- your client can later turn it into a sale or an invoice without typing everything again.'),
+                    'description' => __('Generates the quotation PDF. Your client can later turn it into a sale or an invoice without typing everything again.'),
                 ],
             ],
         ],
@@ -504,7 +504,7 @@
                 [
                     'selector' => '#quote-show-convert',
                     'title' => __('Convert quotation'),
-                    'description' => __('If it\'s still pending, convert it into a POS sale or an electronic invoice from here, reusing the same client and lines -- once converted, this section links to whatever it became.'),
+                    'description' => __('If it\'s still pending, convert it into a POS sale or an electronic invoice from here, reusing the same client and lines. Once converted, this section links to whatever it became.'),
                 ],
                 [
                     'selector' => '#quote-show-download-btn',
@@ -546,12 +546,12 @@
                 [
                     'selector' => '#doc-show-dian-message',
                     'title' => __('DIAN message'),
-                    'description' => __('Only shows up once the DIAN responds -- a summary and, if it was rejected, the specific rules it failed.'),
+                    'description' => __('Only shows up once the DIAN responds. A summary and, if it was rejected, the specific rules it failed.'),
                 ],
                 [
                     'selector' => '#doc-show-summary',
                     'title' => __('Summary'),
-                    'description' => __('Status, dates, totals and payment info -- if it\'s a credit invoice, this is also where you mark it as paid once you collect it.'),
+                    'description' => __('Status, dates, totals and payment info. If it\'s a credit invoice, this is also where you mark it as paid once you collect it.'),
                 ],
                 [
                     'selector' => '#doc-show-downloads',
@@ -577,17 +577,17 @@
                 [
                     'selector' => '#pr-image-btn',
                     'title' => __('Image'),
-                    'description' => __('Optional -- it shows up on the product list, the public catalog and the POS grid.'),
+                    'description' => __('Optional. It shows up on the product list, the public catalog and the POS grid.'),
                 ],
                 [
                     'selector' => '#pr-code',
                     'title' => __('Code'),
-                    'description' => __('An internal code to identify this product -- you choose the format. It has to be unique, and it\'s what you search by everywhere else in the app.'),
+                    'description' => __('An internal code to identify this product. You choose the format. It has to be unique, and it\'s what you search by everywhere else in the app.'),
                 ],
                 [
                     'selector' => '#pr-barcode',
                     'title' => __('Barcode'),
-                    'description' => __('Optional -- if it has one, scanning it in the POS or on the invoice finds this product automatically.'),
+                    'description' => __('Optional. If it has one, scanning it in the POS or on the invoice finds this product automatically.'),
                 ],
                 [
                     'selector' => '#pr-description',
@@ -597,12 +597,12 @@
                 [
                     'selector' => '#pr-unit_code-field',
                     'title' => __('Unit'),
-                    'description' => __('The DIAN unit of measure (unit, kilogram, hour, etc.) -- required so electronic documents go out correctly.'),
+                    'description' => __('The DIAN unit of measure (unit, kilogram, hour, etc.). Required so electronic documents go out correctly.'),
                 ],
                 [
                     'selector' => '#pr-add-price-btn',
                     'title' => __('Price types'),
-                    'description' => __('Add as many prices as you need (retail, wholesale, etc.) -- the first one is the default. You need to have created the price type first (see the "Create a price type" guide) to be able to pick it here.'),
+                    'description' => __('Add as many prices as you need (retail, wholesale, etc.). The first one is the default. You need to have created the price type first (see the "Create a price type" guide) to be able to pick it here.'),
                 ],
                 [
                     'selector' => '#pr-tracks_inventory',
@@ -618,12 +618,12 @@
                 [
                     'selector' => '#pr-add-warehouse-btn',
                     'title' => __('Stock by warehouse'),
-                    'description' => __('Split the total stock across your warehouses -- whatever is left unassigned shows up separately, below. You need to have created the warehouse first (see the "Create a warehouse" guide) to be able to pick it here.'),
+                    'description' => __('Split the total stock across your warehouses. Whatever is left unassigned shows up separately, below. You need to have created the warehouse first (see the "Create a warehouse" guide) to be able to pick it here.'),
                 ],
                 [
                     'selector' => '#productForm button[type="submit"]',
                     'title' => __('Save'),
-                    'description' => __('That\'s it -- the product is ready to sell, invoice, or quote.'),
+                    'description' => __('That\'s it. The product is ready to sell, invoice, or quote.'),
                 ],
             ],
         ],
@@ -643,23 +643,23 @@
                 [
                     'selector' => '.product-edit-btn',
                     'title' => __('Edit'),
-                    'description' => __('Opens the same form used to create it, already filled in -- change whatever you need and save.'),
+                    'description' => __('Opens the same form used to create it, already filled in. Change whatever you need and save.'),
                     'panel' => '#product-panel',
                 ],
                 [
                     'selector' => '#pr-image-btn',
                     'title' => __('Image'),
-                    'description' => __('Optional -- it shows up on the product list, the public catalog and the POS grid.'),
+                    'description' => __('Optional. It shows up on the product list, the public catalog and the POS grid.'),
                 ],
                 [
                     'selector' => '#pr-code',
                     'title' => __('Code'),
-                    'description' => __('An internal code to identify this product -- you choose the format. It has to be unique, and it\'s what you search by everywhere else in the app.'),
+                    'description' => __('An internal code to identify this product. You choose the format. It has to be unique, and it\'s what you search by everywhere else in the app.'),
                 ],
                 [
                     'selector' => '#pr-barcode',
                     'title' => __('Barcode'),
-                    'description' => __('Optional -- if it has one, scanning it in the POS or on the invoice finds this product automatically.'),
+                    'description' => __('Optional. If it has one, scanning it in the POS or on the invoice finds this product automatically.'),
                 ],
                 [
                     'selector' => '#pr-description',
@@ -669,12 +669,12 @@
                 [
                     'selector' => '#pr-unit_code-field',
                     'title' => __('Unit'),
-                    'description' => __('The DIAN unit of measure (unit, kilogram, hour, etc.) -- required so electronic documents go out correctly.'),
+                    'description' => __('The DIAN unit of measure (unit, kilogram, hour, etc.). Required so electronic documents go out correctly.'),
                 ],
                 [
                     'selector' => '#pr-add-price-btn',
                     'title' => __('Price types'),
-                    'description' => __('Add or update as many prices as you need (retail, wholesale, etc.) -- the first one is the default. You need to have created the price type first (see the "Create a price type" guide) to be able to pick it here.'),
+                    'description' => __('Add or update as many prices as you need (retail, wholesale, etc.). The first one is the default. You need to have created the price type first (see the "Create a price type" guide) to be able to pick it here.'),
                 ],
                 [
                     'selector' => '#pr-tracks_inventory',
@@ -690,7 +690,7 @@
                 [
                     'selector' => '#pr-add-warehouse-btn',
                     'title' => __('Stock by warehouse'),
-                    'description' => __('Split the total stock across your warehouses -- whatever is left unassigned shows up separately, below. You need to have created the warehouse first (see the "Create a warehouse" guide) to be able to pick it here.'),
+                    'description' => __('Split the total stock across your warehouses. Whatever is left unassigned shows up separately, below. You need to have created the warehouse first (see the "Create a warehouse" guide) to be able to pick it here.'),
                 ],
                 [
                     'selector' => '#productForm button[type="submit"]',
@@ -721,12 +721,12 @@
                 [
                     'selector' => '#product-show-general',
                     'title' => __('General'),
-                    'description' => __('This section shows the code, barcode and unit of measure -- click "Edit" from the product list to change any of this.'),
+                    'description' => __('This section shows the code, barcode and unit of measure. Click "Edit" from the product list to change any of this.'),
                 ],
                 [
                     'selector' => '#product-show-prices',
                     'title' => __('Prices'),
-                    'description' => __('Every price type this product has, with its value -- also edited from the product list.'),
+                    'description' => __('Every price type this product has, with its value. Also edited from the product list.'),
                 ],
                 [
                     'selector' => '#product-show-stock',
@@ -741,7 +741,7 @@
                 [
                     'selector' => '#product-show-image',
                     'title' => __('Image'),
-                    'description' => __('Click it to upload or replace the product\'s photo -- it updates right away, no need to save anything else.'),
+                    'description' => __('Click it to upload or replace the product\'s photo. It updates right away, no need to save anything else.'),
                 ],
             ],
         ],
@@ -805,7 +805,7 @@
                 [
                     'selector' => '#se-warehouse_id-field',
                     'title' => __('Warehouse'),
-                    'description' => __('Optional -- pick where this stock is going. Leave it as "Unassigned" if you don\'t need to split it by warehouse.'),
+                    'description' => __('Optional. Pick where this stock is going. Leave it as "Unassigned" if you don\'t need to split it by warehouse.'),
                 ],
                 [
                     'selector' => '#se-quantity-display',
@@ -815,12 +815,12 @@
                 [
                     'selector' => '#se-unit_cost-display',
                     'title' => __('Unit cost'),
-                    'description' => __('What you paid per unit for this entry -- it\'s used to recalculate the product\'s average cost.'),
+                    'description' => __('What you paid per unit for this entry. It\'s used to recalculate the product\'s average cost.'),
                 ],
                 [
                     'selector' => '#se-note',
                     'title' => __('Note'),
-                    'description' => __('Optional -- a reference for this entry, like a purchase invoice number, so you remember where the stock came from.'),
+                    'description' => __('Optional. A reference for this entry, like a purchase invoice number, so you remember where the stock came from.'),
                 ],
                 [
                     'selector' => '#stockEntryForm button[type="submit"]',
@@ -851,7 +851,7 @@
                 [
                     'selector' => '.product-delete-btn',
                     'title' => __('Delete'),
-                    'description' => __('It will ask you to confirm before deleting it -- this action cannot be undone.'),
+                    'description' => __('It will ask you to confirm before deleting it. This action cannot be undone.'),
                 ],
             ],
         ],
@@ -883,7 +883,7 @@
                 [
                     'selector' => '#wh-address',
                     'title' => __('Address'),
-                    'description' => __('Optional -- useful if you have more than one physical location.'),
+                    'description' => __('Optional. Useful if you have more than one physical location.'),
                 ],
             ],
         ],
@@ -910,7 +910,7 @@
                 [
                     'selector' => '#pt-name',
                     'title' => __('Name'),
-                    'description' => __('A name to identify this price (e.g. "Retail", "Wholesale") -- you can then set it on each product.'),
+                    'description' => __('A name to identify this price (e.g. "Retail", "Wholesale"). You can then set it on each product.'),
                 ],
             ],
         ],
@@ -957,7 +957,7 @@
                 [
                     'selector' => '#edit-member-modules-fields',
                     'title' => __('Modules and role'),
-                    'description' => __('Change the role for any module, or set it to "No access" to take away access to that module entirely -- it saves exactly what\'s selected here for each module.'),
+                    'description' => __('Change the role for any module, or set it to "No access" to take away access to that module entirely. It saves exactly what\'s selected here for each module.'),
                 ],
                 [
                     'selector' => '#editMemberForm button[type="submit"]',
@@ -977,7 +977,7 @@
                 [
                     'selector' => '.member-delete-btn',
                     'title' => __('Delete'),
-                    'description' => __('Removes this person from the company entirely (they keep their account, just lose access to this company) -- it will ask you to confirm first, since this action cannot be undone. The owner can\'t be removed this way.'),
+                    'description' => __('Removes this person from the company entirely (they keep their account, just lose access to this company). It will ask you to confirm first, since this action cannot be undone. The owner can\'t be removed this way.'),
                 ],
             ],
         ],
@@ -1018,7 +1018,7 @@
                 [
                     'selector' => '#company-create-fiscal_responsibilities-field',
                     'title' => __('Fiscal responsibilities'),
-                    'description' => __('The DIAN tax responsibility codes that apply to this company -- required for the electronic documents to go out correctly. Ask your accountant if you\'re not sure which ones apply.'),
+                    'description' => __('The DIAN tax responsibility codes that apply to this company. Required for the electronic documents to go out correctly. Ask your accountant if you\'re not sure which ones apply.'),
                 ],
                 [
                     'selector' => '#company-create-address',
@@ -1028,37 +1028,37 @@
                 [
                     'selector' => '#company-create-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#company-create-phone-field',
                     'title' => __('Phone and email'),
-                    'description' => __('Optional contact info -- shows up on documents if your template includes it.'),
+                    'description' => __('Optional contact info. Shows up on documents if your template includes it.'),
                 ],
                 [
                     'selector' => '#company-create-dian_environment-field',
                     'title' => __('DIAN environment'),
-                    'description' => __('Start in "Testing" until the DIAN approves your habilitación -- switch to "Production" only once you\'re authorized to issue real documents.'),
+                    'description' => __('Start in "Testing" until the DIAN approves your habilitación. Switch to "Production" only once you\'re authorized to issue real documents.'),
                 ],
                 [
                     'selector' => '#company-create-dian_pin-field',
                     'title' => __('Pin and Software ID'),
-                    'description' => __('The codes provided when the invoicing software is registered with the DIAN -- used to sync resolutions automatically. You can skip this and add it later from the company\'s edit screen.'),
+                    'description' => __('The codes provided when the invoicing software is registered with the DIAN. Used to sync resolutions automatically. You can skip this and add it later from the company\'s edit screen.'),
                 ],
                 [
                     'selector' => '#certificate-upload',
                     'title' => __('Digital certificate'),
-                    'description' => __('The .p12/.pfx file the DIAN issued for this company -- required to sign electronic documents. You can skip this and add it later from the company\'s edit screen.'),
+                    'description' => __('The .p12/.pfx file the DIAN issued for this company. Required to sign electronic documents. You can skip this and add it later from the company\'s edit screen.'),
                 ],
                 [
                     'selector' => '#dian_certificate_validate',
                     'title' => __('Validate'),
-                    'description' => __('Checks the certificate and password are correct before saving -- fix any error here, not after creating the company.'),
+                    'description' => __('Checks the certificate and password are correct before saving. Fix any error here, not after creating the company.'),
                 ],
                 [
                     'selector' => '#company-create-submit-btn',
                     'title' => __('Save'),
-                    'description' => __('Creates the company -- next, set up its DIAN pin/software ID and resolutions before issuing anything (see the next guides).'),
+                    'description' => __('Creates the company. Next, set up its DIAN pin/software ID and resolutions before issuing anything (see the next guides).'),
                 ],
             ],
         ],
@@ -1067,7 +1067,7 @@
                 [
                     'selector' => '#sidebar-companies',
                     'title' => __('Companies'),
-                    'description' => __('Click "Companies" in the sidebar to reach the companies list -- you need at least one company already created (see the "Create a company" guide).'),
+                    'description' => __('Click "Companies" in the sidebar to reach the companies list. You need at least one company already created (see the "Create a company" guide).'),
                     'realNav' => true,
                 ],
                 [
@@ -1090,7 +1090,7 @@
                 [
                     'selector' => '#edit-company-fiscal_responsibilities-field',
                     'title' => __('Fiscal responsibilities'),
-                    'description' => __('The DIAN tax responsibility codes that apply to this company -- required for electronic documents to go out correctly.'),
+                    'description' => __('The DIAN tax responsibility codes that apply to this company. Required for electronic documents to go out correctly.'),
                 ],
                 [
                     'selector' => '#edit-company-address',
@@ -1100,12 +1100,12 @@
                 [
                     'selector' => '#edit-company-department_code-field',
                     'title' => __('Department and city'),
-                    'description' => __('Pick the department first -- the city list narrows down to that department automatically.'),
+                    'description' => __('Pick the department first. The city list narrows down to that department automatically.'),
                 ],
                 [
                     'selector' => '#edit-company-phone-field',
                     'title' => __('Phone and email'),
-                    'description' => __('Optional contact info -- shows up on documents if your template includes it.'),
+                    'description' => __('Optional contact info. Shows up on documents if your template includes it.'),
                 ],
                 [
                     'selector' => '#edit-company-status-field',
@@ -1115,7 +1115,7 @@
                 [
                     'selector' => '#edit-company-dian_environment-field',
                     'title' => __('DIAN environment'),
-                    'description' => __('Stay in "Testing" until the DIAN approves your habilitación -- switch to "Production" only once you\'re authorized to issue real documents.'),
+                    'description' => __('Stay in "Testing" until the DIAN approves your habilitación. Switch to "Production" only once you\'re authorized to issue real documents.'),
                 ],
                 [
                     'selector' => '#edit-company-dian_pin',
@@ -1125,7 +1125,7 @@
                 [
                     'selector' => '#edit-company-dian_software_id',
                     'title' => __('Software ID'),
-                    'description' => __('The software ID the DIAN assigned when you registered your billing software -- pin and software ID together are what let you sync resolutions automatically.'),
+                    'description' => __('The software ID the DIAN assigned when you registered your billing software. Pin and software ID together are what let you sync resolutions automatically.'),
                 ],
                 [
                     'selector' => '#edit-company-certificate-upload',
@@ -1135,12 +1135,12 @@
                 [
                     'selector' => '#edit-company-certificate-validate',
                     'title' => __('Validate'),
-                    'description' => __('Checks the certificate and password before saving -- once it\'s valid, you\'re ready to set up resolutions.'),
+                    'description' => __('Checks the certificate and password before saving. Once it\'s valid, you\'re ready to set up resolutions.'),
                 ],
                 [
                     'selector' => '#edit-company-habilitacion-btn',
                     'title' => __('DIAN enablement'),
-                    'description' => __('Opens the screen to send and track the DIAN test batch (habilitación) -- required once before you can switch this company to the production environment.'),
+                    'description' => __('Opens the screen to send and track the DIAN test batch (habilitación). Required once before you can switch this company to the production environment.'),
                 ],
                 [
                     'selector' => '#edit-company-submit-btn',
@@ -1160,19 +1160,19 @@
                 [
                     'selector' => '#dian-sync-btn',
                     'title' => __('Sync from DIAN'),
-                    'description' => __('Pulls the numbering ranges the DIAN already authorized for this company\'s electronic invoices -- only shown if the invoicing module is active, and only works once the pin and software ID are configured (see the DIAN setup guide).'),
+                    'description' => __('Pulls the numbering ranges the DIAN already authorized for this company\'s electronic invoices. Only shown if the invoicing module is active, and only works once the pin and software ID are configured (see the DIAN setup guide).'),
                     'skipMissingElement' => true,
                 ],
                 [
                     'selector' => '#dian-add-prefix-btn',
                     'title' => __('Add prefixes'),
-                    'description' => __('The DIAN doesn\'t authorize a range for sales tickets, credit/debit notes or quotations -- define your own prefix and starting number here.'),
+                    'description' => __('The DIAN doesn\'t authorize a range for sales tickets, credit/debit notes or quotations. Define your own prefix and starting number here.'),
                     'panel' => '#note-numbering-modal',
                 ],
                 [
                     'selector' => '#dian-manual-doctype-field',
                     'title' => __('Document type'),
-                    'description' => __('Which kind of document this numbering range is for -- sales ticket, credit note, debit note or quotation.'),
+                    'description' => __('Which kind of document this numbering range is for. Sales ticket, credit note, debit note or quotation.'),
                 ],
                 [
                     'selector' => '#dian-manual-prefix',
@@ -1182,12 +1182,12 @@
                 [
                     'selector' => '#dian-manual-range_from',
                     'title' => __('Starting number'),
-                    'description' => __('The first consecutive number to use -- it increases automatically after that.'),
+                    'description' => __('The first consecutive number to use. It increases automatically after that.'),
                 ],
                 [
                     'selector' => '#dian-manual-submit-btn',
                     'title' => __('Create'),
-                    'description' => __('Saves this numbering range -- it shows up right away in the table below, ready to pick when issuing that kind of document.'),
+                    'description' => __('Saves this numbering range. It shows up right away in the table below, ready to pick when issuing that kind of document.'),
                 ],
             ],
         ],
@@ -1213,7 +1213,7 @@
                 [
                     'selector' => '#payment-method-dian-code-field',
                     'title' => __('DIAN equivalent'),
-                    'description' => __('Required only if you plan to issue this sale as an electronic invoice -- without it, a sale paid this way can\'t be turned into one.'),
+                    'description' => __('Required only if you plan to issue this sale as an electronic invoice. Without it, a sale paid this way can\'t be turned into one.'),
                 ],
                 [
                     'selector' => '#payment-method-submit-btn',
@@ -1227,7 +1227,7 @@
                 [
                     'selector' => '#sidebar-pos-sell',
                     'title' => __('Sell'),
-                    'description' => __('Click "Sell" in the sidebar, under "Point of sale" -- the "Sellers" tab (admin only) is up top from there.'),
+                    'description' => __('Click "Sell" in the sidebar, under "Point of sale". The "Sellers" tab (admin only) is up top from there.'),
                     'realNav' => true,
                 ],
                 [
@@ -1235,7 +1235,7 @@
                     'title' => __('Sellers'),
                     'description' => __('Click here to switch to the sellers tab.'),
                     'realNav' => true,
-                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first -- open a shift, then come back to this guide.'),
+                    'resumeMissingMessage' => __('You don\'t have an open shift yet, so "Sell" took you to open one first. Open a shift, then come back to this guide.'),
                 ],
                 [
                     'selector' => '#new-seller-btn',
@@ -1246,7 +1246,7 @@
                 [
                     'selector' => '#seller-name',
                     'title' => __('Name'),
-                    'description' => __('Who you\'ll pick as the seller when charging a sale -- used for the "sales by seller" chart in the panel.'),
+                    'description' => __('Who you\'ll pick as the seller when charging a sale. Used for the "sales by seller" chart in the panel.'),
                 ],
                 [
                     'selector' => '#seller-submit-btn',
@@ -1283,7 +1283,7 @@
                 [
                     'selector' => '#sale-show-lines',
                     'title' => __('Lines'),
-                    'description' => __('Every product on the sale, with quantity, unit price and the warehouse the stock came out of -- an admin can edit it here if it hasn\'t been issued as an electronic invoice yet.'),
+                    'description' => __('Every product on the sale, with quantity, unit price and the warehouse the stock came out of. An admin can edit it here if it hasn\'t been issued as an electronic invoice yet.'),
                 ],
                 [
                     'selector' => '#sale-show-summary',
@@ -1307,24 +1307,24 @@
                 [
                     'selector' => '#sidebar-quotations-index',
                     'title' => __('Quotations'),
-                    'description' => __('Click "Quotations" in the sidebar, under "Quotations" -- this card is above the quotations table on that screen.'),
+                    'description' => __('Click "Quotations" in the sidebar, under "Quotations". This card is above the quotations table on that screen.'),
                     'realNav' => true,
                 ],
                 [
                     'selector' => '#catalog-link-add-btn',
                     'title' => __('New link'),
-                    'description' => __('Create a link you can share with your clients -- they browse the catalog and build their own quotation, no account needed.'),
+                    'description' => __('Create a link you can share with your clients. They browse the catalog and build their own quotation, no account needed.'),
                     'panel' => '#catalog-link-modal',
                 ],
                 [
                     'selector' => '#catalog-link-label',
                     'title' => __('Label'),
-                    'description' => __('Optional -- a name to tell this link apart from others in the list (e.g. "Main store", "Warehouse 2").'),
+                    'description' => __('Optional. A name to tell this link apart from others in the list (e.g. "Main store", "Warehouse 2").'),
                 ],
                 [
                     'selector' => '#catalog-link-warehouse-field',
                     'title' => __('Warehouse'),
-                    'description' => __('If you pick one, the link only shows and sells stock from that warehouse -- leave it as "All warehouses" to show everything.'),
+                    'description' => __('If you pick one, the link only shows and sells stock from that warehouse. Leave it as "All warehouses" to show everything.'),
                 ],
                 [
                     'selector' => '#catalog-link-primary-price-field',
@@ -1334,7 +1334,7 @@
                 [
                     'selector' => '#catalog-link-visible-prices-field',
                     'title' => __('Other visible price types'),
-                    'description' => __('Optional -- any extra prices you check here show up in the price list when hovering over a product card, along with the main price.'),
+                    'description' => __('Optional. Any extra prices you check here show up in the price list when hovering over a product card, along with the main price.'),
                 ],
                 [
                     'selector' => '#catalog-link-submit-btn',
@@ -1364,25 +1364,25 @@
                 [
                     'selector' => '#panel-utility',
                     'title' => __('Gross profit'),
-                    'description' => __('Revenue minus the real cost of what you sold in the period, using the cost each product had at the moment of each sale -- not its current cost. Only shown if you administer invoicing and/or POS.'),
+                    'description' => __('Revenue minus the real cost of what you sold in the period, using the cost each product had at the moment of each sale. Not its current cost. Only shown if you administer invoicing and/or POS.'),
                     'skipMissingElement' => true,
                 ],
                 [
                     'selector' => '#panel-low-stock',
                     'title' => __('Low stock'),
-                    'description' => __('Products that track inventory and are running low -- a heads-up before you run out. Only shown if any product is below the threshold.'),
+                    'description' => __('Products that track inventory and are running low. A heads-up before you run out. Only shown if any product is below the threshold.'),
                     'skipMissingElement' => true,
                 ],
                 [
                     'selector' => '#panel-receivables',
                     'title' => __('Accounts receivable'),
-                    'description' => __('How much you still have pending to collect from credit invoices, how much of that is overdue, and the invoices most overdue right now -- always the current balance, not filtered by the period above.'),
+                    'description' => __('How much you still have pending to collect from credit invoices, how much of that is overdue, and the invoices most overdue right now. Always the current balance, not filtered by the period above.'),
                     'skipMissingElement' => true,
                 ],
                 [
                     'selector' => '#panel-trend-chart',
                     'title' => __('Trend'),
-                    'description' => __('How your activity moved within the chosen period -- by hour if it\'s today, by day for a week/month, by month for a year.'),
+                    'description' => __('How your activity moved within the chosen period. By hour if it\'s today, by day for a week/month, by month for a year.'),
                 ],
                 [
                     'selector' => '#panel-export-btn',
@@ -1402,13 +1402,13 @@
                 [
                     'selector' => '#products-export-btn',
                     'title' => __('Export to Excel'),
-                    'description' => __('Downloads your current catalog as a spreadsheet -- edit it and import it back to update many products at once.'),
+                    'description' => __('Downloads your current catalog as a spreadsheet. Edit it and import it back to update many products at once.'),
                     'panel' => '#product-export-modal',
                 ],
                 [
                     'selector' => '#product-export-fields',
                     'title' => __('Columns'),
-                    'description' => __('Code, description and barcode always go in the file -- check any other column you also want (unit, cost, prices by type, stock by warehouse).'),
+                    'description' => __('Code, description and barcode always go in the file. Check any other column you also want (unit, cost, prices by type, stock by warehouse).'),
                 ],
                 [
                     'selector' => '#product-export-submit-btn',
@@ -1434,12 +1434,12 @@
                 [
                     'selector' => '#import-file-upload',
                     'title' => __('Choose file'),
-                    'description' => __('An Excel (.xlsx) or CSV file -- products are matched by code, so an existing code updates that product instead of creating a duplicate.'),
+                    'description' => __('An Excel (.xlsx) or CSV file. Products are matched by code, so an existing code updates that product instead of creating a duplicate.'),
                 ],
                 [
                     'selector' => '#import-analyze-btn',
                     'title' => __('Analyze file'),
-                    'description' => __('Reads the file and lets you match each of its columns to a field before anything is saved -- nothing changes in your catalog until you confirm on the next step.'),
+                    'description' => __('Reads the file and lets you match each of its columns to a field before anything is saved. Nothing changes in your catalog until you confirm on the next step.'),
                 ],
             ],
         ],
@@ -1451,7 +1451,7 @@
         'done' => __('Done'),
         'progress' => __('{{current}} of {{total}}'),
         'completed' => __('You already completed this guide'),
-        'resumeMissing' => __('This guide can\'t continue on this screen -- something about your current state took you somewhere else.'),
+        'resumeMissing' => __('This guide can\'t continue on this screen. Something about your current state took you somewhere else.'),
         'noticeTitle' => __('Notice'),
     ];
 @endphp

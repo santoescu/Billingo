@@ -5,7 +5,7 @@
 <x-layouts.app :title="__('New ticket')">
     @include('partials.tittle', [
         'title' => __('New ticket'),
-        'subheading' => __('Open a request on behalf of a company -- e.g. a follow-up or notice that starts from this side.'),
+        'subheading' => __('Open a request on behalf of a company. E.g. a follow-up or notice that starts from this side.'),
     ])
 
     @include('admin.tickets.partials.tabs', ['activeTab' => 'tickets'])

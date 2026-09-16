@@ -1,7 +1,7 @@
 <x-layouts.app :title="__('Support')">
     @include('partials.tittle', [
         'title' => __('Support'),
-        'subheading' => __('Ask for help or file a request, complaint or claim -- we answer directly here.'),
+        'subheading' => __('Ask for help or file a request, complaint or claim. We answer directly here.'),
     ])
 
     <div class="flex flex-col gap-6">

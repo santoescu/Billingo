@@ -63,7 +63,7 @@
     ];
 
     $aboutPlatform = [
-        __('Invoicing, POS, quotations, receiving and payroll are all part of the same platform, sharing the same clients, products and stock -- not separate products bolted together.'),
+        __('Invoicing, POS, quotations, receiving and payroll are all part of the same platform, sharing the same clients, products and stock. Not separate products bolted together.'),
         __('Every electronic document follows the UBL format the DIAN requires, and gets validated before it\'s sent, not after.'),
         __('You only turn on the modules your business actually needs, and can add more later without migrating anything.'),
     ];
@@ -81,7 +81,7 @@
         [
             'name' => __('The Billingo team'),
             'role' => __('We use it every day'),
-            'quote' => __('We use Billingo ourselves to invoice, sell and quote every day -- if it didn\'t work for our own business, we wouldn\'t be asking you to trust it with yours.'),
+            'quote' => __('We use Billingo ourselves to invoice, sell and quote every day. If it didn\'t work for our own business, we wouldn\'t be asking you to trust it with yours.'),
         ],
     ];
 

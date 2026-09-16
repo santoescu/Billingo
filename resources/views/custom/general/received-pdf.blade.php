@@ -121,6 +121,6 @@
         </div>
     @endif
 
-    <p class="footer-note">{{ __('This is not the graphic representation the provider generated -- they did not send one. Billingo built this page from the data in the XML they sent.') }}</p>
+    <p class="footer-note">{{ __('This is not the graphic representation the provider generated. They did not send one. Billingo built this page from the data in the XML they sent.') }}</p>
 </body>
 </html>
