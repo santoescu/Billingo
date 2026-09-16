@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminEmailEngagementController;
 use App\Http\Controllers\AdminInboundEmailController;
+use App\Http\Controllers\AdminLeadController;
 use App\Http\Controllers\ApiDocsController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CannedResponseController;
@@ -319,6 +320,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('inbound-emails/show', [AdminInboundEmailController::class, 'show'])->name('inbound-emails.show');
 
         Route::get('email-engagement', [AdminEmailEngagementController::class, 'index'])->name('email-engagement.index');
+
+        Route::get('leads', [AdminLeadController::class, 'index'])->name('leads.index');
+        Route::get('leads/data', [AdminLeadController::class, 'data'])->name('leads.data');
+        Route::post('leads/import', [AdminLeadController::class, 'import'])->name('leads.import');
+        Route::post('leads/send', [AdminLeadController::class, 'send'])->name('leads.send');
+        Route::delete('leads/{lead}', [AdminLeadController::class, 'destroy'])->name('leads.destroy');
     });
 });
 

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmailLog;
+use App\Models\LeadEmailLog;
 use Aws\Sns\Message as SnsMessage;
 use Aws\Sns\MessageValidator;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -53,14 +55,25 @@ class SesEventWebhookController extends Controller
             return response('', 200);
         }
 
-        $log = EmailLog::where('ses_message_id', $messageId)->first();
+        // Busca primero en EmailLog (documentos a clientes) y si no, en LeadEmailLog (correo en
+        // frío a prospectos, ver Lead/AdminLeadController) -- ambos comparten la misma cuenta de
+        // SES/Configuration Set, así que un mismo Message-ID solo puede estar en uno de los dos.
+        $log = EmailLog::where('ses_message_id', $messageId)->first()
+            ?? LeadEmailLog::where('ses_message_id', $messageId)->first();
 
         if (! $log) {
-            Log::info('Evento de correo SES: no hay ningún EmailLog con ese Message-ID.', ['message_id' => $messageId]);
+            Log::info('Evento de correo SES: no hay ningún EmailLog/LeadEmailLog con ese Message-ID.', ['message_id' => $messageId]);
 
             return response('', 200);
         }
 
+        $this->applyEvent($log, $event);
+
+        return response('', 200);
+    }
+
+    private function applyEvent(Model $log, array $event): void
+    {
         match ($event['eventType'] ?? null) {
             'Delivery' => $log->update(['delivered_at' => $log->delivered_at ?? now()]),
             'Open' => $log->update(['opened_at' => $log->opened_at ?? now()]),
@@ -83,7 +96,5 @@ class SesEventWebhookController extends Controller
             ]),
             default => null,
         };
-
-        return response('', 200);
     }
 }

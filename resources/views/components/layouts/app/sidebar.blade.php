@@ -214,6 +214,12 @@
                     'url' => route('admin.email-engagement.index'),
                     'current' => request()->routeIs('admin.email-engagement.*'),
                 ],
+                [
+                    'name' => __('Leads'),
+                    'icon' => 'user-plus',
+                    'url' => route('admin.leads.index'),
+                    'current' => request()->routeIs('admin.leads.*'),
+                ],
             ] : [],
         ],
     ];

@@ -106,6 +106,17 @@ class EnsureMongoIndexes extends Command
             ['key' => ['documento_id' => 1]],
         ]);
 
+        $this->ensureIndexes('leads', [
+            // Detectar duplicados al importar (ver AdminLeadController::import()).
+            ['key' => ['email' => 1]],
+        ]);
+
+        $this->ensureIndexes('lead_email_logs', [
+            // Mismo criterio que email_logs: eventos de SES por Message-ID, historial por lead.
+            ['key' => ['ses_message_id' => 1]],
+            ['key' => ['lead_id' => 1]],
+        ]);
+
         $this->ensureIndexes('activity_logs', [
             ['key' => ['company_id' => 1, 'created_at' => 1]],
         ]);
