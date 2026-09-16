@@ -1,9 +1,9 @@
 <div id="app-confirm-dialog" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="app-confirm-dialog-title">
-    <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-sm sm:w-full m-3 sm:mx-auto">
+    <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-2xl sm:w-full m-3 sm:mx-auto">
         <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
             <div class="p-4">
                 <h3 id="app-confirm-dialog-title" class="font-bold text-gray-800 dark:text-white mb-1">{{ __('Are you sure?') }}</h3>
-                <p id="app-confirm-dialog-message" class="text-sm text-neutral-600 dark:text-neutral-400 mb-4"></p>
+                <p id="app-confirm-dialog-message" class="text-sm text-neutral-600 dark:text-neutral-400 mb-4 whitespace-pre-line max-h-[65vh] overflow-y-auto text-start"></p>
 
                 {{-- El "hidden" va en el <div> envolvente de cada botón, no
                      directo en el flux:button: flux:button siempre trae su
@@ -145,8 +145,9 @@
             document.getElementById('app-confirm-dialog-ok-wrapper').classList.toggle('hidden', ! isAlert);
             reset();
 
-            if (options.label) {
-                acceptWrapper(variant)?.querySelector('.app-confirm-dialog-accept-label').textContent = options.label;
+            const acceptLabelEl = acceptWrapper(variant)?.querySelector('.app-confirm-dialog-accept-label');
+            if (options.label && acceptLabelEl) {
+                acceptLabelEl.textContent = options.label;
             }
 
             window.appModalProcessing.stop('#app-confirm-dialog');
