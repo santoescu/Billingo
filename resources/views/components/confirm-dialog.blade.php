@@ -19,10 +19,27 @@
                     <div id="app-confirm-dialog-cancel-wrapper">
                         <flux:button type="button" variant="filled" id="app-confirm-dialog-cancel-btn" onclick="window.appConfirmDialog.cancel()">{{ __('Cancel') }}</flux:button>
                     </div>
-                    <div id="app-confirm-dialog-accept-wrapper">
-                        <flux:button type="button" variant="danger" id="app-confirm-dialog-accept-btn" onclick="window.appConfirmDialog.accept()">
-                            <span id="app-confirm-dialog-accept-label">{{ __('Delete') }}</span>
-                            <span id="app-confirm-dialog-accept-spinner" class="hidden">
+                    {{-- Dos botones de aceptar, uno por variante (danger para borrar, primary
+                         para confirmar cualquier otra acción) -- flux:button hornea sus clases de
+                         color en tiempo de compilación, así que no se puede "cambiar de variante"
+                         por JS sobre un mismo botón; se renderizan ambos y se alterna cuál queda
+                         visible según la variante que pida cada open()/ask() (ver
+                         window.appConfirmDialog más abajo). --}}
+                    <div id="app-confirm-dialog-accept-danger-wrapper">
+                        <flux:button type="button" variant="danger" class="app-confirm-dialog-accept-btn" onclick="window.appConfirmDialog.accept()">
+                            <span class="app-confirm-dialog-accept-label">{{ __('Delete') }}</span>
+                            <span class="app-confirm-dialog-accept-spinner hidden">
+                                <span class="inline-flex items-center gap-2">
+                                    <span class="animate-spin inline-block size-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="{{ __('Loading') }}"></span>
+                                    {{ __('Processing...') }}
+                                </span>
+                            </span>
+                        </flux:button>
+                    </div>
+                    <div id="app-confirm-dialog-accept-primary-wrapper" class="hidden">
+                        <flux:button type="button" variant="primary" class="app-confirm-dialog-accept-btn" onclick="window.appConfirmDialog.accept()">
+                            <span class="app-confirm-dialog-accept-label">{{ __('Confirm') }}</span>
+                            <span class="app-confirm-dialog-accept-spinner hidden">
                                 <span class="inline-flex items-center gap-2">
                                     <span class="animate-spin inline-block size-4 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="{{ __('Loading') }}"></span>
                                     {{ __('Processing...') }}
@@ -85,35 +102,53 @@
      * Reemplaza confirm()/alert() nativos del navegador (feos y no
      * personalizables) por un modal propio, reutilizado en toda la app.
      * Tres formas de usarlo:
-     *   - En un <form onsubmit="return window.appConfirmDialog.open(event, this, '...')">
+     *   - En un <form onsubmit="return window.appConfirmDialog.open(event, this, '...', options)">
      *     -- al aceptar, deshabilita el botón, muestra un spinner de
      *     "Procesando..." y envía el formulario de verdad.
-     *   - window.appConfirmDialog.ask('...').then(ok => ...) -- para
+     *   - window.appConfirmDialog.ask('...', title, options).then(ok => ...) -- para
      *     confirmar/cancelar en flujos con fetch() que ya manejan su propio
      *     estado de carga.
      *   - window.appConfirmDialog.notify('...') -- reemplazo directo de
      *     alert(): un solo botón "OK", sin opción de cancelar.
      *
-     * @returns {object} open(event, form, message), ask(message), notify(message), cancel(), accept()
+     * "options" es { label, variant } -- variant 'danger' (por defecto, botón
+     * rojo + "Eliminar") solo para acciones destructivas; cualquier otra
+     * confirmación (enviar correos, etc.) debe pasar variant: 'primary' para
+     * que el botón no diga "Eliminar" ni se vea rojo cuando no se está
+     * borrando nada.
+     *
+     * @returns {object} open(event, form, message, options), ask(message, title, options), notify(message), cancel(), accept()
      */
     window.appConfirmDialog = (function () {
         let pendingForm = null;
         let pendingResolve = null;
 
+        function acceptWrapper(variant) {
+            return document.getElementById(variant === 'primary' ? 'app-confirm-dialog-accept-primary-wrapper' : 'app-confirm-dialog-accept-danger-wrapper');
+        }
+
         function reset() {
-            document.getElementById('app-confirm-dialog-accept-label').classList.remove('hidden');
-            document.getElementById('app-confirm-dialog-accept-spinner').classList.add('hidden');
-            document.getElementById('app-confirm-dialog-accept-btn').disabled = false;
+            document.querySelectorAll('.app-confirm-dialog-accept-label').forEach((el) => el.classList.remove('hidden'));
+            document.querySelectorAll('.app-confirm-dialog-accept-spinner').forEach((el) => el.classList.add('hidden'));
+            document.querySelectorAll('.app-confirm-dialog-accept-btn').forEach((el) => el.disabled = false);
             document.getElementById('app-confirm-dialog-cancel-btn').disabled = false;
         }
 
-        function show(message, isAlert, title) {
+        function show(message, isAlert, title, options = {}) {
+            const variant = options.variant === 'primary' ? 'primary' : 'danger';
+
             document.getElementById('app-confirm-dialog-title').textContent = title || '{{ __('Are you sure?') }}';
             document.getElementById('app-confirm-dialog-message').textContent = message || '';
             document.getElementById('app-confirm-dialog-cancel-wrapper').classList.toggle('hidden', isAlert);
-            document.getElementById('app-confirm-dialog-accept-wrapper').classList.toggle('hidden', isAlert);
+            document.getElementById('app-confirm-dialog-accept-danger-wrapper').classList.toggle('hidden', isAlert || variant !== 'danger');
+            document.getElementById('app-confirm-dialog-accept-primary-wrapper').classList.toggle('hidden', isAlert || variant !== 'primary');
             document.getElementById('app-confirm-dialog-ok-wrapper').classList.toggle('hidden', ! isAlert);
             reset();
+
+            if (options.label) {
+                acceptWrapper(variant)?.querySelector('.app-confirm-dialog-accept-label').textContent = options.label;
+            }
+
             window.appModalProcessing.stop('#app-confirm-dialog');
 
             if (window.HSOverlay) {
@@ -122,20 +157,20 @@
             }
         }
 
-        function open(event, form, message) {
+        function open(event, form, message, options = {}) {
             event.preventDefault();
             pendingForm = form;
             pendingResolve = null;
-            show(message, false);
+            show(message, false, null, options);
 
             return false;
         }
 
-        function ask(message, title) {
+        function ask(message, title, options = {}) {
             return new Promise((resolve) => {
                 pendingForm = null;
                 pendingResolve = resolve;
-                show(message, false, title);
+                show(message, false, title, options);
             });
         }
 
@@ -158,9 +193,9 @@
 
         function accept() {
             if (pendingForm) {
-                document.getElementById('app-confirm-dialog-accept-label').classList.add('hidden');
-                document.getElementById('app-confirm-dialog-accept-spinner').classList.remove('hidden');
-                document.getElementById('app-confirm-dialog-accept-btn').disabled = true;
+                document.querySelectorAll('.app-confirm-dialog-accept-label').forEach((el) => el.classList.add('hidden'));
+                document.querySelectorAll('.app-confirm-dialog-accept-spinner').forEach((el) => el.classList.remove('hidden'));
+                document.querySelectorAll('.app-confirm-dialog-accept-btn').forEach((el) => el.disabled = true);
                 document.getElementById('app-confirm-dialog-cancel-btn').disabled = true;
                 window.appModalProcessing.start('#app-confirm-dialog');
 
