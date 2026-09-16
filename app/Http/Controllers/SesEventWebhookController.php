@@ -64,6 +64,10 @@ class SesEventWebhookController extends Controller
         match ($event['eventType'] ?? null) {
             'Delivery' => $log->update(['delivered_at' => $log->delivered_at ?? now()]),
             'Open' => $log->update(['opened_at' => $log->opened_at ?? now()]),
+            'Click' => $log->update([
+                'clicked_at' => $log->clicked_at ?? now(),
+                'clicked_link' => $event['click']['link'] ?? null,
+            ]),
             'Bounce' => $log->update([
                 'bounced_at' => now(),
                 'bounce_reason' => $event['bounce']['bouncedRecipients'][0]['diagnosticCode']

@@ -30,6 +30,7 @@
     "Could not send the document.": "No se pudo enviar el documento.",
     "Bounced": "Rebotado",
     "Opened": "Abierto",
+    "Clicked": "Clic",
     "Delivered": "Entregado",
     "Sent": "Enviado",
     "Give this address to your providers, or forward your already issued documents to this address. Documents sent here are matched to your company automatically by NIT and show up in this inbox.": "Dale esta dirección a tus proveedores, o reenvía tus documentos ya emitidos a esta dirección. Los documentos que lleguen se asocian solos a tu empresa por NIT y aparecen en esta bandeja.",
