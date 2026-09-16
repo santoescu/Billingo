@@ -94,6 +94,39 @@
         </div>
     </form>
 
+    <div id="leads-history-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-6xl sm:w-full m-3 sm:mx-auto">
+            <div class="flex flex-col bg-white border shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-bold text-gray-800 dark:text-white">
+                        {{ __('Email history') }}
+                        <span id="leads-history-company" class="font-normal text-gray-400 dark:text-neutral-500"></span>
+                    </h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400" aria-label="Close" data-hs-overlay="#leads-history-modal">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-4 max-h-[70vh] overflow-y-auto">
+                    <div id="leads-history-empty" class="hidden text-sm text-neutral-400 text-center py-6">{{ __('This lead has not been contacted yet.') }}</div>
+                    <table id="leads-history-table" class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                        <thead class="bg-gray-50 dark:bg-neutral-700">
+                            <tr>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Template') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Sent') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Delivered') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Opened') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Clicked') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Bounced') }}</th>
+                                <th scope="col" class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Spam') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-history-tbody" class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="leads-import-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1">
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
             <div class="flex flex-col bg-white border shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
@@ -195,6 +228,7 @@
 
                 const i18n = {
                     delete: @json(__('Delete')),
+                    history: @json(__('Email history')),
                     notContacted: @json(__('Not contacted')),
                     confirmDelete: @json(__('This action cannot be undone.')),
                 };
@@ -223,25 +257,29 @@
                 }
 
                 function renderStatus(row) {
-                    let html = `<span class="rounded-md px-2 py-0.5 text-xs font-medium ${row.status_badge_classes}">${escapeHtml(row.status_label)}</span>`;
+                    let html = row.status_reason
+                        ? `<button type="button" class="js-status-reason rounded-md px-2 py-0.5 text-xs font-medium underline decoration-dotted ${row.status_badge_classes}" data-reason="${escapeHtml(row.status_reason)}">${escapeHtml(row.status_label)}</button>`
+                        : `<span class="rounded-md px-2 py-0.5 text-xs font-medium ${row.status_badge_classes}">${escapeHtml(row.status_label)}</span>`;
                     if (row.sent_at) {
                         html += `<div class="text-xs text-neutral-400 mt-1">${escapeHtml(row.sent_at)}</div>`;
-                    }
-                    if (row.status_reason) {
-                        html += `<div class="text-xs text-red-600 dark:text-red-400 mt-1">${escapeHtml(row.status_reason)}</div>`;
                     }
 
                     return html;
                 }
 
                 function renderActions(row) {
-                    return `<form action="${row.urls.destroy}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '${i18n.confirmDelete}');" class="inline">
-                        <input type="hidden" name="_token" value="${csrfToken}">
-                        <input type="hidden" name="_method" value="DELETE">
-                        <button type="submit" class="inline-flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="${i18n.delete}" title="${i18n.delete}">
-                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    return `<div class="flex justify-end items-center gap-1">
+                        <button type="button" class="js-lead-history flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="${row.urls.history}" data-company="${escapeHtml(row.razon_social ?? '')}" aria-label="${i18n.history}" title="${i18n.history}">
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
                         </button>
-                    </form>`;
+                        <form action="${row.urls.destroy}" method="POST" onsubmit="return window.appConfirmDialog.open(event, this, '${i18n.confirmDelete}');" class="inline">
+                            <input type="hidden" name="_token" value="${csrfToken}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="inline-flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="${i18n.delete}" title="${i18n.delete}">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                            </button>
+                        </form>
+                    </div>`;
                 }
 
                 function initLeadsTable() {
@@ -271,6 +309,76 @@
                     document.getElementById('leads-status-filter')?.addEventListener('change', function () {
                         const value = this.value;
                         leadsTable?.column(7).search(value ? `^${value}$` : '', true, false).draw();
+                    });
+                }
+
+                /**
+                 * Motivo de rebote/spam (badge de la tabla y celdas del historial) -- se muestra
+                 * con el modal notify() ya probado en vez de un tooltip nativo (title), porque el
+                 * texto de SES es largo/multilínea y un tooltip nativo no es confiable para eso.
+                 * Delegado sobre document porque estos botones viven tanto en el <tbody> de la
+                 * tabla (recreado por DataTables) como en el del modal de historial (recreado en
+                 * cada fetch), ninguno de los dos es un contenedor fijo.
+                 */
+                function bindStatusReasonClicks() {
+                    document.addEventListener('click', function (event) {
+                        const btn = event.target.closest('.js-status-reason');
+                        if (! btn) return;
+
+                        window.appConfirmDialog.notify(btn.dataset.reason, @json(__('Reason')));
+                    });
+                }
+
+                /**
+                 * Historial completo de un lead (todos los intentos, no solo el último que ya se
+                 * ve en la tabla) -- delegado sobre el <tbody> porque las filas (y sus botones
+                 * ".js-lead-history") se recrean en cada draw de DataTables, así que un bind
+                 * directo sobre los botones se perdería al filtrar/paginar/refrescar.
+                 */
+                function bindLeadsHistoryModal() {
+                    document.querySelector('#leadsTable tbody')?.addEventListener('click', function (event) {
+                        const btn = event.target.closest('.js-lead-history');
+                        if (! btn) return;
+
+                        document.getElementById('leads-history-company').textContent = `— ${btn.dataset.company}`;
+                        const tbody = document.getElementById('leads-history-tbody');
+                        const emptyEl = document.getElementById('leads-history-empty');
+                        tbody.innerHTML = '';
+                        emptyEl.classList.add('hidden');
+
+                        if (window.HSOverlay) {
+                            HSOverlay.autoInit();
+                            HSOverlay.open('#leads-history-modal');
+                        }
+
+                        fetch(btn.dataset.url, { headers: { Accept: 'application/json' } })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                if (! data.rows.length) {
+                                    emptyEl.classList.remove('hidden');
+                                    return;
+                                }
+
+                                tbody.innerHTML = data.rows.map((log) => `
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200 whitespace-nowrap">${escapeHtml(log.variant_label)}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">${escapeHtml(log.sent_at ?? '—')}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">${escapeHtml(log.delivered_at ?? '—')}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">${escapeHtml(log.opened_at ?? '—')}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">${escapeHtml(log.clicked_at ?? '—')}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
+                                            ${log.bounce_reason
+                                                ? `<button type="button" class="js-status-reason text-red-600 dark:text-red-400 underline decoration-dotted" data-reason="${escapeHtml(log.bounce_reason)}">${escapeHtml(log.bounced_at ?? '—')}</button>`
+                                                : escapeHtml(log.bounced_at ?? '—')}
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap">
+                                            ${log.complaint_reason
+                                                ? `<button type="button" class="js-status-reason text-red-600 dark:text-red-400 underline decoration-dotted" data-reason="${escapeHtml(log.complaint_reason)}">${escapeHtml(log.complained_at ?? '—')}</button>`
+                                                : escapeHtml(log.complained_at ?? '—')}
+                                        </td>
+                                    </tr>
+                                `).join('');
+                            });
                     });
                 }
 
@@ -355,6 +463,8 @@
 
                 bindLeadsSendForm();
                 bindLeadsStatusFilter();
+                bindLeadsHistoryModal();
+                bindStatusReasonClicks();
 
                 document.addEventListener('DOMContentLoaded', loadLeadsTable);
                 document.addEventListener('livewire:navigated', loadLeadsTable);

@@ -109,9 +109,41 @@ class AdminLeadController extends Controller
                 'sent_at' => $lastLog?->sent_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
                 'urls' => [
                     'destroy' => route('admin.leads.destroy', $lead->_id),
+                    'history' => route('admin.leads.history', $lead->_id),
                 ],
             ];
         });
+
+        return response()->json(['rows' => $rows]);
+    }
+
+    /**
+     * Historial completo de envíos a un lead (no solo el último, a diferencia de data()) -- mismo
+     * criterio que el "Historial de correo" de documents/show.blade.php, para poder ver cuándo se
+     * mandó, entregó, abrió, dio clic o rebotó cada intento, no solo el más reciente.
+     */
+    public function history(string $lead)
+    {
+        $logs = LeadEmailLog::where('lead_id', $lead)->orderByDesc('sent_at')->get();
+
+        $variantLabels = [
+            LeadOutreachMail::VARIANT_INITIAL => __('Initial contact'),
+            LeadOutreachMail::VARIANT_FOLLOWUP => __('Follow-up'),
+            LeadOutreachMail::VARIANT_BREAKUP => __('Breakup (last touch)'),
+        ];
+
+        $rows = $logs->map(fn (LeadEmailLog $log) => [
+            'subject' => $log->subject,
+            'variant_label' => $variantLabels[$log->variant] ?? $log->variant,
+            'sent_at' => $log->sent_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'delivered_at' => $log->delivered_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'opened_at' => $log->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'clicked_at' => $log->clicked_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'bounced_at' => $log->bounced_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'bounce_reason' => $log->bounce_reason,
+            'complained_at' => $log->complained_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'complaint_reason' => $log->complaint_reason,
+        ]);
 
         return response()->json(['rows' => $rows]);
     }

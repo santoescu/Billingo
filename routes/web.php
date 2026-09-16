@@ -326,6 +326,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('leads/preview', [AdminLeadController::class, 'preview'])->name('leads.preview');
         Route::post('leads/import', [AdminLeadController::class, 'import'])->name('leads.import');
         Route::post('leads/send', [AdminLeadController::class, 'send'])->name('leads.send');
+        Route::get('leads/{lead}/history', [AdminLeadController::class, 'history'])->name('leads.history');
         Route::delete('leads/{lead}', [AdminLeadController::class, 'destroy'])->name('leads.destroy');
     });
 });
