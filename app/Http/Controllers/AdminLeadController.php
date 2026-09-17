@@ -64,7 +64,15 @@ class AdminLeadController extends Controller
                 LeadOutreachMail::VARIANT_INITIAL => __('Initial contact'),
                 LeadOutreachMail::VARIANT_FOLLOWUP => __('Follow-up'),
                 LeadOutreachMail::VARIANT_BREAKUP => __('Breakup (last touch)'),
+                LeadOutreachMail::VARIANT_CUSTOM => __('Custom message'),
             ],
+            // Ya envueltos en "{{...}}" acá, no en el .blade.php -- escribir el texto literal
+            // "{{" ahí (incluso dentro de un comentario o un bloque @php) le hace perder el
+            // hilo al compilador de Blade y se traga el resto del archivo en silencio.
+            'mergeVariableTokens' => array_map(
+                fn ($variable) => '{{' . $variable . '}}',
+                array_keys((new Lead())->mergeVariables())
+            ),
             'statuses' => [
                 'not_contacted' => __('Not contacted'),
                 'sent' => __('Sent'),
@@ -130,6 +138,7 @@ class AdminLeadController extends Controller
             LeadOutreachMail::VARIANT_INITIAL => __('Initial contact'),
             LeadOutreachMail::VARIANT_FOLLOWUP => __('Follow-up'),
             LeadOutreachMail::VARIANT_BREAKUP => __('Breakup (last touch)'),
+            LeadOutreachMail::VARIANT_CUSTOM => __('Custom message'),
         ];
 
         $rows = $logs->map(fn (LeadEmailLog $log) => [
@@ -250,18 +259,25 @@ class AdminLeadController extends Controller
                 LeadOutreachMail::VARIANT_INITIAL,
                 LeadOutreachMail::VARIANT_FOLLOWUP,
                 LeadOutreachMail::VARIANT_BREAKUP,
+                LeadOutreachMail::VARIANT_CUSTOM,
             ])],
             'lead_id' => ['nullable', 'string'],
+            'custom_subject' => ['required_if:variant,' . LeadOutreachMail::VARIANT_CUSTOM, 'nullable', 'string'],
+            'custom_body' => ['required_if:variant,' . LeadOutreachMail::VARIANT_CUSTOM, 'nullable', 'string'],
         ]);
 
         $lead = ! empty($data['lead_id']) ? Lead::find($data['lead_id']) : null;
         $lead ??= new Lead(['razon_social' => __('Example company'), 'email' => 'ejemplo@empresa.com']);
 
-        $mailable = new LeadOutreachMail($lead, $data['variant'], 'preview@billingo.com.co');
+        $mailable = new LeadOutreachMail($lead, $data['variant'], 'preview@billingo.com.co', $data['custom_subject'] ?? null, $data['custom_body'] ?? null);
+
+        $mergedCustomBody = $data['variant'] === LeadOutreachMail::VARIANT_CUSTOM
+            ? $lead->fillMergeVariables($data['custom_body'])
+            : null;
 
         return response()->json([
             'subject' => $mailable->envelope()->subject,
-            'body' => trim(view('emails.leads.outreach-text', ['lead' => $lead, 'variant' => $data['variant']])->render()),
+            'body' => trim(view('emails.leads.outreach-text', ['lead' => $lead, 'variant' => $data['variant'], 'mergedCustomBody' => $mergedCustomBody])->render()),
         ]);
     }
 
@@ -279,14 +295,17 @@ class AdminLeadController extends Controller
                 LeadOutreachMail::VARIANT_INITIAL,
                 LeadOutreachMail::VARIANT_FOLLOWUP,
                 LeadOutreachMail::VARIANT_BREAKUP,
+                LeadOutreachMail::VARIANT_CUSTOM,
             ])],
             'reply_to' => ['required', 'email'],
+            'custom_subject' => ['required_if:variant,' . LeadOutreachMail::VARIANT_CUSTOM, 'nullable', 'string'],
+            'custom_body' => ['required_if:variant,' . LeadOutreachMail::VARIANT_CUSTOM, 'nullable', 'string'],
         ]);
 
         $leads = Lead::whereIn('_id', $data['lead_ids'])->get();
 
         foreach ($leads as $lead) {
-            $mailable = new LeadOutreachMail($lead, $data['variant'], $data['reply_to']);
+            $mailable = new LeadOutreachMail($lead, $data['variant'], $data['reply_to'], $data['custom_subject'] ?? null, $data['custom_body'] ?? null);
             $sent = Mail::to($lead->email)->send($mailable);
 
             $sesMessageId = $sent?->getOriginalMessage()->getHeaders()->get('X-SES-Message-ID')?->getBodyAsString();

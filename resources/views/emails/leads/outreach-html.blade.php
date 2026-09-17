@@ -1,20 +1,46 @@
 @php
     $name = $lead->contact_name ?: 'equipo de ' . $lead->razon_social;
     $link = '<a href="https://billingo.com.co" style="color:inherit;">https://billingo.com.co</a>';
+
+    // Mensaje personalizado: viene como texto plano (ya con las variables reemplazadas, ver
+    // LeadOutreachMail::content()), no como HTML -- se parte en párrafos por línea en blanco,
+    // "**negrilla**" (estilo Markdown, lo más natural para quien escribe el mensaje a mano) se
+    // convierte a <strong>, y cualquier URL suelta se convierte en <a> real para que SES sí
+    // pueda hacer click-tracking sobre ella (un correo 100% texto plano nunca genera el evento
+    // "Click" en SES). El orden importa: escapar HTML primero, negrilla y links después, sobre
+    // texto ya escapado (así "**" o "http://" dentro del contenido original no se interpretan
+    // como HTML antes de tiempo).
+    if ($variant === \App\Mail\LeadOutreachMail::VARIANT_CUSTOM) {
+        $customParagraphs = collect(preg_split('/\n{2,}/', trim((string) $mergedCustomBody)))
+            ->map(function ($paragraph) {
+                $html = nl2br(e($paragraph));
+                $html = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $html);
+
+                return preg_replace(
+                    '/(https?:\/\/[^\s<]+)/',
+                    '<a href="$1" style="color:inherit;">$1</a>',
+                    $html
+                );
+            });
+    }
 @endphp
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1f2937; line-height: 1.5;">
-@if ($variant === \App\Mail\LeadOutreachMail::VARIANT_INITIAL)
+@if ($variant === \App\Mail\LeadOutreachMail::VARIANT_CUSTOM)
+@foreach ($customParagraphs as $paragraph)
+<p>{!! $paragraph !!}</p>
+@endforeach
+@elseif ($variant === \App\Mail\LeadOutreachMail::VARIANT_INITIAL)
 <p>Hola {{ $name }},</p>
 
 @if ($lead->pitch_note)
 <p>{{ $lead->pitch_note }}</p>
 @endif
 
-<p>Por lo que he visto, la mayoría de negocios así terminan facturando en un sistema, vendiendo en otro, y llevando cotizaciones en Excel o WhatsApp -- cada uno con su propio listado de clientes. El resultado casi siempre es el mismo: digitar el mismo cliente varias veces, y enterarse de un rechazo de la DIAN cuando ya es tarde para corregirlo.</p>
+<p>Por lo que he visto, la mayoría de negocios así terminan facturando en un sistema, vendiendo en otro, y llevando cotizaciones en Excel o WhatsApp, cada uno con su propio listado de clientes. El resultado casi siempre es el mismo: digitar el mismo cliente varias veces, y enterarse de un rechazo de la DIAN cuando ya es tarde para corregirlo.</p>
 
-<p>Armamos Billingo ({!! $link !!}) para que facturación, punto de venta, cotizaciones y recepción de documentos compartan el mismo cliente e inventario desde el día uno -- y la factura se valida ante la DIAN antes de mandarse, no después. Lo usamos nosotros mismos todos los días para operar.</p>
+<p>Armamos Billingo ({!! $link !!}) para que facturación, punto de venta, cotizaciones y recepción de documentos compartan el mismo cliente e inventario desde el día uno. La factura se valida ante la DIAN antes de mandarse, no después. Lo usamos nosotros mismos todos los días para operar.</p>
 
 <p>¿Te interesaría ver cómo se vería para {{ $lead->razon_social }}?</p>
 @elseif ($variant === \App\Mail\LeadOutreachMail::VARIANT_FOLLOWUP)
@@ -28,7 +54,7 @@
 @else
 <p>Hola {{ $name }},</p>
 
-<p>No quiero llenarte la bandeja -- este es mi último correo.</p>
+<p>No quiero llenarte la bandeja, este es mi último correo.</p>
 
 <p>Si en algún momento la facturación/punto de venta/cotizaciones sueltas te empiezan a pesar, quedo atento. Aquí te dejo el link por si quieres echarle un ojo cuando te sirva: {!! $link !!}</p>
 

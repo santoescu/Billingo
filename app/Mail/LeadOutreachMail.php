@@ -20,6 +20,7 @@ class LeadOutreachMail extends Mailable
     public const VARIANT_INITIAL = 'initial';
     public const VARIANT_FOLLOWUP = 'followup';
     public const VARIANT_BREAKUP = 'breakup';
+    public const VARIANT_CUSTOM = 'custom';
 
     private const SUBJECTS = [
         self::VARIANT_INITIAL => 'facturación',
@@ -31,9 +32,19 @@ class LeadOutreachMail extends Mailable
      * $replyToAddress, no $replyTo -- Mailable ya declara su propia propiedad interna
      * "$replyTo" (la usa ->replyTo() internamente), y una promovida del constructor con el mismo
      * nombre choca con esa declaración ("Type of ...::$replyTo must not be defined").
+     *
+     * $customSubject/$customBody solo se usan cuando $variant es VARIANT_CUSTOM -- ahí el
+     * asunto/cuerpo no viene de una de las 3 plantillas fijas, sino de lo que escribió quien
+     * manda, con variables "{{nombre}}", "{{razon_social}}", etc. (ver Lead::mergeVariables())
+     * que se reemplazan por los datos reales de CADA lead antes de mandarse.
      */
-    public function __construct(public Lead $lead, public string $variant, public string $replyToAddress)
-    {
+    public function __construct(
+        public Lead $lead,
+        public string $variant,
+        public string $replyToAddress,
+        public ?string $customSubject = null,
+        public ?string $customBody = null,
+    ) {
     }
 
     /**
@@ -44,8 +55,12 @@ class LeadOutreachMail extends Mailable
      */
     public function envelope(): Envelope
     {
+        $subject = $this->variant === self::VARIANT_CUSTOM
+            ? $this->lead->fillMergeVariables((string) $this->customSubject)
+            : self::SUBJECTS[$this->variant] ?? self::SUBJECTS[self::VARIANT_INITIAL];
+
         return new Envelope(
-            subject: self::SUBJECTS[$this->variant] ?? self::SUBJECTS[self::VARIANT_INITIAL],
+            subject: $subject,
             replyTo: [new Address($this->replyToAddress)],
         );
     }
@@ -60,12 +75,23 @@ class LeadOutreachMail extends Mailable
      */
     public function content(): Content
     {
+        // "mergedCustomBody", no "customBody" -- Mailable expone TODAS las propiedades públicas
+        // del correo a la vista con su mismo nombre (ver Mailable::buildViewData()), así que
+        // pasar la versión ya reemplazada bajo el nombre "customBody" quedaba pisada por la
+        // propiedad cruda de la clase ($this->customBody, sin reemplazar) -- eso hacía que el
+        // asunto sí saliera bien (envelope() no pasa por la vista) pero el cuerpo del correo
+        // mostrara "{{nombre}}" tal cual, sin reemplazar.
+        $mergedCustomBody = $this->variant === self::VARIANT_CUSTOM
+            ? $this->lead->fillMergeVariables((string) $this->customBody)
+            : null;
+
         return new Content(
             view: 'emails.leads.outreach-html',
             text: 'emails.leads.outreach-text',
             with: [
                 'lead' => $this->lead,
                 'variant' => $this->variant,
+                'mergedCustomBody' => $mergedCustomBody,
             ],
         );
     }

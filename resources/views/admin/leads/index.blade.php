@@ -50,6 +50,31 @@
             <flux:button type="submit" variant="primary">{{ __('Send to selected') }}</flux:button>
         </div>
 
+        {{--
+            Solo se muestra cuando el "Template" de arriba es "Mensaje personalizado" -- ver
+            bindLeadsVariantToggle() más abajo. Las variables se reemplazan por el dato real de
+            CADA lead al mandar (ver Lead::fillMergeVariables()); ya vienen armadas desde
+            AdminLeadController::index() como "mergeVariableTokens", no acá -- escribir esas
+            llaves dobles como texto literal en este archivo hace que Blade pierda el hilo al
+            compilar y se trague contenido más adelante en el archivo.
+        --}}
+        <div id="leads-custom-fields" class="hidden mb-4 flex flex-col gap-3 max-w-2xl rounded-lg border border-gray-200 p-4 dark:border-neutral-700">
+            <div>
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Subject') }}</label>
+                <flux:input type="text" name="custom_subject" value="{{ old('custom_subject') }}" placeholder="{{ __('Subject') }}" />
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-medium text-zinc-500 dark:text-neutral-400">{{ __('Message') }}</label>
+                <textarea name="custom_body" rows="6" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 text-sm p-3 focus:outline-hidden focus:ring-2 focus:ring-accent">{{ old('custom_body') }}</textarea>
+            </div>
+            <p class="text-xs text-neutral-400">
+                {{ __('Available variables') }}:
+                @foreach ($mergeVariableTokens as $token)
+                    <code class="rounded bg-gray-100 px-1 py-0.5 text-zinc-600 dark:bg-neutral-700 dark:text-neutral-300">{{ $token }}</code>
+                @endforeach
+            </p>
+        </div>
+
         <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
             <div class="py-3 px-4 flex flex-wrap justify-between items-center gap-4">
                 <div class="relative max-w-xs">
@@ -441,7 +466,22 @@
                         const variant = form.querySelector('select[name="variant"]').value;
                         const leadId = checked[0].value;
 
-                        fetch(`{{ route('admin.leads.preview') }}?variant=${encodeURIComponent(variant)}&lead_id=${encodeURIComponent(leadId)}`, { headers: { Accept: 'application/json' } })
+                        if (variant === 'custom' && ! form.querySelector('[name="custom_subject"]').value.trim()) {
+                            window.appConfirmDialog.notify(@json(__('Write a subject for the custom message.')));
+                            return;
+                        }
+                        if (variant === 'custom' && ! form.querySelector('[name="custom_body"]').value.trim()) {
+                            window.appConfirmDialog.notify(@json(__('Write a message for the custom email.')));
+                            return;
+                        }
+
+                        const params = new URLSearchParams({ variant, lead_id: leadId });
+                        if (variant === 'custom') {
+                            params.set('custom_subject', form.querySelector('[name="custom_subject"]').value);
+                            params.set('custom_body', form.querySelector('[name="custom_body"]').value);
+                        }
+
+                        fetch(`{{ route('admin.leads.preview') }}?${params.toString()}`, { headers: { Accept: 'application/json' } })
                             .then((response) => response.json())
                             .then((data) => {
                                 const intro = checked.length === 1
@@ -459,12 +499,28 @@
                     });
                 }
 
+                /**
+                 * El bloque de asunto/cuerpo personalizado solo se ve cuando el "Template"
+                 * elegido es "Mensaje personalizado" -- las otras 3 opciones siguen usando las
+                 * plantillas fijas de siempre.
+                 */
+                function bindLeadsVariantToggle() {
+                    const select = document.querySelector('#leads-send-form select[name="variant"]');
+                    const customFields = document.getElementById('leads-custom-fields');
+                    if (! select || ! customFields) return;
+
+                    select.addEventListener('change', function () {
+                        customFields.classList.toggle('hidden', this.value !== 'custom');
+                    });
+                }
+
                 window.loadLeadsTable = loadLeadsTable;
 
                 bindLeadsSendForm();
                 bindLeadsStatusFilter();
                 bindLeadsHistoryModal();
                 bindStatusReasonClicks();
+                bindLeadsVariantToggle();
 
                 document.addEventListener('DOMContentLoaded', loadLeadsTable);
                 document.addEventListener('livewire:navigated', loadLeadsTable);

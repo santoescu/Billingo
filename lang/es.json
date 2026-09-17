@@ -1,4 +1,8 @@
 {
+    "Custom message": "Mensaje personalizado",
+    "Available variables": "Variables disponibles",
+    "Write a subject for the custom message.": "Escribe un asunto para el mensaje personalizado.",
+    "Write a message for the custom email.": "Escribe un mensaje para el correo personalizado.",
     "By :author": "Por :author",
     "Published :date": "Publicado :date",
     "Updated :date": "Actualizado :date",
