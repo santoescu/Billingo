@@ -1,0 +1,28 @@
+# Billingo
+
+> Billingo unifica facturación electrónica DIAN, punto de venta, cotizaciones, nómina y recepción de documentos en una sola plataforma para pymes colombianas. Los documentos se validan contra las reglas de la DIAN antes de enviarse, no después, y todos los módulos comparten los mismos clientes, productos e inventario.
+
+Billingo es un SaaS B2B modular: el negocio activa solo los módulos que necesita (facturación, punto de venta, cotizaciones, nómina, recepción de documentos) y paga por eso, sin migrar nada al agregar más adelante. Está dirigido a pymes colombianas, desde negocios de mostrador hasta empresas que emiten factura electrónica de forma recurrente.
+
+## Documentación
+
+- [Documentación de la API](https://billingo.com.co/api-docs): referencia OpenAPI para integrarse con Billingo directamente (POST /api/documentos y demás endpoints).
+
+## Blog
+
+- [Requisitos DIAN para facturación electrónica 2026](https://billingo.com.co/blog/requisitos-dian-facturacion-electronica-2026)
+- [Resolución de facturación electrónica DIAN](https://billingo.com.co/blog/resolucion-facturacion-electronica-dian)
+- [Cuánto cuesta la facturación electrónica en Colombia](https://billingo.com.co/blog/cuanto-cuesta-facturacion-electronica-colombia)
+- [Mejor software de facturación electrónica para pymes en Colombia](https://billingo.com.co/blog/mejor-software-facturacion-electronica-pymes-colombia)
+- [Factura electrónica rechazada por la DIAN: qué hacer](https://billingo.com.co/blog/factura-electronica-rechazada-dian)
+- [Nota crédito y nota débito electrónica](https://billingo.com.co/blog/nota-credito-debito-electronica)
+- [Documento equivalente POS vs factura electrónica](https://billingo.com.co/blog/documento-equivalente-pos-vs-factura-electronica)
+- [Nómina electrónica en Colombia](https://billingo.com.co/blog/nomina-electronica-colombia)
+- [Control de caja en un punto de venta](https://billingo.com.co/blog/control-de-caja-punto-de-venta)
+- [De cotización a factura sin repetir el cliente](https://billingo.com.co/blog/cotizacion-a-factura-sin-repetir-cliente)
+
+## Comparativas
+
+- [Billingo vs Siigo](https://billingo.com.co/blog/billingo-vs-siigo)
+- [Billingo vs Alegra](https://billingo.com.co/blog/billingo-vs-alegra)
+- [Billingo vs World Office](https://billingo.com.co/blog/billingo-vs-world-office)

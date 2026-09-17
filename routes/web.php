@@ -30,6 +30,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\AdminSupportTicketController;
 use App\Http\Controllers\SellerController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\SuperadminController;
@@ -75,6 +76,10 @@ Route::get('blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 Route::get('api-docs', [ApiDocsController::class, 'index'])->name('api-docs.index');
 Route::get('api-docs/openapi.yaml', [ApiDocsController::class, 'openapi'])->name('api-docs.openapi');
+
+// Sitemap XML de las páginas realmente públicas (ver SitemapController) -- todo lo demás vive
+// detrás de login, así que no tiene caso listarlo.
+Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 
 Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('panel', [DashboardController::class, 'panel'])->middleware(['auth', 'verified'])->name('panel');
