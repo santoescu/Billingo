@@ -6,6 +6,7 @@ buyer_stage: "Awareness/Implementación"
 content_type: "Glossary/how-to"
 pillar: "Cumplimiento DIAN"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # ¿Qué es la resolución de facturación electrónica DIAN y cómo se solicita?

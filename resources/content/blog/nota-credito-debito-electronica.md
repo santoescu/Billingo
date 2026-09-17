@@ -6,6 +6,7 @@ buyer_stage: "Implementación"
 content_type: "How-to"
 pillar: "Cumplimiento DIAN"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Cómo emitir una nota crédito o nota débito electrónica en Colombia

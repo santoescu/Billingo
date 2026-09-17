@@ -76,7 +76,28 @@ class BlogPostRepository
             pillar: $frontMatter['pillar'] ?? '',
             status: $frontMatter['status'] ?? 'draft',
             html: (string) $converter->convert($body),
+            author: $frontMatter['author'] ?? 'Equipo Billingo',
+            publishedAt: $this->parseDate($frontMatter['published_at'] ?? null),
+            updatedAt: $this->parseDate($frontMatter['updated_at'] ?? $frontMatter['published_at'] ?? null),
         );
+    }
+
+    /**
+     * "published_at"/"updated_at" son opcionales en el front matter -- si un artículo no los
+     * trae (viejo, o alguien lo olvidó), cae a "ahora" en vez de tronar. Mejor una fecha de hoy
+     * (que al menos no rompe el schema Article) que ninguna fecha.
+     */
+    private function parseDate(?string $value): \Carbon\Carbon
+    {
+        if (! $value) {
+            return \Carbon\Carbon::now();
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value);
+        } catch (\Throwable) {
+            return \Carbon\Carbon::now();
+        }
     }
 
     /**

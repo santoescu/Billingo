@@ -6,6 +6,7 @@ buyer_stage: "Awareness"
 content_type: "Guía pilar (hub)"
 pillar: "Cumplimiento DIAN"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Requisitos DIAN para facturación electrónica en Colombia [2026]

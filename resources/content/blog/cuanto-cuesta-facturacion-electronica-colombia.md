@@ -6,6 +6,7 @@ buyer_stage: "Decisión"
 content_type: "Transparencia de precio"
 pillar: "Punto de venta"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Cuánto cuesta la facturación electrónica en Colombia

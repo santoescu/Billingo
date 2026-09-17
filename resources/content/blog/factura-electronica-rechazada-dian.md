@@ -6,6 +6,7 @@ buyer_stage: "Awareness (dolor)"
 content_type: "How-to"
 pillar: "Cumplimiento DIAN"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Factura electrónica rechazada por la DIAN: causas comunes y cómo evitarla

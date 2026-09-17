@@ -6,6 +6,7 @@ buyer_stage: "Implementación"
 content_type: "How-to"
 pillar: "Punto de venta"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Control de caja en un punto de venta: guía paso a paso

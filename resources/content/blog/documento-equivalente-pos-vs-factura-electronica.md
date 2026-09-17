@@ -6,6 +6,7 @@ buyer_stage: "Awareness"
 content_type: "Glossary"
 pillar: "Punto de venta"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Documento equivalente POS vs. factura electrónica: diferencias

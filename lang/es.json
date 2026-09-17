@@ -1,4 +1,7 @@
 {
+    "By :author": "Por :author",
+    "Published :date": "Publicado :date",
+    "Updated :date": "Actualizado :date",
     "Raw emails SES has stored in the reception bucket. Useful to read confirmation codes or debug why a document was not ingested.": "Correos crudos que SES guardó en el bucket de recepción. Útil para leer códigos de confirmación o depurar por qué un documento no se procesó.",
     "Referrals": "Referidos",
     "Referral program": "Programa de referidos",

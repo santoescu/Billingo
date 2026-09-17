@@ -6,6 +6,7 @@ buyer_stage: "Implementación / Product-led"
 content_type: "How-to"
 pillar: "Cotizaciones"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Cómo convertir una cotización en factura sin repetir datos del cliente

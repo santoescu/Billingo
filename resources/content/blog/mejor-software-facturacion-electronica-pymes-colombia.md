@@ -6,6 +6,7 @@ buyer_stage: "Consideración"
 content_type: "Best/top"
 pillar: "Punto de venta"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Mejor software de facturación electrónica para pymes en Colombia

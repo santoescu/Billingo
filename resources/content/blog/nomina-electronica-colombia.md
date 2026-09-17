@@ -6,6 +6,7 @@ buyer_stage: "Awareness"
 content_type: "Glossary"
 pillar: "Nómina"
 status: "published"
+published_at: "2026-09-15"
 ---
 
 # Nómina electrónica en Colombia: qué es y quién está obligado

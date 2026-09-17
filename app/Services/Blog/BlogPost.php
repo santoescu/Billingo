@@ -16,6 +16,9 @@ readonly class BlogPost
         public string $pillar,
         public string $status,
         public string $html,
+        public string $author,
+        public \Carbon\Carbon $publishedAt,
+        public \Carbon\Carbon $updatedAt,
     ) {
     }
 
