@@ -18,6 +18,12 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class AdminLeadController extends Controller
 {
     /**
+     * Días sin abrir/dar clic desde el último envío antes de sugerir el siguiente toque -- ni
+     * tan pronto que se sienta acoso, ni tan tarde que se enfríe del todo.
+     */
+    private const FOLLOWUP_COOLDOWN_DAYS = 5;
+
+    /**
      * Alias por encabezado -> campo del modelo. Cubre tanto el formato simple en inglés (para
      * listas armadas a mano) como el de un export real de cámara de comercio (columnas en
      * español, con tildes/mayúsculas) -- normalizado sin acentos y en minúscula antes de
@@ -115,6 +121,7 @@ class AdminLeadController extends Controller
                 'status_badge_classes' => $lastLog?->status_badge_classes ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
                 'status_reason' => $lastLog?->bounce_reason ?? $lastLog?->complaint_reason,
                 'sent_at' => $lastLog?->sent_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'followup_variant' => $this->followupVariant($lastLog),
                 'urls' => [
                     'destroy' => route('admin.leads.destroy', $lead->_id),
                     'history' => route('admin.leads.history', $lead->_id),
@@ -155,6 +162,34 @@ class AdminLeadController extends Controller
         ]);
 
         return response()->json(['rows' => $rows]);
+    }
+
+    /**
+     * Loop de seguimiento de leads fríos: si el último envío (inicial o seguimiento) lleva
+     * FOLLOWUP_COOLDOWN_DAYS o más sin que lo abran ni le den clic, y no rebotó ni se quejó de
+     * spam, sugiere el siguiente toque (inicial -> seguimiento -> despedida). Después de la
+     * despedida no sugiere nada más -- ya se acabaron los toques. No manda nada solo, solo
+     * marca la fila en admin/leads/index.blade.php para que el superadmin decida mandarlo.
+     */
+    private function followupVariant(?LeadEmailLog $lastLog): ?string
+    {
+        if (! $lastLog || ! $lastLog->sent_at) {
+            return null;
+        }
+
+        if ($lastLog->opened_at || $lastLog->clicked_at || $lastLog->bounced_at || $lastLog->complained_at) {
+            return null;
+        }
+
+        if ($lastLog->sent_at->diffInDays(now()) < self::FOLLOWUP_COOLDOWN_DAYS) {
+            return null;
+        }
+
+        return match ($lastLog->variant) {
+            LeadOutreachMail::VARIANT_INITIAL => LeadOutreachMail::VARIANT_FOLLOWUP,
+            LeadOutreachMail::VARIANT_FOLLOWUP => LeadOutreachMail::VARIANT_BREAKUP,
+            default => null,
+        };
     }
 
     /**

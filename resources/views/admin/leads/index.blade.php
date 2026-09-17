@@ -92,6 +92,11 @@
                         </select>
                     </div>
 
+                    <label class="flex items-center gap-2 text-sm text-zinc-600 dark:text-neutral-300 whitespace-nowrap">
+                        <input type="checkbox" id="leads-followup-filter" class="shrink-0 size-4 rounded-sm border-gray-300 accent-accent focus:ring-accent dark:border-neutral-600 dark:bg-neutral-800 dark:focus:ring-offset-neutral-800">
+                        {{ __('Pending follow-up only') }}
+                    </label>
+
                     <button type="button" id="leads-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="window.loadLeadsTable()">
                         <svg id="leads-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                     </button>
@@ -256,6 +261,8 @@
                     history: @json(__('Email history')),
                     notContacted: @json(__('Not contacted')),
                     confirmDelete: @json(__('This action cannot be undone.')),
+                    followUpWith: @json(__('Follow up with')),
+                    variants: @json($variants),
                 };
 
                 function escapeHtml(value) {
@@ -288,6 +295,10 @@
                     if (row.sent_at) {
                         html += `<div class="text-xs text-neutral-400 mt-1">${escapeHtml(row.sent_at)}</div>`;
                     }
+                    if (row.followup_variant) {
+                        const label = i18n.variants[row.followup_variant] ?? row.followup_variant;
+                        html += `<div class="mt-1"><span class="rounded-md px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">${i18n.followUpWith}: ${escapeHtml(label)}</span></div>`;
+                    }
 
                     return html;
                 }
@@ -319,6 +330,7 @@
                             { data: null, className: 'px-4 py-3 text-sm', render: (data, type, row) => renderStatus(row) },
                             { data: null, orderable: false, className: 'px-4 py-3 text-end text-sm', render: (data, type, row) => renderActions(row) },
                             { data: 'status_code', visible: false },
+                            { data: 'followup_variant', visible: false, defaultContent: '' },
                         ],
                     });
                     leadsTable.order([]).draw();
@@ -334,6 +346,17 @@
                     document.getElementById('leads-status-filter')?.addEventListener('change', function () {
                         const value = this.value;
                         leadsTable?.column(7).search(value ? `^${value}$` : '', true, false).draw();
+                    });
+                }
+
+                /**
+                 * Loop de seguimiento de leads fríos (ver AdminLeadController::followupVariant())
+                 * -- filtra contra la columna oculta "followup_variant" (índice 8): cualquier
+                 * fila con algo ahí (no vacío) es un lead que ya toca seguir.
+                 */
+                function bindLeadsFollowupFilter() {
+                    document.getElementById('leads-followup-filter')?.addEventListener('change', function () {
+                        leadsTable?.column(8).search(this.checked ? '.+' : '', true, false).draw();
                     });
                 }
 
@@ -518,6 +541,7 @@
 
                 bindLeadsSendForm();
                 bindLeadsStatusFilter();
+                bindLeadsFollowupFilter();
                 bindLeadsHistoryModal();
                 bindStatusReasonClicks();
                 bindLeadsVariantToggle();
