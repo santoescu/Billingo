@@ -45,6 +45,10 @@ class CompanyContract extends Model
         // hay pasarela que lo cobre solo), este campo es solo para dejar registrado cuánto de
         // ese precio es descuento por referido, no un cargo aparte.
         'referral_discount_percentage',
+        // Cuándo se contactó a la empresa por última vez sobre la renovación de este contrato
+        // (ver AdminContractRenewalController) -- puramente informativo para el superadmin, no
+        // afecta el cupo ni la vigencia.
+        'renewal_contacted_at',
     ];
 
     const QUOTA_MODE_PER_MODULE = 'per_module';
@@ -65,6 +69,7 @@ class CompanyContract extends Model
             'period_started_at' => 'datetime',
             'commission_percentage' => 'float',
             'referral_discount_percentage' => 'float',
+            'renewal_contacted_at' => 'datetime',
         ];
     }
 

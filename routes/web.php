@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\AdminContractRenewalController;
 use App\Http\Controllers\AdminEmailEngagementController;
 use App\Http\Controllers\AdminInboundEmailController;
 use App\Http\Controllers\AdminLeadController;
@@ -333,6 +334,8 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('email-engagement', [AdminEmailEngagementController::class, 'index'])->name('email-engagement.index');
         Route::get('referrals', [AdminReferralController::class, 'index'])->name('referrals.index');
+        Route::get('contract-renewals', [AdminContractRenewalController::class, 'index'])->name('contract-renewals.index');
+        Route::post('contract-renewals/{contractId}/contacted', [AdminContractRenewalController::class, 'toggleContacted'])->name('contract-renewals.toggle-contacted');
 
         Route::get('leads', [AdminLeadController::class, 'index'])->name('leads.index');
         Route::get('leads/data', [AdminLeadController::class, 'data'])->name('leads.data');

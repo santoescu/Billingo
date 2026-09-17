@@ -230,6 +230,12 @@
                     'url' => route('admin.leads.index'),
                     'current' => request()->routeIs('admin.leads.*'),
                 ],
+                [
+                    'name' => __('Active contracts'),
+                    'icon' => 'exclamation-triangle',
+                    'url' => route('admin.contract-renewals.index'),
+                    'current' => request()->routeIs('admin.contract-renewals.*'),
+                ],
             ] : [],
         ],
     ];
