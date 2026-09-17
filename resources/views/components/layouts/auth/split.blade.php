@@ -121,13 +121,13 @@
         ],
         [
             'name' => __('Quote to Sale'),
-            'price' => __('$650,000/year'),
+            'price' => __('$540,000/year'),
             'tagline' => __('Quotations + Invoicing'),
             'features' => [__('Unlimited users'), __('Quotations + Invoicing'), __('Up to 1,200 documents/year'), __('Email support')],
         ],
         [
             'name' => __('Full Ops'),
-            'price' => __('$1,950,000/year'),
+            'price' => __('$1,840,000/year'),
             'tagline' => __('All 5 modules'),
             'features' => [__('Unlimited users'), __('All 5 modules included'), __('Up to 6,000 documents/year'), __('Priority support')],
         ],
@@ -135,16 +135,21 @@
 
     // Calculadora "arma tu propio combo" -- mismos números que los planes de
     // arriba, para que el resultado no contradiga lo que ya se cotiza a
-    // mano. MODULE_BASE_PRICE es el costo de tener acceso a un módulo
-    // (independiente del volumen); VOLUME_ANCHORS son puntos [documentos,
-    // cargo por volumen] -- el cargo real de cualquier cantidad de
-    // documentos que el usuario deslice en el rango se interpola en línea
-    // recta entre los dos puntos que lo rodean, así el precio va cambiando
-    // suave mientras arrastra en vez de saltar entre escalones fijos. Los
-    // puntos están puestos a propósito para que el costo marginal por
-    // documento baje entre tramo y tramo (descuento por volumen), aunque el
-    // total siempre suba con más documentos.
-    $calculatorModuleBasePrice = 220000;
+    // mano. MODULE_BASE_PRICES es el costo de tener acceso a cada módulo
+    // (independiente del volumen) -- "cotizaciones" vale la mitad que el
+    // resto (110,000 en vez de 220,000) porque el módulo pesa menos que
+    // facturación/POS/nómina/recepción; VOLUME_ANCHORS son puntos
+    // [documentos, cargo por volumen] -- el cargo real de cualquier
+    // cantidad de documentos que el usuario deslice en el rango se
+    // interpola en línea recta entre los dos puntos que lo rodean, así el
+    // precio va cambiando suave mientras arrastra en vez de saltar entre
+    // escalones fijos. Los puntos están puestos a propósito para que el
+    // costo marginal por documento baje entre tramo y tramo (descuento por
+    // volumen), aunque el total siempre suba con más documentos.
+    $calculatorDefaultModulePrice = 220000;
+    $calculatorModuleBasePrices = [
+        'cotizaciones' => 110000,
+    ];
     $calculatorVolumeMin = 100;
     $calculatorVolumeMax = 6000;
     $calculatorVolumeStep = 100;
@@ -167,14 +172,16 @@
     // un documento más allá). Con el ajuste aplicado siempre, la curva
     // queda continua y el combo se reconoce sin importar qué volumen se
     // elija dentro del rango. Storefront/Quote to Sale usan un moduleBase
-    // más barato que el genérico (2 * 220,000 = 440,000) porque son
+    // 70,000 más barato que la suma genérica de sus módulos porque son
     // combinaciones comunes que Billingo quiere incentivar; Full Ops usa
-    // uno más caro que el genérico (5 * 220,000 = 1,100,000) porque incluye
-    // soporte prioritario.
+    // uno 230,000 más caro que la suma genérica porque incluye soporte
+    // prioritario. La suma genérica de cada combo (con "cotizaciones" a
+    // 110,000): Storefront 220,000+220,000=440,000; Quote to Sale
+    // 110,000+220,000=330,000; Full Ops 220,000*4+110,000=990,000.
     $calculatorNamedCombos = [
         ['modules' => ['pos', 'invoicing'], 'moduleBase' => 370000, 'name' => __('Storefront')],
-        ['modules' => ['cotizaciones', 'invoicing'], 'moduleBase' => 370000, 'name' => __('Quote to Sale')],
-        ['modules' => ['invoicing', 'receiving', 'payroll', 'pos', 'cotizaciones'], 'moduleBase' => 1330000, 'name' => __('Full Ops')],
+        ['modules' => ['cotizaciones', 'invoicing'], 'moduleBase' => 260000, 'name' => __('Quote to Sale')],
+        ['modules' => ['invoicing', 'receiving', 'payroll', 'pos', 'cotizaciones'], 'moduleBase' => 1220000, 'name' => __('Full Ops')],
     ];
 
 @endphp
@@ -652,7 +659,8 @@
                 @endif
             }
 
-            const CALCULATOR_MODULE_BASE_PRICE = @json($calculatorModuleBasePrice);
+            const CALCULATOR_DEFAULT_MODULE_PRICE = @json($calculatorDefaultModulePrice);
+            const CALCULATOR_MODULE_BASE_PRICES = @json($calculatorModuleBasePrices);
             const CALCULATOR_VOLUME_ANCHORS = @json($calculatorVolumeAnchors);
             const CALCULATOR_VOLUME_MAX = @json($calculatorVolumeMax);
             const CALCULATOR_NAMED_COMBOS = @json($calculatorNamedCombos);
@@ -738,7 +746,11 @@
                         && combo.modules.every((module) => selectedModules.includes(module))
                     );
 
-                    const moduleBase = namedCombo ? namedCombo.moduleBase : CALCULATOR_MODULE_BASE_PRICE * selectedModules.length;
+                    const genericModuleBase = selectedModules.reduce(
+                        (total, module) => total + (CALCULATOR_MODULE_BASE_PRICES[module] ?? CALCULATOR_DEFAULT_MODULE_PRICE),
+                        0
+                    );
+                    const moduleBase = namedCombo ? namedCombo.moduleBase : genericModuleBase;
                     const price = moduleBase + interpolateVolumeCharge(documents);
 
                     const volumeLabel = documents.toLocaleString('es-CO') + ' ' + @json(__('documents/year'));
