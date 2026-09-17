@@ -106,6 +106,77 @@
             'features' => [__('Unlimited users'), __('More than 3 modules of your choice'), __('Unlimited documents/year'), __('Dedicated support')],
         ],
     ];
+
+    // Combos armados alrededor de los casos de uso más comunes (ver
+    // .agents/product-marketing.md) -- salen más baratos que armar la misma
+    // combinación a mano en la calculadora de abajo, como incentivo para
+    // elegir el combo ya armado en vez de "Pro" genérico cuando el negocio
+    // encaja en uno de estos dos patrones.
+    $comboPlans = [
+        [
+            'name' => __('Storefront'),
+            'price' => __('$650,000/year'),
+            'tagline' => __('POS + Invoicing'),
+            'features' => [__('Unlimited users'), __('Point of sale + Invoicing'), __('Up to 1,200 documents/year'), __('Email support')],
+        ],
+        [
+            'name' => __('Quote to Sale'),
+            'price' => __('$650,000/year'),
+            'tagline' => __('Quotations + Invoicing'),
+            'features' => [__('Unlimited users'), __('Quotations + Invoicing'), __('Up to 1,200 documents/year'), __('Email support')],
+        ],
+        [
+            'name' => __('Full Ops'),
+            'price' => __('$1,950,000/year'),
+            'tagline' => __('All 5 modules'),
+            'features' => [__('Unlimited users'), __('All 5 modules included'), __('Up to 6,000 documents/year'), __('Priority support')],
+        ],
+    ];
+
+    // Calculadora "arma tu propio combo" -- mismos números que los planes de
+    // arriba, para que el resultado no contradiga lo que ya se cotiza a
+    // mano. MODULE_BASE_PRICE es el costo de tener acceso a un módulo
+    // (independiente del volumen); VOLUME_ANCHORS son puntos [documentos,
+    // cargo por volumen] -- el cargo real de cualquier cantidad de
+    // documentos que el usuario deslice en el rango se interpola en línea
+    // recta entre los dos puntos que lo rodean, así el precio va cambiando
+    // suave mientras arrastra en vez de saltar entre escalones fijos. Los
+    // puntos están puestos a propósito para que el costo marginal por
+    // documento baje entre tramo y tramo (descuento por volumen), aunque el
+    // total siempre suba con más documentos.
+    $calculatorModuleBasePrice = 220000;
+    $calculatorVolumeMin = 100;
+    $calculatorVolumeMax = 6000;
+    $calculatorVolumeStep = 100;
+    $calculatorVolumeAnchors = [
+        [100, 90000],
+        [500, 200000],
+        [1200, 280000],
+        [2000, 340000],
+        [3500, 460000],
+        [6000, 620000],
+    ];
+    // Los combos ya armados (Storefront/Quote to Sale/Full Ops) no cambian
+    // el cargo por volumen (sigue interpolando igual que cualquier otra
+    // combinación) -- lo que cambia es "moduleBase", que REEMPLAZA a
+    // MODULE_BASE_PRICE * cantidad de módulos para ese conjunto exacto de
+    // módulos, aplicado en TODO el rango del slider, no solo en un punto.
+    // Antes esto se hacía con un precio fijo solo en el volumen exacto para
+    // el que el combo fue calibrado, lo que generaba un hueco raro en la
+    // curva (el precio bajaba de golpe justo en ese punto y volvía a subir
+    // un documento más allá). Con el ajuste aplicado siempre, la curva
+    // queda continua y el combo se reconoce sin importar qué volumen se
+    // elija dentro del rango. Storefront/Quote to Sale usan un moduleBase
+    // más barato que el genérico (2 * 220,000 = 440,000) porque son
+    // combinaciones comunes que Billingo quiere incentivar; Full Ops usa
+    // uno más caro que el genérico (5 * 220,000 = 1,100,000) porque incluye
+    // soporte prioritario.
+    $calculatorNamedCombos = [
+        ['modules' => ['pos', 'invoicing'], 'moduleBase' => 370000, 'name' => __('Storefront')],
+        ['modules' => ['cotizaciones', 'invoicing'], 'moduleBase' => 370000, 'name' => __('Quote to Sale')],
+        ['modules' => ['invoicing', 'receiving', 'payroll', 'pos', 'cotizaciones'], 'moduleBase' => 1330000, 'name' => __('Full Ops')],
+    ];
+
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDark ? 'dark' : '' }}">
@@ -135,7 +206,7 @@
              a partir de "lg" -- por eso el estado mobile no puede filtrarse
              a desktop aunque no se resetee al cambiar de tamaño. --}}
         <div id="auth-shell" class="relative grid h-dvh grid-cols-[minmax(0,1fr)] items-stretch justify-center lg:max-w-none {{ $authShellOpenByDefault ? 'lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0fr)]' }} lg:justify-normal lg:transition-[grid-template-columns] lg:duration-500 lg:ease-in-out">
-            <div id="auth-promo-panel" class="bg-muted relative flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-6 text-white sm:p-10 lg:flex dark:border-r dark:border-neutral-800">
+            <div id="auth-promo-panel" class="bg-muted relative flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-neutral-900 p-6 text-white sm:p-10 lg:flex dark:border-r dark:border-neutral-800 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutral-500">
                 <button type="button" id="auth-login-toggle-btn" aria-label="{{ __('Log in') }}" title="{{ __('Log in') }}"
                     onclick="window.toggleAuthLoginPanel()"
                     class="absolute end-6 top-6 z-30 hidden size-10 items-center justify-center rounded-full text-neutral-300 hover:bg-white/10 hover:text-white focus:outline-hidden lg:flex">
@@ -254,6 +325,60 @@
                                     </ul>
                                 </div>
                             @endforeach
+                        </div>
+
+                        <p class="mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-400">{{ __('Popular combos') }}</p>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                            @foreach ($comboPlans as $plan)
+                                <div class="rounded-lg border border-white/10 bg-white/5 p-4">
+                                    <p class="font-semibold text-white">{{ $plan['name'] }}</p>
+                                    <p class="text-xs text-neutral-400">{{ $plan['tagline'] }}</p>
+                                    <p class="mt-2 text-sm font-medium text-white">{{ $plan['price'] }}</p>
+                                    <ul class="mt-3 space-y-1.5">
+                                        @foreach ($plan['features'] as $feature)
+                                            <li class="flex items-start gap-1.5 text-xs text-neutral-300">
+                                                <svg class="mt-0.5 size-3.5 shrink-0 text-accent" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                                                {{ $feature }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-8 rounded-lg border border-white/10 bg-white/5 p-5">
+                            <p class="font-semibold text-white">{{ __('Build your own combo') }}</p>
+                            <p class="mt-1 text-sm text-neutral-400">{{ __('Not sure which plan fits? Pick your modules and expected volume and get an instant estimate.') }}</p>
+
+                            <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                                @foreach ($modules as $key => $module)
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-neutral-200 has-checked:border-accent has-checked:bg-accent/10">
+                                        <input type="checkbox" class="js-calculator-module shrink-0 size-4 rounded-sm border-white/20 bg-transparent accent-accent focus:ring-accent" value="{{ $key }}">
+                                        {{ $module['name'] }}
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-4">
+                                <div class="mb-1.5 flex items-center justify-between">
+                                    <label for="calculator-document-volume" class="text-sm font-medium text-neutral-200">{{ __('Expected documents per year') }}</label>
+                                    <span id="calculator-document-volume-value" class="text-sm font-semibold text-white"></span>
+                                </div>
+                                <input type="range" id="calculator-document-volume" class="js-calculator-volume h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/10 accent-accent"
+                                    min="{{ $calculatorVolumeMin }}" max="{{ $calculatorVolumeMax }}" step="{{ $calculatorVolumeStep }}" value="{{ $calculatorVolumeAnchors[1][0] }}">
+                                <div class="mt-1 flex justify-between text-xs text-neutral-500">
+                                    <span>{{ number_format($calculatorVolumeMin) }}</span>
+                                    <span>{{ number_format($calculatorVolumeMax) }}+</span>
+                                </div>
+                            </div>
+
+                            <div id="calculator-result" class="mt-4 rounded-lg border border-accent/30 bg-accent/10 p-4 text-sm text-neutral-200">
+                                {{ __('Select at least one module to see an estimate.') }}
+                            </div>
+
+                            <button type="button" id="calculator-send-quote" class="mt-4 hidden rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
+                                {{ __('Send me this quote') }}
+                            </button>
                         </div>
                     </div>
 
@@ -526,6 +651,127 @@
                     }
                 @endif
             }
+
+            const CALCULATOR_MODULE_BASE_PRICE = @json($calculatorModuleBasePrice);
+            const CALCULATOR_VOLUME_ANCHORS = @json($calculatorVolumeAnchors);
+            const CALCULATOR_VOLUME_MAX = @json($calculatorVolumeMax);
+            const CALCULATOR_NAMED_COMBOS = @json($calculatorNamedCombos);
+            const CALCULATOR_MODULE_NAMES = @json($modules->map(fn ($module) => $module['name'])->all());
+
+            /**
+             * Cargo por volumen para una cantidad de documentos, interpolando
+             * en línea recta entre los dos puntos de CALCULATOR_VOLUME_ANCHORS
+             * que rodean ese valor -- así el precio cambia suave mientras se
+             * arrastra el slider en vez de saltar entre escalones fijos. Por
+             * fuera del rango de los anchors se usa el punto extremo más
+             * cercano tal cual (sin extrapolar).
+             * @param {number} documents
+             * @returns {number}
+             */
+            function interpolateVolumeCharge(documents) {
+                const anchors = CALCULATOR_VOLUME_ANCHORS;
+
+                if (documents <= anchors[0][0]) return anchors[0][1];
+                if (documents >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
+
+                for (let i = 0; i < anchors.length - 1; i++) {
+                    const [fromDocs, fromCharge] = anchors[i];
+                    const [toDocs, toCharge] = anchors[i + 1];
+
+                    if (documents >= fromDocs && documents <= toDocs) {
+                        const progress = (documents - fromDocs) / (toDocs - fromDocs);
+                        return Math.round(fromCharge + (toCharge - fromCharge) * progress);
+                    }
+                }
+
+                return anchors[anchors.length - 1][1];
+            }
+
+            /**
+             * Calculadora "arma tu propio combo" (pestaña Planes) -- calcula
+             * un estimado con la misma fórmula documentada arriba en PHP
+             * (base por módulo + cargo por volumen interpolado), recalcula
+             * en vivo mientras se arrastra el slider ("input", no "change"),
+             * y reconoce cuando la selección coincide exactamente con uno de
+             * los combos ya armados para mostrar ese precio fijo en vez de
+             * la fórmula genérica.
+             * @returns {void}
+             */
+            function bindPriceCalculator() {
+                const moduleInputs = document.querySelectorAll('.js-calculator-module');
+                const volumeInput = document.querySelector('.js-calculator-volume');
+                const volumeValueLabel = document.getElementById('calculator-document-volume-value');
+                const result = document.getElementById('calculator-result');
+                const sendButton = document.getElementById('calculator-send-quote');
+                if (! volumeInput || ! volumeValueLabel || ! result || ! sendButton) return;
+
+                let lastQuoteSummary = '';
+
+                function formatCurrency(amount) {
+                    return '$' + amount.toLocaleString('es-CO');
+                }
+
+                function buildSummary(selectedModules, volumeLabel, price) {
+                    const moduleNames = selectedModules.map((key) => CALCULATOR_MODULE_NAMES[key] || key).join(', ');
+                    const priceLine = price ? formatCurrency(price) + @json(__('/year')) : @json(__('custom quote'));
+
+                    return @json(__('Modules: ')) + moduleNames + '. ' + @json(__('Volume: ')) + volumeLabel + '. ' + @json(__('Estimated price: ')) + priceLine;
+                }
+
+                function updateCalculator() {
+                    const selectedModules = Array.from(moduleInputs).filter((input) => input.checked).map((input) => input.value);
+                    const documents = parseInt(volumeInput.value, 10);
+                    const atMax = documents >= CALCULATOR_VOLUME_MAX;
+
+                    volumeValueLabel.textContent = atMax
+                        ? documents.toLocaleString('es-CO') + '+'
+                        : documents.toLocaleString('es-CO');
+
+                    if (selectedModules.length === 0) {
+                        result.textContent = @json(__('Select at least one module to see an estimate.'));
+                        sendButton.classList.add('hidden');
+                        return;
+                    }
+
+                    const namedCombo = CALCULATOR_NAMED_COMBOS.find((combo) =>
+                        combo.modules.length === selectedModules.length
+                        && combo.modules.every((module) => selectedModules.includes(module))
+                    );
+
+                    const moduleBase = namedCombo ? namedCombo.moduleBase : CALCULATOR_MODULE_BASE_PRICE * selectedModules.length;
+                    const price = moduleBase + interpolateVolumeCharge(documents);
+
+                    const volumeLabel = documents.toLocaleString('es-CO') + ' ' + @json(__('documents/year'));
+
+                    result.innerHTML = (namedCombo
+                        ? @json(__('This matches our ":name" combo: ')).replace(':name', namedCombo.name)
+                        : '') + '<span class="text-lg font-semibold text-white">' + formatCurrency(price) + '</span> ' + @json(__('/year'))
+                        + (atMax ? '<div class="mt-1 text-xs text-neutral-400">' + @json(__('This is an estimate for the top of the range. For more, send us your numbers.')) + '</div>' : '');
+
+                    lastQuoteSummary = buildSummary(selectedModules, volumeLabel, price);
+                    sendButton.classList.remove('hidden');
+                }
+
+                moduleInputs.forEach((input) => input.addEventListener('change', updateCalculator));
+                volumeInput.addEventListener('input', updateCalculator);
+
+                sendButton.addEventListener('click', () => {
+                    window.showAuthPromoTab('contact');
+
+                    const messageField = document.getElementById('contact_body');
+                    if (messageField) {
+                        messageField.value = lastQuoteSummary;
+                    }
+
+                    if (window.matchMedia('(max-width: 1023px)').matches) {
+                        setMobilePanel(true);
+                    }
+                });
+
+                updateCalculator();
+            }
+
+            bindPriceCalculator();
 
             initAuthPanelState();
 
