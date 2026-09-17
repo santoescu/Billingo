@@ -53,6 +53,26 @@ class AdminReferralController extends Controller
             ];
         })->sortByDesc('total_commission')->values();
 
+        // Empresas que llegaron por el link de un referido (Company.referred_by_user_id) pero
+        // todavía no tienen NINGÚN contrato -- sin importar si ese contrato futuro terminaría
+        // atribuido al referido o no, lo que importa acá es que el negocio se está enfriando sin
+        // que nadie le dé seguimiento. Ordenadas por más antigua primero (la más urgente).
+        $allContractedCompanyIds = CompanyContract::all()->pluck('company_ids')->flatten()->unique()->all();
+
+        $pendingCompanies = Company::whereNotNull('referred_by_user_id')->get()
+            ->reject(fn (Company $company) => in_array((string) $company->_id, $allContractedCompanyIds, true))
+            ->sortBy('created_at')
+            ->map(function (Company $company) use ($users) {
+                $referrerId = (string) $company->referred_by_user_id;
+
+                return [
+                    'company' => $company->name,
+                    'referrer' => $users->get($referrerId)?->name ?? __('Unknown'),
+                    'created_at' => $company->created_at?->format('Y-m-d'),
+                    'days_pending' => $company->created_at ? (int) floor($company->created_at->diffInDays(now())) : null,
+                ];
+            })->values();
+
         return view('admin.referrals', [
             'totalReferred' => $rows->sum('referred_count'),
             'totalWithContract' => $rows->sum('converted_count'),
@@ -63,6 +83,7 @@ class AdminReferralController extends Controller
             // es el valor de lista antes del descuento.
             'totalContracted' => $referrerContracts->sum('net_price'),
             'rows' => $rows,
+            'pendingCompanies' => $pendingCompanies,
         ]);
     }
 }
