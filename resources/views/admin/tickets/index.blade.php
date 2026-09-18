@@ -90,17 +90,18 @@
 
     @push('scripts')
         <script>
+        {{-- wire:navigate no recarga la página completa -- vuelve a ejecutar este <script>
+             cada vez que se navega aquí, y un "let"/"const" de nivel superior explota la
+             segunda vez ("ya declarado"). Todo va dentro de un IIFE para que quede aislado en
+             su propio scope, igual que auth/split.blade.php. --}}
+        (function () {
             // Instancia viva de la tabla -- se crea una sola vez en loadAdminTicketsTable() y
             // de ahí en adelante cada refresh solo le reemplaza las filas (clear/rows.add) en
             // vez de destruirla y reconstruirla (ver documents/index.blade.php para el porqué:
             // destroy() restaura el <tbody> al contenido del primer init).
             let ticketsTable = null;
 
-            const moduleBadges = @json(
-                collect($modules)->mapWithKeys(fn ($module, $key) => [
-                    $key => ['name' => $module['name'], 'badge_classes' => $module['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200'],
-                ])
-            );
+            const moduleBadges = @json($moduleBadges);
 
             function escapeHtmlTicketRow(value) {
                 return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -206,7 +207,15 @@
             }
 
             document.addEventListener('DOMContentLoaded', initAdminTicketsPage);
-            document.addEventListener('livewire:navigated', initAdminTicketsPage);
+
+            {{-- El propio <script> se re-ejecuta en cada wire:navigate (ver el comentario del
+                 inicio del IIFE), así que sin este guard se iría acumulando un listener de
+                 "livewire:navigated" por cada navegación a esta pantalla. --}}
+            if (! window.__adminTicketsNavigateBound) {
+                window.__adminTicketsNavigateBound = true;
+                document.addEventListener('livewire:navigated', initAdminTicketsPage);
+            }
+        })();
         </script>
     @endpush
 </x-layouts.app>

@@ -169,11 +169,24 @@ class AdminSupportTicketController extends Controller
      */
     public function index(Request $request)
     {
+        $modules = config('modules');
+
         return view('admin.tickets.index', [
             'tickets' => collect(),
             'companies' => Company::orderBy('name')->get(),
             'staffUsers' => User::where('role', 'superadmin')->orderBy('name')->get(),
-            'modules' => config('modules'),
+            'modules' => $modules,
+            // Calculado acá (no con un @json(...) de varias líneas en el blade) porque la
+            // directiva @json de Blade escanea el archivo caracter por caracter buscando el
+            // paréntesis de cierre, sin entender PHP/JS -- las comillas del regex
+            // "[&<>\"']" y del objeto-lookup "({...})[char]" más abajo en el mismo <script>
+            // la confunden y nunca encuentra el cierre real, tumbando la vista entera con
+            // "Unclosed '[' ... does not match ')'" varias líneas después. Pasar la
+            // estructura ya resuelta evita que la directiva tenga que parsear algo más
+            // complejo que el nombre de una variable.
+            'moduleBadges' => collect($modules)->mapWithKeys(fn ($module, $key) => [
+                $key => ['name' => $module['name'], 'badge_classes' => $module['badge_classes'] ?? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200'],
+            ]),
             'filters' => $request->only(['status', 'module', 'company_id', 'assigned_to']),
         ]);
     }
