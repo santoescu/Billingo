@@ -1,4 +1,6 @@
 {
+    "Usage drop": "Caída de uso",
+    ":recent documents in the last 30 days, vs :prior the previous 30 days (:pct% drop)": ":recent documentos en los últimos 30 días, contra :prior en los 30 días anteriores (:pct% de caída)",
     "Ticket status changed": "Cambió el estado del ticket",
     "A ticket was assigned to you": "Te asignaron un ticket",
     "View ticket": "Ver ticket",

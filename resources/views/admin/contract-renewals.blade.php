@@ -57,7 +57,7 @@
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $row['ends_at'] ?? __('No expiration') }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $row['days_left'] ?? '—' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ number_format($row['price'], 2, '.', ',') }}</td>
-                                    <td class="px-4 py-3 text-sm">
+                                    <td class="px-4 py-3 text-sm break-words">
                                         @if (! $row['needs_attention'])
                                             <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 dark:bg-neutral-500/10 dark:text-neutral-400">{{ __('Active') }}</span>
                                         @elseif ($row['has_replacement'])
@@ -68,6 +68,14 @@
                                                 <div class="mt-1 text-xs text-neutral-400">{{ __('On :date', ['date' => $row['contacted_at']]) }}</div>
                                             @else
                                                 <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-400">{{ __('Needs outreach') }}</span>
+                                            @endif
+
+                                            @if ($row['usage_drop_warning'])
+                                                <flux:tooltip :content="$row['usage_drop_warning']" position="top">
+                                                    <span class="mt-1 inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300 cursor-help">
+                                                        {{ __('Usage drop') }}
+                                                    </span>
+                                                </flux:tooltip>
                                             @endif
 
                                             <form method="POST" action="{{ route('admin.contract-renewals.toggle-contacted', $row['id']) }}" class="mt-1">

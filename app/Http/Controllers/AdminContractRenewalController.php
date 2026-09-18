@@ -4,12 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\CompanyContract;
+use App\Models\DocumentoEmitido;
+use App\Models\DocumentoPos;
+use App\Models\DocumentoRecibido;
+use App\Models\Quotation;
 
 class AdminContractRenewalController extends Controller
 {
     private const LOOKAHEAD_DAYS = 30;
 
     private const QUOTA_WARNING_THRESHOLD = 0.9;
+
+    // Umbrales de la señal de "caída de uso" (ver usageDropWarning()): por debajo de
+    // MIN_PRIOR_VOLUME documentos en el mes anterior no vale la pena comparar (una empresa que
+    // ya facturaba poco no "cae" de forma significativa, es ruido); por debajo de DROP_RATIO del
+    // volumen anterior sí se considera una caída real, no variación normal mes a mes.
+    private const USAGE_DROP_MIN_PRIOR_VOLUME = 5;
+
+    private const USAGE_DROP_RATIO = 0.4;
 
     /**
      * Todos los contratos vigentes ahora mismo, para que el superadmin tenga la foto completa de
@@ -46,7 +58,8 @@ class AdminContractRenewalController extends Controller
 
             $expiringByDate = ! $contract->unlimited && $contract->ends_at && $contract->ends_at->lte($windowEnd);
             $quotaByModule = $this->quotaByModule($contract);
-            $needsAttention = $expiringByDate || collect($quotaByModule)->contains('warning', true);
+            $usageDropWarning = $this->usageDropWarning($contract);
+            $needsAttention = $expiringByDate || collect($quotaByModule)->contains('warning', true) || $usageDropWarning !== null;
 
             return [
                 'id' => (string) $contract->_id,
@@ -58,6 +71,7 @@ class AdminContractRenewalController extends Controller
                 'days_left' => $contract->ends_at ? now()->startOfDay()->diffInDays($contract->ends_at->copy()->startOfDay(), false) : null,
                 'price' => $contract->net_price,
                 'expiring_by_date' => $expiringByDate,
+                'usage_drop_warning' => $usageDropWarning,
                 'needs_attention' => $needsAttention,
                 'has_replacement' => $needsAttention && $this->hasFutureContract($contract),
                 'contacted_at' => $contract->renewal_contacted_at?->setTimezone('America/Bogota')->format('Y-m-d'),
@@ -137,6 +151,78 @@ class AdminContractRenewalController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * Señal de riesgo que no depende de fecha ni cupo: una empresa que facturaba seguido y de
+     * repente casi no usa la plataforma, aunque su contrato siga vigente por meses -- suele
+     * anticipar el abandono antes de que el contrato venza (ver skill churn-prevention:
+     * "usage drop" como señal líder). Compara los últimos 30 días contra los 30 días
+     * anteriores a esos, sumando documentos de todos los módulos que este contrato cubre
+     * (facturación, POS, cotizaciones, recepción -- nómina no tiene un conteo de "documentos"
+     * equivalente, se deja fuera).
+     *
+     * @return string|null Null si no hay suficiente volumen previo para comparar (ver
+     *         USAGE_DROP_MIN_PRIOR_VOLUME) o si no cayó lo suficiente (ver USAGE_DROP_RATIO).
+     */
+    private function usageDropWarning(CompanyContract $contract): ?string
+    {
+        if (empty($contract->company_ids) || empty($contract->modules)) {
+            return null;
+        }
+
+        $now = now();
+        $recentStart = $now->copy()->subDays(30);
+        $priorStart = $now->copy()->subDays(60);
+
+        $priorCount = $this->documentCount($contract, $priorStart, $recentStart);
+
+        if ($priorCount < self::USAGE_DROP_MIN_PRIOR_VOLUME) {
+            return null;
+        }
+
+        $recentCount = $this->documentCount($contract, $recentStart, $now);
+
+        if ($recentCount / $priorCount >= self::USAGE_DROP_RATIO) {
+            return null;
+        }
+
+        $pctDrop = round((1 - $recentCount / $priorCount) * 100);
+
+        return __(':recent documents in the last 30 days, vs :prior the previous 30 days (:pct% drop)', [
+            'recent' => $recentCount,
+            'prior' => $priorCount,
+            'pct' => $pctDrop,
+        ]);
+    }
+
+    /**
+     * Documentos emitidos por las empresas de este contrato, sumando solo los módulos que el
+     * contrato cubre, entre $from (inclusive) y $to (exclusive).
+     */
+    private function documentCount(CompanyContract $contract, \Carbon\Carbon $from, \Carbon\Carbon $to): int
+    {
+        $companyIds = $contract->company_ids ?? [];
+        $modules = $contract->modules ?? [];
+        $count = 0;
+
+        if (in_array('invoicing', $modules, true)) {
+            $count += DocumentoEmitido::whereIn('company_id', $companyIds)->whereBetween('issue_date', [$from, $to])->count();
+        }
+
+        if (in_array('pos', $modules, true)) {
+            $count += DocumentoPos::whereIn('company_id', $companyIds)->whereBetween('created_at', [$from, $to])->count();
+        }
+
+        if (in_array('cotizaciones', $modules, true)) {
+            $count += Quotation::whereIn('company_id', $companyIds)->whereBetween('created_at', [$from, $to])->count();
+        }
+
+        if (in_array('receiving', $modules, true)) {
+            $count += DocumentoRecibido::whereIn('company_id', $companyIds)->whereBetween('created_at', [$from, $to])->count();
+        }
+
+        return $count;
     }
 
     /**
