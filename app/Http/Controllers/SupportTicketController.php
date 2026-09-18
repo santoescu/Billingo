@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SupportTicketNotificationMail;
 use App\Models\Notification;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketActivity;
@@ -63,7 +64,7 @@ class SupportTicketController extends Controller
             'body' => $data['body'],
         ]);
 
-        $this->notifyStaff($ticket, $company->name, __('New support request'));
+        $this->notifyStaff($ticket, $company->name, __('New support request'), sendEmail: true);
 
         session()->flash('toast', [
             'type' => 'success',
@@ -221,14 +222,23 @@ class SupportTicketController extends Controller
         ]);
 
         $ticket->update(['status' => $newStatus]);
+
+        // La empresa cerrando/reabriendo su propia solicitud sí amerita correo al staff -- a
+        // diferencia de un mensaje nuevo (ver notifyStaff()), un cambio de estado es un evento
+        // puntual, no algo que se repita seguido en el mismo hilo.
+        $this->notifyStaff($ticket, $ticket->company?->name ?? '', __('Ticket status changed'), sendEmail: true, kind: SupportTicketNotificationMail::KIND_STATUS);
     }
 
     /**
      * @param  SupportTicket  $ticket
      * @param  string  $companyName  Para el título del aviso, sin tener que recargar la empresa desde el lado del staff.
      * @param  string  $title  Distingue en la campanita si es un ticket nuevo o un mensaje nuevo en uno existente.
+     * @param  bool  $sendEmail  Además de la campanita, manda correo -- solo para eventos puntuales
+     *                           (ticket nuevo, cambio de estado), nunca por cada mensaje nuevo dentro
+     *                           de un hilo ya abierto (demasiado correo para algo de bajo valor).
+     * @param  string  $kind  Insignia de color del correo (ver SupportTicketNotificationMail::KINDS).
      */
-    private function notifyStaff(SupportTicket $ticket, string $companyName, string $title): void
+    private function notifyStaff(SupportTicket $ticket, string $companyName, string $title, bool $sendEmail = false, string $kind = SupportTicketNotificationMail::KIND_NEW): void
     {
         // Si el ticket ya tiene un superadmin asignado, el aviso le llega
         // solo a esa persona -- no a todo el equipo -- de ahí en adelante.
@@ -236,11 +246,13 @@ class SupportTicketController extends Controller
             ? [(string) $ticket->assigned_to]
             : User::where('role', 'superadmin')->get()->pluck('_id')->map(fn ($id) => (string) $id)->all();
 
-        Notification::notifyUsers(
-            $staffIds,
-            $title,
-            __(':company: :subject', ['company' => $companyName, 'subject' => $ticket->subject]),
-            route('admin.tickets.show', $ticket->_id)
-        );
+        $body = __(':company: :subject', ['company' => $companyName, 'subject' => $ticket->subject]);
+        $url = route('admin.tickets.show', $ticket->_id);
+
+        if ($sendEmail) {
+            Notification::notifyUsersWithEmail($staffIds, $title, $body, $url, fn () => new SupportTicketNotificationMail($ticket, $title, $body, $url, $kind));
+        } else {
+            Notification::notifyUsers($staffIds, $title, $body, $url);
+        }
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SupportTicketNotificationMail;
 use App\Models\CannedResponse;
 use App\Models\Company;
 use App\Models\Notification;
@@ -143,11 +144,15 @@ class AdminSupportTicketController extends Controller
             'body' => $data['body'],
         ]);
 
-        Notification::notifyUsers(
-            $company->administratorUserIdsForModule($ticket->module),
+        $adminIds = $company->administratorUserIdsForModule($ticket->module);
+        $url = route('support.show', $ticket->_id);
+
+        Notification::notifyUsersWithEmail(
+            $adminIds,
             __('New message from Billingo support'),
             $ticket->subject,
-            route('support.show', $ticket->_id)
+            $url,
+            fn () => new SupportTicketNotificationMail($ticket, __('New message from Billingo support'), $ticket->subject, $url, SupportTicketNotificationMail::KIND_NEW),
         );
 
         session()->flash('toast', [
@@ -351,7 +356,9 @@ class AdminSupportTicketController extends Controller
             'status' => 'required|in:' . implode(',', SupportTicket::STATUSES),
         ]);
 
-        if ($data['status'] !== $ticket->status) {
+        $statusChanged = $data['status'] !== $ticket->status;
+
+        if ($statusChanged) {
             SupportTicketActivity::create([
                 'support_ticket_id' => (string) $ticket->_id,
                 'user_id' => (string) $request->user()->_id,
@@ -362,6 +369,18 @@ class AdminSupportTicketController extends Controller
         }
 
         $ticket->update(['status' => $data['status'], 'staff_last_viewed_at' => now()]);
+
+        // Un lead sin cuenta (ver PublicContactController) no tiene usuarios administradores a
+        // quién avisarle -- solo aplica a tickets de una empresa real.
+        if ($statusChanged && $ticket->company_id) {
+            $company = Company::find($ticket->company_id);
+            $adminIds = $company?->administratorUserIdsForModule($ticket->module) ?? [];
+            $url = route('support.show', $ticket->_id);
+            $title = __('Ticket status changed');
+            $body = $ticket->subject;
+
+            Notification::notifyUsersWithEmail($adminIds, $title, $body, $url, fn () => new SupportTicketNotificationMail($ticket, $title, $body, $url, SupportTicketNotificationMail::KIND_STATUS));
+        }
 
         return redirect()->route('admin.tickets.show', $ticket->_id);
     }
@@ -428,6 +447,16 @@ class AdminSupportTicketController extends Controller
         }
 
         $ticket->update(['assigned_to' => $assignedTo, 'staff_last_viewed_at' => now()]);
+
+        // Solo avisa cuando de verdad queda asignado a alguien -- quitarle la asignación
+        // ("Sin asignar") no tiene a quién notificarle.
+        if ($assignedTo && $assignedTo !== $previousAssignedTo) {
+            $url = route('admin.tickets.show', $ticket->_id);
+            $title = __('A ticket was assigned to you');
+            $body = $ticket->subject;
+
+            Notification::notifyUsersWithEmail([$assignedTo], $title, $body, $url, fn () => new SupportTicketNotificationMail($ticket, $title, $body, $url, SupportTicketNotificationMail::KIND_ASSIGNED));
+        }
 
         return redirect()->route('admin.tickets.show', $ticket->_id);
     }

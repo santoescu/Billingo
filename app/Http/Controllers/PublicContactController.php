@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SupportTicketNotificationMail;
 use App\Models\Notification;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
@@ -45,13 +46,11 @@ class PublicContactController extends Controller
         ]);
 
         $staffIds = User::where('role', 'superadmin')->get()->pluck('_id')->map(fn ($id) => (string) $id)->all();
+        $title = __('New contact request');
+        $body = $data['contact_name'] . ': ' . Str::limit($data['body'], 100);
+        $url = route('admin.tickets.show', $ticket->_id);
 
-        Notification::notifyUsers(
-            $staffIds,
-            __('New contact request'),
-            $data['contact_name'] . ': ' . Str::limit($data['body'], 100),
-            route('admin.tickets.show', $ticket->_id)
-        );
+        Notification::notifyUsersWithEmail($staffIds, $title, $body, $url, fn () => new SupportTicketNotificationMail($ticket, $title, $body, $url, SupportTicketNotificationMail::KIND_NEW));
 
         return redirect()->route('login')->with('status', __('Thanks! We got your message and will contact you soon.'));
     }

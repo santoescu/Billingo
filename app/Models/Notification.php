@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Facades\Mail;
 use MongoDB\Laravel\Eloquent\Model as Eloquent;
 
 class Notification extends Eloquent
@@ -54,6 +55,29 @@ class Notification extends Eloquent
                 'body' => $body,
                 'url' => $url,
             ]);
+        }
+    }
+
+    /**
+     * Igual que notifyUsers(), pero además le manda un correo SINCRÓNICO (no en cola -- el
+     * Mailable no implementa ShouldQueue, ver SupportTicketNotificationMail) a cada usuario que
+     * tenga email -- para avisos puntuales que sí vale la pena que lleguen de inmediato aunque
+     * la persona no tenga la app abierta (ticket nuevo, asignación, cambio de estado), a
+     * diferencia de la campanita sola que usa notifyUsers() para todo lo demás (ej. cada mensaje
+     * nuevo dentro de un ticket ya abierto -- eso sería demasiado correo).
+     *
+     * @param  array<int, string>  $userIds
+     * @param  \Closure(): \Illuminate\Contracts\Mail\Mailable  $mailFactory  Una instancia nueva
+     *         del Mailable por cada destinatario (no una sola compartida entre todos).
+     */
+    public static function notifyUsersWithEmail(array $userIds, string $title, string $body, ?string $url, \Closure $mailFactory): void
+    {
+        self::notifyUsers($userIds, $title, $body, $url);
+
+        $users = User::whereIn('_id', array_unique($userIds))->whereNotNull('email')->get();
+
+        foreach ($users as $user) {
+            Mail::to($user->email)->send($mailFactory());
         }
     }
 }
