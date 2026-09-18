@@ -88,7 +88,7 @@
     $plans = [
         [
             'name' => __('Basic'),
-            'price' => __('From $420,000/year'),
+            'price' => __('From $300,000/year'),
             'tagline' => __('To start invoicing'),
             'features' => [__('Unlimited users'), __('1 module of your choice'), __('Up to 400 documents/year'), __('Email support')],
         ],
@@ -121,13 +121,13 @@
         ],
         [
             'name' => __('Quote to Sale'),
-            'price' => __('$540,000/year'),
+            'price' => __('$485,000/year'),
             'tagline' => __('Quotations + Invoicing'),
             'features' => [__('Unlimited users'), __('Quotations + Invoicing'), __('Up to 1,200 documents/year'), __('Email support')],
         ],
         [
             'name' => __('Full Ops'),
-            'price' => __('$1,840,000/year'),
+            'price' => __('$1,785,000/year'),
             'tagline' => __('All 5 modules'),
             'features' => [__('Unlimited users'), __('All 5 modules included'), __('Up to 6,000 documents/year'), __('Priority support')],
         ],
@@ -136,8 +136,8 @@
     // Calculadora "arma tu propio combo" -- mismos números que los planes de
     // arriba, para que el resultado no contradiga lo que ya se cotiza a
     // mano. MODULE_BASE_PRICES es el costo de tener acceso a cada módulo
-    // (independiente del volumen) -- "cotizaciones" vale la mitad que el
-    // resto (110,000 en vez de 220,000) porque el módulo pesa menos que
+    // (independiente del volumen) -- "cotizaciones" vale una fracción del
+    // resto (55,000 en vez de 220,000) porque el módulo pesa menos que
     // facturación/POS/nómina/recepción; VOLUME_ANCHORS son puntos
     // [documentos, cargo por volumen] -- el cargo real de cualquier
     // cantidad de documentos que el usuario deslice en el rango se
@@ -148,11 +148,15 @@
     // volumen), aunque el total siempre suba con más documentos.
     $calculatorDefaultModulePrice = 220000;
     $calculatorModuleBasePrices = [
-        'cotizaciones' => 110000,
+        'cotizaciones' => 55000,
     ];
     $calculatorVolumeMin = 100;
-    $calculatorVolumeMax = 6000;
+    $calculatorVolumeMax = 50000;
     $calculatorVolumeStep = 100;
+    // Extendido más allá de 6,000 documentos (antes el tope del slider) para
+    // cubrir negocios de mayor volumen -- misma lógica de antes, el costo
+    // marginal por documento sigue bajando entre tramo y tramo, sin que el
+    // total deje de subir.
     $calculatorVolumeAnchors = [
         [100, 90000],
         [500, 200000],
@@ -160,6 +164,33 @@
         [2000, 340000],
         [3500, 460000],
         [6000, 620000],
+        [10000, 820000],
+        [20000, 1150000],
+        [35000, 1500000],
+        [50000, 1800000],
+    ];
+    // Curva de precio TOTAL (no un cargo que se suma a un moduleBase) para
+    // cuando el único módulo elegido es "invoicing" puro -- calibrada contra
+    // los planes anuales de Factus (proveedor de la API de facturación
+    // electrónica DIAN, sin POS/cotizaciones/nómina/nada más encima) a un
+    // margen de ~1.6x sobre su precio, más bajo que el margen implícito de
+    // ~2.1x que queda para el resto de módulos/combinaciones (que sí
+    // incluyen plataforma completa, no solo la conexión DIAN). Este
+    // descuento aplica SOLO cuando "invoicing" es el único módulo
+    // seleccionado -- cualquier otra combinación sigue usando
+    // MODULE_BASE_PRICES + VOLUME_ANCHORS sin cambios.
+    $calculatorInvoicingOnlyVolumeAnchors = [
+        [100, 250000],
+        [150, 270000],
+        [400, 300000],
+        [1600, 350000],
+        [2500, 420000],
+        [5000, 460000],
+        [10000, 620000],
+        [15000, 700000],
+        [20000, 780000],
+        [35000, 1300000],
+        [50000, 1750000],
     ];
     // Los combos ya armados (Storefront/Quote to Sale/Full Ops) no cambian
     // el cargo por volumen (sigue interpolando igual que cualquier otra
@@ -176,12 +207,12 @@
     // combinaciones comunes que Billingo quiere incentivar; Full Ops usa
     // uno 230,000 más caro que la suma genérica porque incluye soporte
     // prioritario. La suma genérica de cada combo (con "cotizaciones" a
-    // 110,000): Storefront 220,000+220,000=440,000; Quote to Sale
-    // 110,000+220,000=330,000; Full Ops 220,000*4+110,000=990,000.
+    // 55,000): Storefront 220,000+220,000=440,000; Quote to Sale
+    // 55,000+220,000=275,000; Full Ops 220,000*4+55,000=935,000.
     $calculatorNamedCombos = [
         ['modules' => ['pos', 'invoicing'], 'moduleBase' => 370000, 'name' => __('Storefront')],
-        ['modules' => ['cotizaciones', 'invoicing'], 'moduleBase' => 260000, 'name' => __('Quote to Sale')],
-        ['modules' => ['invoicing', 'receiving', 'payroll', 'pos', 'cotizaciones'], 'moduleBase' => 1220000, 'name' => __('Full Ops')],
+        ['modules' => ['cotizaciones', 'invoicing'], 'moduleBase' => 205000, 'name' => __('Quote to Sale')],
+        ['modules' => ['invoicing', 'receiving', 'payroll', 'pos', 'cotizaciones'], 'moduleBase' => 1165000, 'name' => __('Full Ops')],
     ];
 
 @endphp
@@ -662,23 +693,22 @@
             const CALCULATOR_DEFAULT_MODULE_PRICE = @json($calculatorDefaultModulePrice);
             const CALCULATOR_MODULE_BASE_PRICES = @json($calculatorModuleBasePrices);
             const CALCULATOR_VOLUME_ANCHORS = @json($calculatorVolumeAnchors);
+            const CALCULATOR_INVOICING_ONLY_VOLUME_ANCHORS = @json($calculatorInvoicingOnlyVolumeAnchors);
             const CALCULATOR_VOLUME_MAX = @json($calculatorVolumeMax);
             const CALCULATOR_NAMED_COMBOS = @json($calculatorNamedCombos);
             const CALCULATOR_MODULE_NAMES = @json($modules->map(fn ($module) => $module['name'])->all());
 
             /**
-             * Cargo por volumen para una cantidad de documentos, interpolando
-             * en línea recta entre los dos puntos de CALCULATOR_VOLUME_ANCHORS
-             * que rodean ese valor -- así el precio cambia suave mientras se
-             * arrastra el slider en vez de saltar entre escalones fijos. Por
-             * fuera del rango de los anchors se usa el punto extremo más
-             * cercano tal cual (sin extrapolar).
+             * Interpola en línea recta entre los dos puntos [documentos,
+             * precio] de "anchors" que rodean "documents" -- así el precio
+             * cambia suave mientras se arrastra el slider en vez de saltar
+             * entre escalones fijos. Por fuera del rango de los anchors se
+             * usa el punto extremo más cercano tal cual (sin extrapolar).
+             * @param {Array<[number, number]>} anchors
              * @param {number} documents
              * @returns {number}
              */
-            function interpolateVolumeCharge(documents) {
-                const anchors = CALCULATOR_VOLUME_ANCHORS;
-
+            function interpolate(anchors, documents) {
                 if (documents <= anchors[0][0]) return anchors[0][1];
                 if (documents >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
 
@@ -698,11 +728,12 @@
             /**
              * Calculadora "arma tu propio combo" (pestaña Planes) -- calcula
              * un estimado con la misma fórmula documentada arriba en PHP
-             * (base por módulo + cargo por volumen interpolado), recalcula
-             * en vivo mientras se arrastra el slider ("input", no "change"),
-             * y reconoce cuando la selección coincide exactamente con uno de
-             * los combos ya armados para mostrar ese precio fijo en vez de
-             * la fórmula genérica.
+             * (base por módulo + cargo por volumen interpolado, salvo
+             * "invoicing" solo, que usa su propia curva de precio total),
+             * recalcula en vivo mientras se arrastra el slider ("input", no
+             * "change"), y reconoce cuando la selección coincide exactamente
+             * con uno de los combos ya armados para mostrar ese precio fijo
+             * en vez de la fórmula genérica.
              * @returns {void}
              */
             function bindPriceCalculator() {
@@ -741,17 +772,30 @@
                         return;
                     }
 
+                    // "invoicing" solo (sin ningún otro módulo) tiene su propia curva de
+                    // precio TOTAL, calibrada con un margen más bajo sobre el costo de la
+                    // API de facturación electrónica pura (ver comentario en PHP) -- para
+                    // cualquier otro módulo o combinación se usa la fórmula genérica de
+                    // siempre (moduleBase + cargo por volumen).
+                    const isInvoicingOnly = selectedModules.length === 1 && selectedModules[0] === 'invoicing';
+
                     const namedCombo = CALCULATOR_NAMED_COMBOS.find((combo) =>
                         combo.modules.length === selectedModules.length
                         && combo.modules.every((module) => selectedModules.includes(module))
                     );
 
-                    const genericModuleBase = selectedModules.reduce(
-                        (total, module) => total + (CALCULATOR_MODULE_BASE_PRICES[module] ?? CALCULATOR_DEFAULT_MODULE_PRICE),
-                        0
-                    );
-                    const moduleBase = namedCombo ? namedCombo.moduleBase : genericModuleBase;
-                    const price = moduleBase + interpolateVolumeCharge(documents);
+                    let price;
+
+                    if (isInvoicingOnly) {
+                        price = interpolate(CALCULATOR_INVOICING_ONLY_VOLUME_ANCHORS, documents);
+                    } else {
+                        const genericModuleBase = selectedModules.reduce(
+                            (total, module) => total + (CALCULATOR_MODULE_BASE_PRICES[module] ?? CALCULATOR_DEFAULT_MODULE_PRICE),
+                            0
+                        );
+                        const moduleBase = namedCombo ? namedCombo.moduleBase : genericModuleBase;
+                        price = moduleBase + interpolate(CALCULATOR_VOLUME_ANCHORS, documents);
+                    }
 
                     const volumeLabel = documents.toLocaleString('es-CO') + ' ' + @json(__('documents/year'));
 
