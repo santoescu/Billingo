@@ -627,6 +627,45 @@ class PanelMetricsService
     }
 
     /**
+     * Proveedores a los que más se les compró en el periodo elegido -- a
+     * diferencia de topClients(), DocumentoRecibido no guarda el nombre del
+     * proveedor en su payload (solo "proveedor_id"), así que el nombre se
+     * resuelve con una consulta aparte a ThirdParty, igual que en
+     * payables(). Null si no hay al menos 2 proveedores distintos.
+     *
+     * @return array<int, array{name: string, total: float}>|null
+     */
+    public function topSuppliers(Company $company, array $period): ?array
+    {
+        $docs = $company->documentosRecibidos()
+            ->whereBetween('issue_date', [$period['from'], $period['to']])
+            ->select(['proveedor_id', 'total'])
+            ->get();
+
+        if ($docs->isEmpty()) {
+            return null;
+        }
+
+        $totals = $docs
+            ->groupBy(fn ($doc) => $doc->proveedor_id ?: 'sin-proveedor')
+            ->map(fn (Collection $group) => (float) $group->sum('total'));
+
+        if ($totals->count() < 2) {
+            return null;
+        }
+
+        $namesById = ThirdParty::whereIn('_id', $totals->keys()->filter()->all())->get()
+            ->mapWithKeys(fn (ThirdParty $t) => [(string) $t->_id => $t->name]);
+
+        $totals = $totals->sortByDesc(fn ($total) => $total)->take(8);
+
+        return $totals->map(fn ($total, $id) => [
+            'name' => $namesById->get($id, __('Unknown')),
+            'total' => $total,
+        ])->values()->all();
+    }
+
+    /**
      * Documentos más recientes de UN módulo, ya recortados a 8 en la propia
      * consulta -- el widget de actividad reciente llama esto por cada módulo
      * visible y mezcla los resultados (máximo 8 * módulos visibles antes de

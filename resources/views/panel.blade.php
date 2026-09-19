@@ -81,6 +81,11 @@
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 mb-6">
+            @livewire('panel.top-products', $ctx + ['module' => 'receiving'], 'top-products-receiving-' . $k)
+            @livewire('panel.top-suppliers', $ctx, 'top-suppliers-' . $k)
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2 mb-6">
             @livewire('panel.module-distribution', $ctx, 'module-distribution-' . $k)
             @livewire('panel.invoice-status-breakdown', $ctx, 'invoice-status-' . $k)
         </div>
