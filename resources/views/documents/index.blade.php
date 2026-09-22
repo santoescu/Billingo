@@ -104,7 +104,7 @@
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-5xl sm:w-full m-3 sm:mx-auto">
             <div class="flex flex-col bg-white border shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
                 <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
-                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('Email history') }}</h3>
+                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('Email history') }} <span id="doc-tracking-modal-numeral" class="text-zinc-500 dark:text-neutral-400"></span></h3>
                     <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400" aria-label="Close" data-hs-overlay="#doc-tracking-modal">
                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                     </button>
@@ -132,7 +132,7 @@
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-5xl sm:w-full m-3 sm:mx-auto">
             <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
                 <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
-                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('RADIAN events') }}</h3>
+                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('RADIAN events') }} <span id="doc-radian-modal-numeral" class="text-zinc-500 dark:text-neutral-400"></span></h3>
                     <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400" aria-label="Close" data-hs-overlay="#doc-radian-modal">
                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                     </button>
@@ -196,7 +196,7 @@
                 function renderTracking(row) {
                     let html = `<div class="flex flex-col items-start gap-1">`;
 
-                    html += `<button type="button" class="document-email-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300 hover:opacity-80 focus:outline-hidden" data-url="${row.urls.emailLogs}">
+                    html += `<button type="button" class="document-email-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300 hover:opacity-80 focus:outline-hidden" data-url="${row.urls.emailLogs}" data-numeral="${escapeHtml(row.numeral)}">
                         ${i18n.email}
                     </button>`;
 
@@ -204,7 +204,7 @@
                         const tone = row.radian_events_count > 0
                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
                             : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300';
-                        html += `<button type="button" class="document-radian-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${tone} hover:opacity-80 focus:outline-hidden" data-url="${row.urls.radianEvents}">
+                        html += `<button type="button" class="document-radian-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${tone} hover:opacity-80 focus:outline-hidden" data-url="${row.urls.radianEvents}" data-numeral="${escapeHtml(row.numeral)}">
                             ${i18n.radian}
                         </button>`;
                     }
@@ -226,7 +226,7 @@
                         // aunque ya tenga UUID asignado (mismo criterio que
                         // DocumentoEmitidoController::sendEmail()).
                         if (row.status === 2) {
-                            html += `<button type="button" class="document-send-email-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="${row.urls.sendEmail}" data-email="${escapeHtml(row.customer_email ?? '')}" aria-label="${i18n.sendByEmail}" title="${i18n.sendByEmail}">
+                            html += `<button type="button" class="document-send-email-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="${row.urls.sendEmail}" data-email="${escapeHtml(row.customer_email ?? '')}" data-numeral="${escapeHtml(row.numeral)}" aria-label="${i18n.sendByEmail}" title="${i18n.sendByEmail}">
                                 <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                             </button>`;
                         }
@@ -242,7 +242,7 @@
                                 <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                             </button>
                             <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration fixed z-50 bg-white border border-zinc-200 rounded-lg shadow-xl p-1 flex items-center gap-1 dark:bg-neutral-800 dark:border-neutral-700">
-                                <button type="button" class="document-retry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="${row.urls.retry}" aria-label="${i18n.validate}" title="${i18n.validate}">
+                                <button type="button" class="document-retry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="${row.urls.retry}" data-numeral="${escapeHtml(row.numeral)}" aria-label="${i18n.validate}" title="${i18n.validate}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 shrink-0">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                                     </svg>
@@ -606,7 +606,9 @@
                  * @param {string} url
                  * @returns {Promise<void>}
                  */
-                async function openDocumentTrackingModal(url) {
+                async function openDocumentTrackingModal(url, numeral) {
+                    document.getElementById('doc-tracking-modal-numeral').textContent = numeral ?? '';
+
                     const body = document.getElementById('doc-tracking-modal-body');
                     body.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-neutral-400">{{ __('Loading...') }}</td></tr>`;
 
@@ -658,7 +660,9 @@
                  * @param {string} url
                  * @returns {Promise<void>}
                  */
-                async function openRadianModal(url) {
+                async function openRadianModal(url, numeral) {
+                    document.getElementById('doc-radian-modal-numeral').textContent = numeral ?? '';
+
                     const body = document.getElementById('doc-radian-modal-body');
                     body.innerHTML = `<p class="text-zinc-500 dark:text-zinc-400">{{ __('Querying the DIAN...') }}</p>`;
 
@@ -689,13 +693,13 @@
                     document.addEventListener('click', function (event) {
                         const emailBtn = event.target.closest('.document-email-tracking-btn');
                         if (emailBtn) {
-                            openDocumentTrackingModal(emailBtn.dataset.url);
+                            openDocumentTrackingModal(emailBtn.dataset.url, emailBtn.dataset.numeral);
                             return;
                         }
 
                         const radianBtn = event.target.closest('.document-radian-tracking-btn');
                         if (radianBtn) {
-                            openRadianModal(radianBtn.dataset.url);
+                            openRadianModal(radianBtn.dataset.url, radianBtn.dataset.numeral);
                             return;
                         }
 

@@ -18,7 +18,7 @@
             <form method="POST" id="doc-send-email-form">
                 @csrf
                 <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
-                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('Send by email') }}</h3>
+                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('Send by email') }} <span id="doc-send-email-modal-numeral" class="text-zinc-500 dark:text-neutral-400"></span></h3>
                     <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400" aria-label="Close" data-hs-overlay="#doc-send-email-modal">
                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                     </button>
@@ -162,6 +162,7 @@
                     const openBtn = event.target.closest('.document-send-email-btn');
                     if (openBtn) {
                         document.getElementById('doc-send-email-form').action = openBtn.dataset.url;
+                        document.getElementById('doc-send-email-modal-numeral').textContent = openBtn.dataset.numeral ?? '';
                         chipEmails = (openBtn.dataset.email || '')
                             .split(',')
                             .map((email) => email.trim())

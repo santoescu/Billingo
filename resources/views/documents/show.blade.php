@@ -251,7 +251,7 @@
                         <div class="flex items-center gap-2">
                             <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ $documento->status_badge_classes }}">{{ $documento->status_label }}</span>
                             @if (in_array($documento->status, [\App\Models\DocumentoEmitido::STATUS_PENDING, \App\Models\DocumentoEmitido::STATUS_REJECTED], true))
-                                <button type="button" class="document-retry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="{{ route('documents.retry', $documento->_id) }}" aria-label="{{ __('Validate') }}" title="{{ __('Validate') }}">
+                                <button type="button" class="document-retry-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" data-url="{{ route('documents.retry', $documento->_id) }}" data-numeral="{{ $documento->numeral }}" aria-label="{{ __('Validate') }}" title="{{ __('Validate') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 shrink-0">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                                     </svg>
@@ -327,7 +327,7 @@
                         </a>
 
                         @if ($documento->status === \App\Models\DocumentoEmitido::STATUS_ACCEPTED)
-                            <flux:button type="button" variant="filled" icon="envelope" class="document-send-email-btn" data-url="{{ route('documents.send-email', $documento->_id) }}" data-email="{{ $customer['email'] ?? '' }}">
+                            <flux:button type="button" variant="filled" icon="envelope" class="document-send-email-btn" data-url="{{ route('documents.send-email', $documento->_id) }}" data-email="{{ $customer['email'] ?? '' }}" data-numeral="{{ $documento->numeral }}">
                                 {{ __('Send by email') }}
                             </flux:button>
                         @endif
