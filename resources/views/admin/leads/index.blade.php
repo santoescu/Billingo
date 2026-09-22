@@ -319,7 +319,12 @@
                 }
 
                 function initLeadsTable() {
+                    // Página más grande que el default (50) del resto de tablas de la app --
+                    // acá "seleccionar todo" se usa para mandar correos masivos, así que menos
+                    // clics para juntar cientos de leads en una sola página importa más que en
+                    // un listado normal.
                     leadsTable = initWorkflowDataTable('#leadsTable', '#leads-search', {
+                        pageLength: 200,
                         emptyTable: "{{ __('There are no registered :name.', ['name' => __('leads')]) }}",
                         columns: [
                             { data: null, orderable: false, className: 'px-4 py-3', render: (data, type, row) => renderSelect(row) },
