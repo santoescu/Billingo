@@ -21,6 +21,7 @@ use App\Models\Tributo;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\DianSoapClient;
+use App\Services\Dian\RadianEventsSyncService;
 use App\Services\Dian\DocumentAttachmentZipBuilder;
 use App\Services\Dian\DocumentJsonMapper;
 use App\Services\Dian\DocumentTotalsCalculator;
@@ -143,6 +144,7 @@ class DocumentoEmitidoController extends Controller
                 'status_label' => $documento->status_label,
                 'status_badge_classes' => $documento->status_badge_classes,
                 'has_uuid' => (bool) $documento->uuid,
+                'radian_events_count' => count($documento->radian_events ?? []),
                 'can_retry' => in_array($documento->status, [DocumentoEmitido::STATUS_PENDING, DocumentoEmitido::STATUS_REJECTED], true),
                 'is_rejected' => $documento->status === DocumentoEmitido::STATUS_REJECTED,
                 'urls' => [
@@ -152,6 +154,7 @@ class DocumentoEmitidoController extends Controller
                     'edit' => route('documents.create', ['edit_document_id' => $documento->_id]),
                     'sendEmail' => route('documents.send-email', $documento->_id),
                     'emailLogs' => route('documents.email-logs', $documento->_id),
+                    'radianEvents' => route('documents.radian-events', $documento->_id),
                 ],
             ];
         });
@@ -1911,6 +1914,46 @@ class DocumentoEmitidoController extends Controller
             ->values();
 
         return response()->json(['logs' => $logs]);
+    }
+
+    /**
+     * Endpoint AJAX: consulta los eventos RADIAN del documento contra DIAN (GetDocumentInfo, ver
+     * RadianEventsSyncService) y los guarda -- a diferencia de emailLogs(), esto NO se trae solo
+     * de la base: es una consulta en vivo a un servicio externo, así que se dispara con un botón
+     * ("Consultar eventos"), no automáticamente al abrir la página.
+     */
+    public function radianEvents(Request $request, string $documento, RadianEventsSyncService $radianEvents)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosEmitidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+
+        if (! $documento->uuid) {
+            return response()->json(['success' => false, 'message' => __('This document does not have a DIAN UUID yet.')]);
+        }
+
+        try {
+            $result = $radianEvents->fetch($company, $documento->uuid);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+
+        $documento->update([
+            'radian_status' => $result['status'],
+            'radian_events' => $result['events'],
+            'radian_info' => $result['info'],
+            'radian_synced_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'status' => $result['status'],
+            'events' => $result['events'],
+            'info' => $result['info'],
+            'synced_at' => $documento->radian_synced_at->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+        ]);
     }
 
     /**

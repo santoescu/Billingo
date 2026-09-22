@@ -52,6 +52,10 @@ class DocumentoRecibido extends Model
         'payment_means_code',
         'paid_at',
         'notes',
+        'radian_status',
+        'radian_events',
+        'radian_info',
+        'radian_synced_at',
     ];
 
     protected function casts(): array
@@ -62,6 +66,10 @@ class DocumentoRecibido extends Model
             'issue_date' => 'datetime',
             'due_date' => 'datetime',
             'paid_at' => 'datetime',
+            'radian_status' => 'array',
+            'radian_events' => 'array',
+            'radian_info' => 'array',
+            'radian_synced_at' => 'datetime',
         ];
     }
 

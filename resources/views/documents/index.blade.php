@@ -98,6 +98,7 @@
     <x-date-range-picker-script />
     @include('documents.partials.send-email-modal')
     @include('documents.partials.retry-modal')
+    @include('partials.dian-document-info')
 
     <div id="doc-tracking-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1">
         <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-5xl sm:w-full m-3 sm:mx-auto">
@@ -127,6 +128,20 @@
         </div>
     </div>
 
+    <div id="doc-radian-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1">
+        <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-5xl sm:w-full m-3 sm:mx-auto">
+            <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                    <h3 class="font-bold text-gray-800 dark:text-white">{{ __('RADIAN events') }}</h3>
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400" aria-label="Close" data-hs-overlay="#doc-radian-modal">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                    </button>
+                </div>
+                <div id="doc-radian-modal-body" class="p-4 max-h-[75vh] overflow-y-auto text-sm text-gray-700 dark:text-neutral-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"></div>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
         <script>
             (function () {
@@ -143,6 +158,7 @@
                     view: @json(__('View')),
                     sendByEmail: @json(__('Send by email')),
                     email: @json(__('Email')),
+                    radian: @json(__('RADIAN')),
                     moreActions: @json(__('More actions')),
                     validate: @json(__('Validate')),
                     correctAndResend: @json(__('Correct and resend')),
@@ -169,19 +185,32 @@
                 }
 
                 /**
-                 * Sin contador ni condición -- el botón se muestra siempre, sin importar si el
-                 * documento ya se mandó por correo o no. Contar cuántos EmailLog tiene cada
-                 * documento (para decidir si mostrar el botón) obligaba a traer y agrupar todos
-                 * los logs de la empresa en cada carga de la tabla (ver
-                 * DocumentoEmitidoController::data()) -- ese conteo también quedaba
-                 * desactualizado apenas se mandaba un correo nuevo sin recargar la tabla. El
-                 * detalle real (si tiene historial o no) se resuelve al abrir el modal, pidiendo
-                 * siempre a la base (ver openDocumentTrackingModal()).
+                 * Dos casillas independientes, cada una abre su propio modal (ver
+                 * openDocumentTrackingModal()/openRadianModal()) con solo lo suyo -- sin
+                 * contador ni condición en la de correo, se muestra siempre sin importar si ya se
+                 * mandó o no (el detalle real se resuelve al abrir el modal, pidiendo siempre a
+                 * la base). La de RADIAN solo aparece si el documento ya tiene UUID (sin eso no
+                 * hay nada que consultar contra la DIAN), y cambia de color si ya se encontraron
+                 * eventos en una consulta anterior.
                  */
                 function renderTracking(row) {
-                    return `<button type="button" class="document-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300 hover:opacity-80 focus:outline-hidden" data-url="${row.urls.emailLogs}">
+                    let html = `<div class="flex flex-col items-start gap-1">`;
+
+                    html += `<button type="button" class="document-email-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300 hover:opacity-80 focus:outline-hidden" data-url="${row.urls.emailLogs}">
                         ${i18n.email}
                     </button>`;
+
+                    if (row.has_uuid) {
+                        const tone = row.radian_events_count > 0
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                            : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300';
+                        html += `<button type="button" class="document-radian-tracking-btn inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${tone} hover:opacity-80 focus:outline-hidden" data-url="${row.urls.radianEvents}">
+                            ${i18n.radian}
+                        </button>`;
+                    }
+
+                    html += '</div>';
+                    return html;
                 }
 
                 function renderActions(row) {
@@ -622,14 +651,51 @@
                     });
                 }
 
+                /**
+                 * A diferencia del historial de correo (solo lee de la base), esto pega contra
+                 * DIAN (GetDocumentInfo) cada vez que se abre -- modal separado del de correo a
+                 * propósito, cada uno muestra solo lo suyo.
+                 * @param {string} url
+                 * @returns {Promise<void>}
+                 */
+                async function openRadianModal(url) {
+                    const body = document.getElementById('doc-radian-modal-body');
+                    body.innerHTML = `<p class="text-zinc-500 dark:text-zinc-400">{{ __('Querying the DIAN...') }}</p>`;
+
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#doc-radian-modal');
+                    }
+
+                    try {
+                        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                        const data = await response.json();
+
+                        if (! data.success) {
+                            body.innerHTML = `<p class="text-red-600 dark:text-red-400">${escapeHtml(data.message || '{{ __('Could not check RADIAN events.') }}')}</p>`;
+                            return;
+                        }
+
+                        body.innerHTML = window.renderDianInfo(data.info, false);
+                    } catch (error) {
+                        body.innerHTML = `<p class="text-red-600 dark:text-red-400">{{ __('Could not check RADIAN events.') }}</p>`;
+                    }
+                }
+
                 function initDocumentTrackingButtons() {
                     if (document.body.dataset.docTrackingBound === 'true') return;
                     document.body.dataset.docTrackingBound = 'true';
 
                     document.addEventListener('click', function (event) {
-                        const button = event.target.closest('.document-tracking-btn');
-                        if (button) {
-                            openDocumentTrackingModal(button.dataset.url);
+                        const emailBtn = event.target.closest('.document-email-tracking-btn');
+                        if (emailBtn) {
+                            openDocumentTrackingModal(emailBtn.dataset.url);
+                            return;
+                        }
+
+                        const radianBtn = event.target.closest('.document-radian-tracking-btn');
+                        if (radianBtn) {
+                            openRadianModal(radianBtn.dataset.url);
                             return;
                         }
 

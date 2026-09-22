@@ -159,6 +159,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('{documento}', [DocumentoRecibidoController::class, 'show'])->name('show');
             Route::get('{documento}/pdf', [DocumentoRecibidoController::class, 'pdf'])->name('pdf');
             Route::post('{documento}/toggle-paid', [DocumentoRecibidoController::class, 'togglePaid'])->name('toggle-paid');
+            Route::get('{documento}/radian-events', [DocumentoRecibidoController::class, 'radianEvents'])->name('radian-events');
         });
 
     Route::middleware(['company.selected', 'company.role.any:invoicing:administrador|vendedor|auditor,pos:administrador|cajero|auditor,cotizaciones:administrador|vendedor|auditor'])
@@ -223,6 +224,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('{documento}/retry', [DocumentoEmitidoController::class, 'retry'])->name('retry');
             Route::post('{documento}/send-email', [DocumentoEmitidoController::class, 'sendEmail'])->name('send-email');
             Route::get('{documento}/email-logs', [DocumentoEmitidoController::class, 'emailLogs'])->name('email-logs');
+            Route::get('{documento}/radian-events', [DocumentoEmitidoController::class, 'radianEvents'])->name('radian-events');
         });
 
     Route::middleware(['company.selected', 'company.role:pos,administrador,cajero,auditor'])

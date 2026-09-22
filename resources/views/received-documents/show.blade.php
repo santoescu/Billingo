@@ -308,6 +308,8 @@
                 </div>
             </div>
 
+            @include('partials.radian-events', ['radianEventsUrl' => route('received-documents.radian-events', $documento->_id)])
+
             @if ($documento->xml)
                 <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">

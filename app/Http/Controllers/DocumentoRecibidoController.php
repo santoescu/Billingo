@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DocumentoRecibido;
 use App\Models\ThirdParty;
 use App\Services\Dian\ReceivedDocumentIngestionService;
+use App\Services\Dian\RadianEventsSyncService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -216,6 +217,46 @@ class DocumentoRecibidoController extends Controller
         abort_unless($documento, 404);
 
         return view('received-documents.show', compact('company', 'documento'));
+    }
+
+    /**
+     * Endpoint AJAX: consulta los eventos RADIAN del documento contra DIAN (GetDocumentInfo, ver
+     * RadianEventsSyncService) y los guarda -- mismo criterio que
+     * DocumentoEmitidoController::radianEvents(): consulta en vivo disparada con un botón, no
+     * automática al abrir la página.
+     */
+    public function radianEvents(Request $request, string $documento, RadianEventsSyncService $radianEvents)
+    {
+        $company = $this->currentCompany($request);
+
+        $documento = $company->documentosRecibidos()->where('_id', $documento)->first();
+
+        abort_unless($documento, 404);
+
+        if (! $documento->uuid) {
+            return response()->json(['success' => false, 'message' => __('This document does not have a DIAN UUID yet.')]);
+        }
+
+        try {
+            $result = $radianEvents->fetch($company, $documento->uuid);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+
+        $documento->update([
+            'radian_status' => $result['status'],
+            'radian_events' => $result['events'],
+            'radian_info' => $result['info'],
+            'radian_synced_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'status' => $result['status'],
+            'events' => $result['events'],
+            'info' => $result['info'],
+            'synced_at' => $documento->radian_synced_at->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+        ]);
     }
 
     /**

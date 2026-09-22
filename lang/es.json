@@ -1,4 +1,11 @@
 {
+    "RADIAN events": "Eventos RADIAN",
+    "Check events": "Consultar eventos",
+    "Last checked": "Última consulta",
+    "Not checked yet.": "Aún no se ha consultado.",
+    "No events yet.": "Todavía no hay eventos.",
+    "Could not check RADIAN events.": "No se pudieron consultar los eventos RADIAN.",
+    "This document does not have a DIAN UUID yet.": "Este documento todavía no tiene UUID de la DIAN.",
     "All modules": "Todos los módulos",
     "Top suppliers": "Top proveedores",
     "Top purchased products": "Productos más comprados",

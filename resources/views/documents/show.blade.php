@@ -203,6 +203,8 @@
                 </div>
             @endif
 
+            @include('partials.radian-events', ['radianEventsUrl' => route('documents.radian-events', $documento->_id)])
+
             @if (filled($notas))
                 <div id="doc-show-notes" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700">

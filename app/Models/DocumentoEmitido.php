@@ -46,6 +46,10 @@ class DocumentoEmitido extends Model
         'overdue_notified_at',
         'emailed_at',
         'emailed_to',
+        'radian_status',
+        'radian_events',
+        'radian_info',
+        'radian_synced_at',
     ];
 
     protected function casts(): array
@@ -60,6 +64,10 @@ class DocumentoEmitido extends Model
             'paid_at' => 'datetime',
             'overdue_notified_at' => 'datetime',
             'emailed_at' => 'datetime',
+            'radian_status' => 'array',
+            'radian_events' => 'array',
+            'radian_info' => 'array',
+            'radian_synced_at' => 'datetime',
         ];
     }
 
