@@ -69,4 +69,9 @@ class CashShift extends Model
     {
         return $query->where('status', self::STATUS_OPEN);
     }
+
+    public function scopeClosed($query)
+    {
+        return $query->where('status', self::STATUS_CLOSED);
+    }
 }

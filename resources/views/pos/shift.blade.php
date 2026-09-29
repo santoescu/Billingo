@@ -1,5 +1,10 @@
 @php
-    $basicSelectConfig = \App\Support\SelectConfig::basic();
+    // "allowEmptyOption: true" -- acá el <option value=""> inicial ES una opción real (nada
+    // elegido todavía), no solo un placeholder decorativo: sin esto, Preline lo descarta y el
+    // select queda con la primera resolución de la lista ya elegida "por debajo" aunque el
+    // cajero nunca haya tocado el campo, dejando abrir el turno con la resolución equivocada
+    // sin avisar.
+    $basicSelectConfig = \App\Support\SelectConfig::basic(null, true);
 @endphp
 
 <x-layouts.app :title="__('Cash register')">
@@ -50,7 +55,7 @@
 
                             <div id="shift-fv-resolution-field">
                                 <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Sales invoice resolution') }}</label>
-                                <select name="fv_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" required>
+                                <select name="fv_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                                     <option value=""></option>
                                     @foreach ($fvResolutions as $resolution)
                                         <option value="{{ $resolution->_id }}">{{ $resolution->prefix }}</option>
@@ -61,7 +66,7 @@
                             @if ($invoicingResolutions->isNotEmpty())
                                 <div id="shift-invoicing-resolution-field">
                                     <label class="inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white mb-2">{{ __('Electronic invoice resolution') }}</label>
-                                    <select name="invoicing_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden" required>
+                                    <select name="invoicing_resolution_id" data-hs-select='{!! $basicSelectConfig !!}' class="hidden">
                                         <option value=""></option>
                                         @foreach ($invoicingResolutions as $resolution)
                                             <option value="{{ $resolution->_id }}">{{ $resolution->prefix }} - {{ __('Resolution') }} {{ $resolution->resolution_number }}</option>
@@ -149,6 +154,31 @@
                             </div>
 
                             <div>
+                                <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Payment methods') }}</p>
+                                <div id="admin-close-payment-breakdown" class="rounded-md bg-gray-50 p-3 text-sm dark:bg-white/5 space-y-1">
+                                    <p class="text-zinc-400 dark:text-neutral-500">…</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Products sold') }}</p>
+                                <div class="rounded-md bg-gray-50 dark:bg-white/5 max-h-40 overflow-y-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead>
+                                            <tr class="text-xs text-zinc-500 dark:text-neutral-400">
+                                                <th class="text-start font-medium px-3 py-1.5">{{ __('Name') }}</th>
+                                                <th class="text-end font-medium px-3 py-1.5">{{ __('Quantity') }}</th>
+                                                <th class="text-end font-medium px-3 py-1.5">{{ __('Amount') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="admin-close-products">
+                                            <tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">…</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
                                 <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="admin-close-counted-display">{{ __('Counted cash') }}</label>
                                 <div class="relative">
                                     <input type="hidden" id="admin-close-counted-hidden" name="closing_balance" value="0">
@@ -165,6 +195,100 @@
                                 <flux:button type="submit" variant="primary">{{ __('Close shift') }}</flux:button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if ($isAdmin && $closedShifts->isNotEmpty())
+            <div>
+                <h3 class="mb-3 font-semibold text-gray-800 dark:text-white">{{ __('Closed cash shifts') }}</h3>
+
+                <div class="-m-1.5 overflow-x-auto">
+                    <div class="p-1.5 min-w-full inline-block align-middle">
+                        <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
+                            <div class="overflow-hidden">
+                                <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Cashier') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Opened at') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Closed at') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Opening balance') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Expected balance') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Counted cash') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Difference') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Payment methods') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Products sold') }}</th>
+                                            <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Sales') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                                        @foreach ($closedShifts as $closed)
+                                            @php $cs = $closed['shift']; @endphp
+                                            <tr>
+                                                <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200">{{ $cs->user?->name ?? '—' }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $cs->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $cs->closed_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->opening_balance, 2) }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->expected_balance, 2) }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->closing_balance, 2) }}</td>
+                                                <td class="px-4 py-3 text-sm {{ (float) $cs->variance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-neutral-400' }}">{{ '$' . number_format((float) $cs->variance, 2) }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">
+                                                    @forelse ($closed['payment_breakdown'] as $row)
+                                                        <div>{{ $row['name'] }}: {{ '$' . number_format((float) $row['amount'], 2) }}</div>
+                                                    @empty
+                                                        —
+                                                    @endforelse
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">
+                                                    @if (empty($closed['products']))
+                                                        —
+                                                    @else
+                                                        <button type="button" class="closed-shift-products-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View products sold') }}" title="{{ __('View products sold') }}" data-products="{{ json_encode($closed['products']) }}">
+                                                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                                                <circle cx="12" cy="12" r="3"></circle>
+                                                            </svg>
+                                                        </button>
+                                                    @endif
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $closed['sales_count'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="closed-shift-products-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="closed-shift-products-modal-label">
+                <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+                    <div class="w-full flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700">
+                        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 dark:border-neutral-700">
+                            <h3 id="closed-shift-products-modal-label" class="font-bold text-gray-800 dark:text-white">{{ __('Products sold') }}</h3>
+                            <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600" aria-label="Close" data-hs-overlay="#closed-shift-products-modal">
+                                <span class="sr-only">Close</span>
+                                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 6 6 18"></path>
+                                    <path d="m6 6 12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="p-4 max-h-[70vh] overflow-y-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="text-xs text-zinc-500 dark:text-neutral-400">
+                                        <th class="text-start font-medium px-3 py-1.5">{{ __('Name') }}</th>
+                                        <th class="text-end font-medium px-3 py-1.5">{{ __('Quantity') }}</th>
+                                        <th class="text-end font-medium px-3 py-1.5">{{ __('Amount') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="closed-shift-products-body"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -217,6 +341,16 @@
                 wireMoneyInput('opening-balance-hidden', 'opening-balance-display');
                 wireMoneyInput('admin-close-counted-hidden', 'admin-close-counted-display');
 
+                function escapeHtml(value) {
+                    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+                    })[char]);
+                }
+
+                function formatMoneyDisplay(value) {
+                    return '$' + Number(value ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
                 window.openAdminCloseShiftModal = function ({ closeUrl, showUrl }) {
                     document.getElementById('admin-close-shift-form').action = closeUrl;
 
@@ -226,18 +360,63 @@
                     }
 
                     const expectedEl = document.getElementById('admin-close-expected');
+                    const paymentBreakdownEl = document.getElementById('admin-close-payment-breakdown');
+                    const productsEl = document.getElementById('admin-close-products');
                     expectedEl.textContent = '…';
+                    paymentBreakdownEl.innerHTML = '<p class="text-zinc-400 dark:text-neutral-500">…</p>';
+                    productsEl.innerHTML = '<tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">…</td></tr>';
 
                     fetch(showUrl, { headers: { 'Accept': 'application/json' } })
                         .then((response) => response.json())
                         .then((data) => {
-                            const expected = Number(data.expected_balance ?? 0);
-                            expectedEl.textContent = '$' + expected.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            expectedEl.textContent = formatMoneyDisplay(data.expected_balance);
+
+                            const payments = data.payment_breakdown || [];
+                            paymentBreakdownEl.innerHTML = payments.length
+                                ? payments.map((row) => `
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500 dark:text-neutral-400">${escapeHtml(row.name)}</span>
+                                        <span class="text-gray-800 dark:text-neutral-200">${formatMoneyDisplay(row.amount)}</span>
+                                    </div>
+                                `).join('')
+                                : `<p class="text-zinc-400 dark:text-neutral-500">{{ __('No sales yet.') }}</p>`;
+
+                            const products = data.products || [];
+                            productsEl.innerHTML = products.length
+                                ? products.map((row) => `
+                                    <tr>
+                                        <td class="px-3 py-1.5 text-gray-500 dark:text-neutral-400">${escapeHtml(row.description)}</td>
+                                        <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${row.quantity}</td>
+                                        <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${formatMoneyDisplay(row.total)}</td>
+                                    </tr>
+                                `).join('')
+                                : `<tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">{{ __('No sales yet.') }}</td></tr>`;
                         })
                         .catch(() => {
                             expectedEl.textContent = '—';
                         });
                 };
+
+                document.addEventListener('click', function (event) {
+                    const btn = event.target.closest('.closed-shift-products-btn');
+                    if (! btn) return;
+
+                    const products = JSON.parse(btn.dataset.products || '[]');
+                    const body = document.getElementById('closed-shift-products-body');
+
+                    body.innerHTML = products.map((row) => `
+                        <tr>
+                            <td class="px-3 py-1.5 text-gray-500 dark:text-neutral-400">${escapeHtml(row.description)}</td>
+                            <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${row.quantity}</td>
+                            <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${formatMoneyDisplay(row.total)}</td>
+                        </tr>
+                    `).join('');
+
+                    if (window.HSOverlay) {
+                        HSOverlay.autoInit();
+                        HSOverlay.open('#closed-shift-products-modal');
+                    }
+                });
             })();
         </script>
     @endpush

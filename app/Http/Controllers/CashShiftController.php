@@ -6,6 +6,7 @@ use App\Models\CashMovement;
 use App\Models\CashShift;
 use App\Models\Resolution;
 use App\Models\User;
+use App\Services\Pos\CashShiftReportService;
 use Illuminate\Http\Request;
 
 class CashShiftController extends Controller
@@ -17,9 +18,12 @@ class CashShiftController extends Controller
      * varias resoluciones 'FV' activas (p. ej. una por cajera), el cajero
      * elige la suya acá, una sola vez por turno, no en cada venta. Si la
      * empresa tiene el módulo de facturación electrónica activo y hay
-     * resoluciones '01' disponibles, también se pide 'invoicing_resolution_id'
-     * (con esa se emiten las ventas que el cajero marque como electrónicas
-     * durante el turno).
+     * resoluciones '01' disponibles, también se ofrece elegir
+     * 'invoicing_resolution_id' (con esa se emiten las ventas que el cajero
+     * marque como electrónicas durante el turno) -- pero es opcional: el
+     * cajero puede abrir el turno sin elegirla si no piensa emitir ninguna
+     * factura electrónica ese turno; si después sí lo intenta sin haberla
+     * elegido, PosController::issueElectronic() avisa en ese momento.
      */
     public function store(Request $request, DocumentoEmitidoController $documentController)
     {
@@ -34,7 +38,7 @@ class CashShiftController extends Controller
             'opening_balance' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
             'fv_resolution_id' => ['required', 'string'],
-            'invoicing_resolution_id' => [$invoicingResolutions->isNotEmpty() ? 'required' : 'nullable', 'nullable', 'string'],
+            'invoicing_resolution_id' => ['nullable', 'string'],
         ]);
 
         $fvResolution = $fvResolutions->first(fn (Resolution $r) => (string) $r->_id === $data['fv_resolution_id']);
@@ -84,7 +88,7 @@ class CashShiftController extends Controller
         return redirect()->route('pos.create');
     }
 
-    public function show(Request $request, string $shift)
+    public function show(Request $request, string $shift, CashShiftReportService $reportService)
     {
         $company = $this->currentCompany($request);
 
@@ -96,10 +100,14 @@ class CashShiftController extends Controller
 
         $expectedSoFar = $cashShift->opening_balance + $movements->sum(fn (CashMovement $movement) => $movement->signedAmount());
 
+        $sales = $reportService->salesFor((string) $cashShift->_id);
+
         return response()->json([
             'shift' => $cashShift,
             'movements' => $movements,
             'expected_balance' => $expectedSoFar,
+            'payment_breakdown' => $reportService->paymentBreakdownFor($sales),
+            'products' => $reportService->productsSoldFor($sales),
         ]);
     }
 

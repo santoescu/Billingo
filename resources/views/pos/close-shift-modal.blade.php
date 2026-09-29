@@ -27,6 +27,31 @@
                 </div>
 
                 <div>
+                    <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Payment methods') }}</p>
+                    <div id="pos-close-payment-breakdown" class="rounded-md bg-gray-50 p-3 text-sm dark:bg-white/5 space-y-1">
+                        <p class="text-zinc-400 dark:text-neutral-500">…</p>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Products sold') }}</p>
+                    <div class="rounded-md bg-gray-50 dark:bg-white/5 max-h-40 overflow-y-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="text-xs text-zinc-500 dark:text-neutral-400">
+                                    <th class="text-start font-medium px-3 py-1.5">{{ __('Name') }}</th>
+                                    <th class="text-end font-medium px-3 py-1.5">{{ __('Quantity') }}</th>
+                                    <th class="text-end font-medium px-3 py-1.5">{{ __('Amount') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pos-close-products">
+                                <tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
                     <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" for="pos-close-counted-display">{{ __('Counted cash') }}</label>
                     <div class="relative">
                         <input type="hidden" id="pos-close-counted-hidden" name="closing_balance" value="0">
@@ -56,15 +81,49 @@
             }
 
             const expectedEl = document.getElementById('pos-close-expected');
+            const paymentBreakdownEl = document.getElementById('pos-close-payment-breakdown');
+            const productsEl = document.getElementById('pos-close-products');
             expectedEl.textContent = '…';
+            paymentBreakdownEl.innerHTML = '<p class="text-zinc-400 dark:text-neutral-500">…</p>';
+            productsEl.innerHTML = '<tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">…</td></tr>';
+
+            function formatMoneyDisplay(value) {
+                return '$' + Number(value ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+                })[char]);
+            }
 
             fetch('{{ route('pos.shifts.show', $shift->_id) }}', {
                 headers: { 'Accept': 'application/json' },
             })
                 .then((response) => response.json())
                 .then((data) => {
-                    const expected = Number(data.expected_balance ?? 0);
-                    expectedEl.textContent = '$' + expected.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    expectedEl.textContent = formatMoneyDisplay(data.expected_balance);
+
+                    const payments = data.payment_breakdown || [];
+                    paymentBreakdownEl.innerHTML = payments.length
+                        ? payments.map((row) => `
+                            <div class="flex justify-between">
+                                <span class="text-gray-500 dark:text-neutral-400">${escapeHtml(row.name)}</span>
+                                <span class="text-gray-800 dark:text-neutral-200">${formatMoneyDisplay(row.amount)}</span>
+                            </div>
+                        `).join('')
+                        : `<p class="text-zinc-400 dark:text-neutral-500">{{ __('No sales yet.') }}</p>`;
+
+                    const products = data.products || [];
+                    productsEl.innerHTML = products.length
+                        ? products.map((row) => `
+                            <tr>
+                                <td class="px-3 py-1.5 text-gray-500 dark:text-neutral-400">${escapeHtml(row.description)}</td>
+                                <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${row.quantity}</td>
+                                <td class="px-3 py-1.5 text-end text-gray-800 dark:text-neutral-200">${formatMoneyDisplay(row.total)}</td>
+                            </tr>
+                        `).join('')
+                        : `<tr><td colspan="3" class="px-3 py-2 text-zinc-400 dark:text-neutral-500">{{ __('No sales yet.') }}</td></tr>`;
                 })
                 .catch(() => {
                     expectedEl.textContent = '—';

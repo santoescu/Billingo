@@ -22,6 +22,7 @@ class CashMovement extends Model
         'shift_id',
         'type',
         'amount',
+        'cash_amount',
         'reason',
         'document_id',
         'payment_means_code',
@@ -32,6 +33,7 @@ class CashMovement extends Model
     {
         return [
             'amount' => 'float',
+            'cash_amount' => 'float',
         ];
     }
 
@@ -51,15 +53,16 @@ class CashMovement extends Model
     }
 
     /**
-     * Solo estos movimientos afectan el efectivo físico de la caja: las
-     * ventas en efectivo, y los ingresos/retiros manuales. Ventas con otro
-     * medio de pago (tarjeta, transferencia) quedan registradas para el
-     * historial del turno, pero no suman ni restan del saldo esperado.
+     * Solo estos movimientos afectan el efectivo físico de la caja: la
+     * porción en efectivo de una venta (una venta puede pagarse mitad
+     * efectivo, mitad tarjeta -- "amount" sigue siendo el total completo de
+     * la venta para las métricas de ingresos, "cash_amount" es solo lo que
+     * de verdad entró en efectivo), y los ingresos/retiros manuales.
      */
     public function affectsCashBalance(): bool
     {
         if ($this->type === self::TYPE_VENTA) {
-            return $this->payment_means_code === self::CASH_PAYMENT_MEANS_CODE;
+            return (float) $this->cash_amount > 0;
         }
 
         return in_array($this->type, [self::TYPE_INGRESO, self::TYPE_RETIRO], true);
@@ -73,6 +76,10 @@ class CashMovement extends Model
     {
         if (! $this->affectsCashBalance()) {
             return 0.0;
+        }
+
+        if ($this->type === self::TYPE_VENTA) {
+            return abs((float) $this->cash_amount);
         }
 
         return $this->type === self::TYPE_RETIRO ? -abs((float) $this->amount) : abs((float) $this->amount);

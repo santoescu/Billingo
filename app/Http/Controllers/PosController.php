@@ -9,11 +9,13 @@ use App\Models\Department;
 use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
 use App\Models\FiscalResponsibility;
+use App\Models\LoyaltyProgram;
 use App\Models\PaymentMeansCode;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Dian\IssueDocumentService;
+use App\Services\Pos\CashShiftReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -102,6 +104,7 @@ class PosController extends Controller
             'editSalePrefill' => $editSalePrefill,
             'canEditPrice' => $canEditPrice,
             'isAdmin' => $canEditPrice,
+            'loyaltyEnabled' => $company->hasModule('loyalty') && optional($company->loyaltyProgram)->status === LoyaltyProgram::STATUS_ACTIVE,
         ]);
     }
 
@@ -197,7 +200,7 @@ class PosController extends Controller
      * del módulo POS, la lista de TODAS las cajas abiertas de la empresa en
      * este momento -- un cajero cualquiera no ve las cajas de los demás.
      */
-    public function shift(Request $request, DocumentoEmitidoController $documentController)
+    public function shift(Request $request, DocumentoEmitidoController $documentController, CashShiftReportService $reportService)
     {
         $company = $this->currentCompany($request);
 
@@ -209,17 +212,35 @@ class PosController extends Controller
             ? $documentController->resolutionsFor($company, '01')
             : collect();
 
+        $closedShifts = collect();
+
         if ($isAdmin) {
             $openShifts = CashShift::where('company_id', (string) $company->_id)
                 ->open()
                 ->orderBy('opened_at')
                 ->get()
                 ->map(fn (CashShift $s) => $this->shiftSummary($s));
+
+            $closedShifts = CashShift::where('company_id', (string) $company->_id)
+                ->closed()
+                ->orderByDesc('closed_at')
+                ->limit(50)
+                ->get()
+                ->map(function (CashShift $s) use ($reportService) {
+                    $sales = $reportService->salesFor((string) $s->_id);
+
+                    return [
+                        'shift' => $s,
+                        'payment_breakdown' => $reportService->paymentBreakdownFor($sales),
+                        'products' => $reportService->productsSoldFor($sales),
+                        'sales_count' => $sales->count(),
+                    ];
+                });
         } else {
             $openShifts = $shift ? collect([$this->shiftSummary($shift)]) : collect();
         }
 
-        return view('pos.shift', compact('shift', 'isAdmin', 'fvResolutions', 'invoicingResolutions', 'openShifts'));
+        return view('pos.shift', compact('shift', 'isAdmin', 'fvResolutions', 'invoicingResolutions', 'openShifts', 'closedShifts'));
     }
 
     /**
@@ -238,6 +259,41 @@ class PosController extends Controller
             'sales_total' => (float) $movements->where('type', CashMovement::TYPE_VENTA)->sum('amount'),
             'sales_count' => $movements->where('type', CashMovement::TYPE_VENTA)->count(),
         ];
+    }
+
+    /**
+     * Registra el movimiento de caja de una venta -- "amount" queda siempre
+     * como el total completo (para las métricas de ingresos del turno,
+     * ver shiftSummary()), pero "cash_amount" es solo la porción que de
+     * verdad se pagó en efectivo (puede ser $0 si se pagó todo con
+     * tarjeta/transferencia, o menos que el total si fue una venta con
+     * varios medios de pago), que es lo único que debe sumar al efectivo
+     * físico de la caja (ver CashMovement::signedAmount()). Usa
+     * "DocumentoPos.payments" (el desglose real por medio de pago) en vez
+     * de "payment_means_code" (que puede ser un array con todos los medios
+     * usados, no el de esta transacción puntual).
+     */
+    private function recordSaleCashMovements(Company $company, CashShift $shift, DocumentoPos $documentoPos, string $userId): void
+    {
+        $cashAmount = collect($documentoPos->payments ?? [])
+            ->where('dian_code', CashMovement::CASH_PAYMENT_MEANS_CODE)
+            ->sum('amount');
+
+        if (empty($documentoPos->payments) && $documentoPos->payment_means_code === CashMovement::CASH_PAYMENT_MEANS_CODE) {
+            $cashAmount = (float) $documentoPos->total;
+        }
+
+        CashMovement::create([
+            'company_id' => (string) $company->_id,
+            'shift_id' => (string) $shift->_id,
+            'type' => CashMovement::TYPE_VENTA,
+            'amount' => $documentoPos->total,
+            'cash_amount' => $cashAmount,
+            'reason' => 'document:' . $documentoPos->numeral,
+            'document_id' => (string) $documentoPos->_id,
+            'payment_means_code' => $documentoPos->payment_means_code,
+            'user_id' => $userId,
+        ]);
     }
 
     /**
@@ -272,16 +328,7 @@ class PosController extends Controller
             return response()->json(['message' => __('Could not issue the document.')], 500);
         }
 
-        CashMovement::create([
-            'company_id' => (string) $company->_id,
-            'shift_id' => (string) $shift->_id,
-            'type' => CashMovement::TYPE_VENTA,
-            'amount' => $documentoPos->total,
-            'reason' => 'document:' . $documentoPos->numeral,
-            'document_id' => (string) $documentoPos->_id,
-            'payment_means_code' => $documentoPos->payment_means_code,
-            'user_id' => (string) $request->user()->_id,
-        ]);
+        $this->recordSaleCashMovements($company, $shift, $documentoPos, (string) $request->user()->_id);
 
         if ($cashReceived !== null) {
 
@@ -402,9 +449,18 @@ class PosController extends Controller
             return response()->json(['message' => __('Could not update the sale.')], 500);
         }
 
-        CashMovement::where('document_id', (string) $documento->_id)
+        $movement = CashMovement::where('document_id', (string) $documento->_id)
             ->where('type', CashMovement::TYPE_VENTA)
-            ->update(['amount' => $documento->total]);
+            ->first();
+
+        if ($movement) {
+            $oldTotal = (float) $movement->amount;
+            $ratio = $oldTotal > 0 ? (float) $movement->cash_amount / $oldTotal : 0;
+            $movement->update([
+                'amount' => $documento->total,
+                'cash_amount' => round($documento->total * $ratio, 2),
+            ]);
+        }
 
         return response()->json([
             'sale_id' => (string) $documento->_id,
