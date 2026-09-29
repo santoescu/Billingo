@@ -138,6 +138,12 @@
             <td class="muted">{{ __('Tax') }}</td>
             <td class="end">{{ number_format((float) $documento->tax_total, 2) }}</td>
         </tr>
+        @foreach (collect($documento->payload['cargos_descuentos'] ?? [])->where('tipo', 'descuento') as $descuento)
+            <tr>
+                <td class="muted">{{ $descuento['motivo'] ?? __('Discount') }}</td>
+                <td class="end">-{{ number_format((float) ($descuento['amount'] ?? 0), 2) }}</td>
+            </tr>
+        @endforeach
         @if (count($documento->payments ?? []) > 1)
             @foreach ($documento->payments as $payment)
                 <tr>

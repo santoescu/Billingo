@@ -122,6 +122,24 @@
                 @endif
             </div>
 
+            @if ($loyaltyEnabled)
+                <div id="pos-loyalty-panel" class="hidden border border-gray-200 rounded-lg dark:border-neutral-700 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Loyalty') }}</label>
+                        <span id="pos-loyalty-discount-display" class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hidden"></span>
+                    </div>
+                    <div id="pos-loyalty-options" class="flex flex-col gap-2.5"></div>
+                    <p id="pos-loyalty-not-enrolled" class="hidden text-xs text-zinc-500 dark:text-neutral-400">{{ __('This client is not enrolled in the loyalty program.') }}</p>
+                    <div class="mt-2.5 flex gap-2">
+                        <input type="text" id="pos-loyalty-code-input" autocomplete="off" placeholder="{{ __('Coupon or gift card code') }}"
+                            class="flex-1 uppercase bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs h-9 py-1.5 px-3 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                        <flux:button type="button" id="pos-loyalty-code-add-btn" size="sm">{{ __('Add') }}</flux:button>
+                    </div>
+                    <div id="pos-loyalty-codes" class="mt-2 flex flex-wrap gap-1.5"></div>
+                    <p id="pos-loyalty-error" class="hidden mt-2 text-xs text-red-600 dark:text-red-400"></p>
+                </div>
+            @endif
+
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-2.5 py-2.5 border-b border-gray-200 dark:border-neutral-700">
                     <div class="grid" style="grid-template-columns: 1fr 76px 40px 112px 108px 40px;">
@@ -255,6 +273,10 @@
                 const productSearchUrl = @json(route('documents.create-product-search'));
                 const clientSearchUrl = @json(route('documents.create-client-search'));
                 const checkoutUrl = @json(route('pos.checkout'));
+                const loyaltyEnabled = @json($loyaltyEnabled);
+                const loyaltyLookupUrl = @json(route('pos.loyalty.lookup'));
+                const loyaltyValidateCodeUrl = @json(route('pos.loyalty.validate-code'));
+                const loyaltyPreviewUrl = @json(route('pos.loyalty.preview-discount'));
                 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
                 const defaultClient = @json($defaultClientJs);
@@ -313,6 +335,13 @@
                         if (! parsed || ! Array.isArray(parsed.tickets) || parsed.tickets.length === 0) {
                             return null;
                         }
+
+                        parsed.tickets.forEach((ticket) => {
+                            ticket.loyalty = ticket.loyalty ?? null;
+                            ticket.loyaltyDiscount = ticket.loyaltyDiscount ?? 0;
+                            ticket.loyaltySelection = ticket.loyaltySelection ?? { points_amount: 0, redeem_stamps: false, cashback_amount: 0, codes: [] };
+                        });
+
                         return parsed;
                     } catch (error) {
                         console.warn('No se pudieron leer las pre-cuentas guardadas', error);
@@ -351,6 +380,9 @@
                         efectivoRecibido: '',
                         warehouseId: 'all',
                         sellerId: '',
+                        loyalty: null,
+                        loyaltyDiscount: 0,
+                        loyaltySelection: { points_amount: 0, redeem_stamps: false, cashback_amount: 0, codes: [] },
                     };
                     tickets.push(ticket);
                     return ticket;
@@ -445,6 +477,11 @@
                     document.getElementById('pos-client-search').value = ticket.client.name;
                     document.getElementById('pos-client-identificacion').textContent = ticket.client.identificacion;
                     document.getElementById('pos-client-results').classList.add('hidden');
+
+                    if (loyaltyEnabled) {
+                        document.getElementById('pos-loyalty-panel')?.classList.remove('hidden');
+                        renderLoyaltyPanel();
+                    }
 
                     const sellerSelect = document.getElementById('pos-seller-select');
                     if (sellerSelect) {
@@ -1250,7 +1287,10 @@
                 }
 
                 function cartTotal() {
-                    return activeTicket().cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
+                    const ticket = activeTicket();
+                    const gross = ticket.cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
+
+                    return Math.max(gross - (ticket.loyaltyDiscount || 0), 0);
                 }
 
                 /**
@@ -1261,6 +1301,14 @@
                  * @returns {void}
                  */
                 function updateTotal() {
+                    refreshTotalDisplay();
+
+                    if (loyaltyEnabled) {
+                        scheduleLoyaltyPreview();
+                    }
+                }
+
+                function refreshTotalDisplay() {
                     document.getElementById('pos-total-display').textContent = formatMoney(cartTotal());
 
                     const ticket = activeTicket();
@@ -1277,10 +1325,235 @@
                 // --- Cliente ---
 
                 function selectClient(client) {
-                    activeTicket().client = client;
+                    const ticket = activeTicket();
+                    ticket.client = client;
                     document.getElementById('pos-client-search').value = client.name;
                     document.getElementById('pos-client-identificacion').textContent = client.identificacion;
                     document.getElementById('pos-client-results').classList.add('hidden');
+
+                    if (loyaltyEnabled) {
+                        ticket.loyalty = null;
+                        ticket.loyaltyDiscount = 0;
+                        ticket.loyaltySelection = { points_amount: 0, redeem_stamps: false, cashback_amount: 0, codes: [] };
+                        fetchLoyaltyForClient(client.identificacion);
+                    }
+                }
+
+                // --- Fidelización ---
+
+                let loyaltyPreviewTimeout = null;
+
+                async function fetchLoyaltyForClient(identificacion) {
+                    const ticket = activeTicket();
+
+                    if (! identificacion) {
+                        ticket.loyalty = null;
+                        renderLoyaltyPanel();
+                        return;
+                    }
+
+                    const response = await fetch(loyaltyLookupUrl + '?identificacion=' + encodeURIComponent(identificacion));
+                    const data = await response.json();
+
+                    ticket.loyalty = data.found ? data : null;
+                    renderLoyaltyPanel();
+                }
+
+                function renderLoyaltyPanel() {
+                    const ticket = activeTicket();
+                    const panel = document.getElementById('pos-loyalty-panel');
+                    if (! panel) return;
+
+                    const options = document.getElementById('pos-loyalty-options');
+                    const notEnrolled = document.getElementById('pos-loyalty-not-enrolled');
+
+                    document.getElementById('pos-loyalty-error').classList.add('hidden');
+
+                    if (! ticket.loyalty) {
+                        options.innerHTML = '';
+                        notEnrolled.classList.remove('hidden');
+                        renderLoyaltyCodes();
+                        updateLoyaltyDiscountDisplay();
+                        return;
+                    }
+
+                    notEnrolled.classList.add('hidden');
+                    const loyalty = ticket.loyalty;
+                    const selection = ticket.loyaltySelection;
+                    let html = '';
+
+                    if (loyalty.points.active && loyalty.points.balance > 0) {
+                        html += `
+                            <label class="flex items-center justify-between gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                                <span>{{ __('Points') }} (${loyalty.points.balance})</span>
+                                <input type="number" min="0" max="${loyalty.points.balance}" step="1" id="pos-loyalty-points-input" value="${selection.points_amount || ''}" placeholder="0" class="w-24 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/10 rounded-lg text-sm h-8 px-2 text-end">
+                            </label>
+                        `;
+                    }
+
+                    if (loyalty.stamps.active && loyalty.stamps.ready) {
+                        html += `
+                            <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                                <input type="checkbox" id="pos-loyalty-stamps-input" ${selection.redeem_stamps ? 'checked' : ''} class="rounded-sm border-gray-300 accent-accent">
+                                {{ __('Redeem completed card') }} (${formatMoney(loyalty.stamps.reward_value)})
+                            </label>
+                        `;
+                    }
+
+                    if (loyalty.cashback.active && loyalty.cashback.balance > 0) {
+                        html += `
+                            <label class="flex items-center justify-between gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                                <span>{{ __('Cashback') }} (${formatMoney(loyalty.cashback.balance)})</span>
+                                <input type="number" min="0" max="${loyalty.cashback.balance}" step="0.01" id="pos-loyalty-cashback-input" value="${selection.cashback_amount || ''}" placeholder="0" class="w-24 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/10 rounded-lg text-sm h-8 px-2 text-end">
+                            </label>
+                        `;
+                    }
+
+                    if (! html) {
+                        html = `<p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('No redeemable balance right now.') }}</p>`;
+                    }
+
+                    options.innerHTML = html;
+
+                    document.getElementById('pos-loyalty-points-input')?.addEventListener('input', (event) => {
+                        selection.points_amount = parseFloat(event.target.value) || 0;
+                        scheduleLoyaltyPreview();
+                    });
+                    document.getElementById('pos-loyalty-stamps-input')?.addEventListener('change', (event) => {
+                        selection.redeem_stamps = event.target.checked;
+                        scheduleLoyaltyPreview();
+                    });
+                    document.getElementById('pos-loyalty-cashback-input')?.addEventListener('input', (event) => {
+                        selection.cashback_amount = parseFloat(event.target.value) || 0;
+                        scheduleLoyaltyPreview();
+                    });
+
+                    renderLoyaltyCodes();
+                    updateLoyaltyDiscountDisplay();
+                }
+
+                function renderLoyaltyCodes() {
+                    const ticket = activeTicket();
+                    const container = document.getElementById('pos-loyalty-codes');
+                    if (! container) return;
+
+                    container.innerHTML = ticket.loyaltySelection.codes.map((code) => `
+                        <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-zinc-300 text-xs px-2.5 py-1">
+                            ${code}
+                            <button type="button" class="pos-loyalty-code-remove" data-code="${code}" aria-label="{{ __('Remove') }}">&times;</button>
+                        </span>
+                    `).join('');
+
+                    container.querySelectorAll('.pos-loyalty-code-remove').forEach((btn) => {
+                        btn.addEventListener('click', () => {
+                            ticket.loyaltySelection.codes = ticket.loyaltySelection.codes.filter((c) => c !== btn.dataset.code);
+                            renderLoyaltyCodes();
+                            scheduleLoyaltyPreview();
+                        });
+                    });
+                }
+
+                function updateLoyaltyDiscountDisplay() {
+                    const ticket = activeTicket();
+                    const display = document.getElementById('pos-loyalty-discount-display');
+                    if (! display) return;
+
+                    if (ticket.loyaltyDiscount > 0) {
+                        display.textContent = '-' + formatMoney(ticket.loyaltyDiscount);
+                        display.classList.remove('hidden');
+                    } else {
+                        display.classList.add('hidden');
+                    }
+                }
+
+                function scheduleLoyaltyPreview() {
+                    clearTimeout(loyaltyPreviewTimeout);
+                    loyaltyPreviewTimeout = setTimeout(recalculateLoyaltyDiscount, 400);
+                }
+
+                async function recalculateLoyaltyDiscount() {
+                    const ticket = activeTicket();
+                    const errorEl = document.getElementById('pos-loyalty-error');
+                    errorEl.classList.add('hidden');
+
+                    const gross = ticket.cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
+                    const selection = ticket.loyaltySelection;
+                    const hasSelection = (selection.points_amount || 0) > 0 || selection.redeem_stamps || (selection.cashback_amount || 0) > 0 || selection.codes.length > 0;
+
+                    if (! hasSelection || gross <= 0) {
+                        ticket.loyaltyDiscount = 0;
+                        updateLoyaltyDiscountDisplay();
+                        refreshTotalDisplay();
+                        return;
+                    }
+
+                    const response = await fetch(loyaltyPreviewUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            identificacion: ticket.client.identificacion,
+                            subtotal: gross,
+                            points_amount: selection.points_amount || 0,
+                            redeem_stamps: selection.redeem_stamps || false,
+                            cashback_amount: selection.cashback_amount || 0,
+                            codes: selection.codes,
+                        }),
+                    });
+                    const data = await response.json();
+
+                    if (! response.ok) {
+                        ticket.loyaltyDiscount = 0;
+                        errorEl.textContent = data.message || '{{ __('Could not calculate the loyalty discount.') }}';
+                        errorEl.classList.remove('hidden');
+                        refreshTotalDisplay();
+                        return;
+                    }
+
+                    ticket.loyaltyDiscount = data.total;
+                    updateLoyaltyDiscountDisplay();
+                    refreshTotalDisplay();
+                }
+
+                function bindLoyaltyControls() {
+                    if (! loyaltyEnabled) return;
+
+                    document.getElementById('pos-loyalty-code-add-btn')?.addEventListener('click', async () => {
+                        const input = document.getElementById('pos-loyalty-code-input');
+                        const code = input.value.trim().toUpperCase();
+                        if (! code) return;
+
+                        const errorEl = document.getElementById('pos-loyalty-error');
+                        errorEl.classList.add('hidden');
+
+                        const response = await fetch(loyaltyValidateCodeUrl, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ code }),
+                        });
+                        const data = await response.json();
+
+                        if (! response.ok || ! data.valid) {
+                            errorEl.textContent = data.message || '{{ __('Code not found.') }}';
+                            errorEl.classList.remove('hidden');
+                            return;
+                        }
+
+                        const ticket = activeTicket();
+                        if (! ticket.loyaltySelection.codes.includes(data.code)) {
+                            ticket.loyaltySelection.codes.push(data.code);
+                        }
+                        input.value = '';
+                        renderLoyaltyCodes();
+                        scheduleLoyaltyPreview();
+                    });
                 }
 
                 /**
@@ -1641,6 +1914,22 @@
                         }
                     });
 
+                    if (loyaltyEnabled && ticket.loyaltyDiscount > 0) {
+                        const selection = ticket.loyaltySelection;
+                        if (selection.points_amount > 0) {
+                            body.append('loyalty_points_amount', selection.points_amount);
+                        }
+                        if (selection.redeem_stamps) {
+                            body.append('loyalty_redeem_stamps', '1');
+                        }
+                        if (selection.cashback_amount > 0) {
+                            body.append('loyalty_cashback_amount', selection.cashback_amount);
+                        }
+                        selection.codes.forEach((code, index) => {
+                            body.append(`loyalty_codes[${index}]`, code);
+                        });
+                    }
+
                     try {
                         const response = await fetch(checkoutUrl, {
                             method: 'POST',
@@ -1886,6 +2175,7 @@
                     bindPaymentControls();
                     bindCheckout();
                     bindSellerSelect();
+                    bindLoyaltyControls();
 
                     renderProducts(initialProducts);
                     updatePosCashSectionVisibility();

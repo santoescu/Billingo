@@ -73,6 +73,12 @@
             <td>{{ __('Tax') }}</td>
             <td class="end">{{ number_format((float) $documento->tax_total, 2) }}</td>
         </tr>
+        @foreach (collect($documento->payload['cargos_descuentos'] ?? [])->where('tipo', 'descuento') as $descuento)
+            <tr>
+                <td>{{ $descuento['motivo'] ?? __('Discount') }}</td>
+                <td class="end">-{{ number_format((float) ($descuento['amount'] ?? 0), 2) }}</td>
+            </tr>
+        @endforeach
         <tr>
             <td class="bold">{{ __('Total') }}</td>
             <td class="end bold">{{ $documento->total_formatted }}</td>

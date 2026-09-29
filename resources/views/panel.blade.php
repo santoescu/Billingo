@@ -66,6 +66,7 @@
             @livewire('panel.low-stock-products', $ctx, 'low-stock-' . $k)
             @livewire('panel.receivables', $ctx, 'receivables-' . $k)
             @livewire('panel.payables', $ctx, 'payables-' . $k)
+            @livewire('panel.loyalty-summary', $ctx, 'loyalty-summary-' . $k)
         </div>
 
         @livewire('panel.trend-chart', $ctx, 'trend-' . $k)

@@ -423,6 +423,21 @@ class Company extends Model
         return $this->hasMany(Quotation::class);
     }
 
+    public function loyaltyProgram()
+    {
+        return $this->hasOne(LoyaltyProgram::class);
+    }
+
+    public function loyaltyCustomers()
+    {
+        return $this->hasMany(LoyaltyCustomer::class);
+    }
+
+    public function loyaltyInstruments()
+    {
+        return $this->hasMany(LoyaltyInstrument::class);
+    }
+
     public function paymentMethods()
     {
         return $this->hasMany(PaymentMethod::class);

@@ -18,15 +18,21 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DianController;
 use App\Http\Controllers\DocumentoEmitidoController;
 use App\Http\Controllers\DocumentoRecibidoController;
+use App\Http\Controllers\LoyaltyCustomerController;
+use App\Http\Controllers\LoyaltyInstrumentController;
+use App\Http\Controllers\LoyaltyProgramController;
+use App\Http\Controllers\LoyaltyTransactionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosLoyaltyController;
 use App\Http\Controllers\PriceTypeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\PublicContactController;
+use App\Http\Controllers\PublicLoyaltyController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\AdminSupportTicketController;
@@ -57,6 +63,19 @@ Route::prefix('catalog/{token}')->name('public.catalog.')->group(function () {
     Route::post('client', [PublicCatalogController::class, 'storeClient'])->name('client.store');
     Route::post('quotations', [PublicCatalogController::class, 'store'])->name('quotations.store');
     Route::get('quotations/{quotation}/pdf', [PublicCatalogController::class, 'pdf'])->name('quotations.pdf');
+});
+
+// Inscripción y "mi tarjeta" de fidelización: sin auth, igual criterio que el catálogo público de
+// arriba -- un cliente final del negocio nunca tiene cuenta en Billingo. Dos tokens distintos: uno
+// identifica el PROGRAMA (para inscribirse), el otro identifica al CLIENTE ya inscrito (para ver
+// su tarjeta), ver LoyaltyProgram::enrollment_token vs LoyaltyCustomer::public_token.
+Route::prefix('loyalty-enroll/{token}')->name('public.loyalty.enroll.')->group(function () {
+    Route::get('/', [PublicLoyaltyController::class, 'showEnrollForm'])->name('show');
+    Route::get('lookup', [PublicLoyaltyController::class, 'lookupByIdentificacion'])->name('lookup');
+    Route::post('/', [PublicLoyaltyController::class, 'enroll'])->name('store');
+});
+Route::prefix('loyalty-card/{publicToken}')->name('public.loyalty.card.')->group(function () {
+    Route::get('/', [PublicLoyaltyController::class, 'showCard'])->name('show');
 });
 
 // Formulario "Contáctanos" del panel de login: sin auth (todavía no tiene
@@ -241,6 +260,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('sales/{sale}/receipt-letter.pdf', [PosController::class, 'receiptPdfLetter'])->name('sales.receipt-letter-pdf');
             Route::get('sales/{sale}/receipt-letter-preview', [PosController::class, 'receiptPreviewLetter'])->name('sales.receipt-letter-preview');
             Route::post('sales/{sale}/issue-electronic', [PosController::class, 'issueElectronic'])->name('sales.issue-electronic');
+            Route::get('loyalty/lookup', [PosLoyaltyController::class, 'lookup'])->name('loyalty.lookup');
+            Route::post('loyalty/validate-code', [PosLoyaltyController::class, 'validateCode'])->name('loyalty.validate-code');
+            Route::post('loyalty/preview-discount', [PosLoyaltyController::class, 'previewDiscount'])->name('loyalty.preview-discount');
             Route::post('shifts', [CashShiftController::class, 'store'])->name('shifts.store');
             Route::get('shifts/{shift}', [CashShiftController::class, 'show'])->name('shifts.show');
             Route::post('shifts/{shift}/close', [CashShiftController::class, 'close'])->name('shifts.close');
@@ -269,6 +291,29 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('catalog-links')->name('catalog-links.')->group(function () {
             Route::post('/', [CatalogLinkController::class, 'store'])->name('store');
             Route::delete('{catalogLink}', [CatalogLinkController::class, 'destroy'])->name('destroy');
+        });
+
+    Route::middleware(['company.selected', 'company.role:loyalty,administrador,vendedor,auditor'])
+        ->prefix('loyalty')->name('loyalty.')->group(function () {
+            Route::get('/', [LoyaltyProgramController::class, 'edit'])->name('program.edit');
+            Route::put('/', [LoyaltyProgramController::class, 'update'])->name('program.update');
+
+            Route::get('customers', [LoyaltyCustomerController::class, 'index'])->name('customers.index');
+            Route::get('customers/data', [LoyaltyCustomerController::class, 'data'])->name('customers.data');
+            Route::get('customers/lookup', [LoyaltyCustomerController::class, 'lookup'])->name('customers.lookup');
+            Route::get('customers/client-search', [LoyaltyCustomerController::class, 'clientSearch'])->name('customers.client-search');
+            Route::post('customers', [LoyaltyCustomerController::class, 'store'])->name('customers.store');
+            Route::get('customers/{loyaltyCustomer}', [LoyaltyCustomerController::class, 'show'])->name('customers.show');
+            Route::post('customers/{loyaltyCustomer}/adjust', [LoyaltyCustomerController::class, 'adjust'])->name('customers.adjust');
+            Route::post('customers/{loyaltyCustomer}/redeem', [LoyaltyCustomerController::class, 'redeem'])->name('customers.redeem');
+
+            Route::get('instruments', [LoyaltyInstrumentController::class, 'index'])->name('instruments.index');
+            Route::post('instruments', [LoyaltyInstrumentController::class, 'store'])->name('instruments.store');
+            Route::post('instruments/redeem', [LoyaltyInstrumentController::class, 'redeem'])->name('instruments.redeem');
+            Route::post('instruments/{loyaltyInstrument}/cancel', [LoyaltyInstrumentController::class, 'cancel'])->name('instruments.cancel');
+
+            Route::get('transactions', [LoyaltyTransactionController::class, 'index'])->name('transactions.index');
+            Route::get('transactions/data', [LoyaltyTransactionController::class, 'data'])->name('transactions.data');
         });
 
     // Sin restricción de rol por módulo: cualquier miembro de la empresa

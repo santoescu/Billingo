@@ -126,6 +126,40 @@
         ],
 
         [
+            'label' => __('Loyalty'),
+            'items' => array_key_exists('loyalty', $myModules) ? [
+                [
+                    'id' => 'sidebar-loyalty-customers',
+                    'name' => __('Customers'),
+                    'icon' => 'user-group',
+                    'url' => route('loyalty.customers.index'),
+                    'current' => request()->routeIs('loyalty.customers.*'),
+                ],
+                [
+                    'id' => 'sidebar-loyalty-instruments',
+                    'name' => __('Coupons and cards'),
+                    'icon' => 'ticket',
+                    'url' => route('loyalty.instruments.index'),
+                    'current' => request()->routeIs('loyalty.instruments.*'),
+                ],
+                [
+                    'id' => 'sidebar-loyalty-transactions',
+                    'name' => __('History'),
+                    'icon' => 'clock',
+                    'url' => route('loyalty.transactions.index'),
+                    'current' => request()->routeIs('loyalty.transactions.*'),
+                ],
+                [
+                    'id' => 'sidebar-loyalty-program',
+                    'name' => __('Program setup'),
+                    'icon' => 'cog-6-tooth',
+                    'url' => route('loyalty.program.edit'),
+                    'current' => request()->routeIs('loyalty.program.*'),
+                ],
+            ] : [],
+        ],
+
+        [
             'label' => __('Company'),
             'items' => session('selected_company') ? array_values(array_filter([
                 ($hasInvoicing || $hasPos || $hasCotizaciones) ? [

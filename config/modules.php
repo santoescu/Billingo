@@ -35,4 +35,10 @@ return [
         'badge_classes' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
     ],
 
+    'loyalty' => [
+        'name' => 'Fidelización',
+        'roles' => ['administrador', 'vendedor', 'auditor'],
+        'badge_classes' => 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    ],
+
 ];

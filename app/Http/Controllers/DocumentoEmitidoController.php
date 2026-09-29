@@ -10,6 +10,8 @@ use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
 use App\Models\EmailLog;
 use App\Models\FiscalResponsibility;
+use App\Models\LoyaltyCustomer;
+use App\Models\LoyaltyProgram;
 use App\Models\MeasurementUnit;
 use App\Models\PaymentMeansCode;
 use App\Models\PaymentMethod;
@@ -26,6 +28,7 @@ use App\Services\Dian\DocumentAttachmentZipBuilder;
 use App\Services\Dian\DocumentJsonMapper;
 use App\Services\Dian\DocumentTotalsCalculator;
 use App\Services\Dian\IssueDocumentService;
+use App\Services\Loyalty\LoyaltyPosRedemptionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
@@ -890,6 +893,78 @@ class DocumentoEmitidoController extends Controller
     }
 
     /**
+     * Si el cajero pidió canjear algo de fidelización en esta venta,
+     * recalcula el descuento en el servidor (nunca confía en un monto que
+     * mande el navegador) y lo agrega a las filas "cargo_*" que ya entiende
+     * buildDocumentJson()/DocumentTotalsCalculator -- así el total de la
+     * venta y el PDF quedan correctos sin necesitar un camino aparte para
+     * este descuento. El $plan resultante (qué mecánica canjear y cuánto)
+     * viaja hasta IssueDocumentService::issuePosSale(), que lo aplica de
+     * verdad (descuenta el saldo) después de guardar la venta.
+     *
+     * @param  array  $data  Datos ya validados de la petición (se le agregan cargo_* si aplica).
+     * @param  float  $saleSubtotal  Total de la venta antes de cualquier descuento.
+     * @return array{0: ?LoyaltyCustomer, 1: array, 2: float} Cliente de fidelización, plan de canje, y el descuento total.
+     * @throws InvalidArgumentException Si se pidió canjear algo pero no es válido (sin saldo, código inválido, etc.).
+     */
+    private function resolveLoyaltyPosRedemption(Company $company, array &$data, float $saleSubtotal): array
+    {
+        $requested = (float) ($data['loyalty_points_amount'] ?? 0) > 0
+            || ! empty($data['loyalty_redeem_stamps'])
+            || (float) ($data['loyalty_cashback_amount'] ?? 0) > 0
+            || ! empty(array_filter($data['loyalty_codes'] ?? []));
+
+        if (! $requested) {
+            return [null, [], 0.0];
+        }
+
+        if (! $company->hasModule('loyalty')) {
+            throw new InvalidArgumentException(__('This company does not have the loyalty module enabled.'));
+        }
+
+        if (! $program = $company->loyaltyProgram) {
+            throw new InvalidArgumentException(__('This client is not enrolled in the loyalty program.'));
+        }
+        if ($program->status !== LoyaltyProgram::STATUS_ACTIVE) {
+            throw new InvalidArgumentException(__('This client is not enrolled in the loyalty program.'));
+        }
+
+        $posRedemptionService = app(LoyaltyPosRedemptionService::class);
+        $customer = $posRedemptionService->resolveCustomer($company, $data['cliente_identificacion']);
+
+        $needsCustomer = (float) ($data['loyalty_points_amount'] ?? 0) > 0
+            || ! empty($data['loyalty_redeem_stamps'])
+            || (float) ($data['loyalty_cashback_amount'] ?? 0) > 0;
+
+        if ($needsCustomer && ! $customer) {
+            throw new InvalidArgumentException(__('This client is not enrolled in the loyalty program.'));
+        }
+
+        try {
+            $result = $posRedemptionService->preview($company, $program, $customer, [
+                'points_amount' => $data['loyalty_points_amount'] ?? 0,
+                'redeem_stamps' => $data['loyalty_redeem_stamps'] ?? false,
+                'cashback_amount' => $data['loyalty_cashback_amount'] ?? 0,
+                'codes' => $data['loyalty_codes'] ?? [],
+            ], $saleSubtotal);
+        } catch (RuntimeException $e) {
+            throw new InvalidArgumentException($e->getMessage());
+        }
+
+        foreach ($result['discounts'] as $discount) {
+            if ($discount['amount'] <= 0) {
+                continue;
+            }
+            $data['cargo_tipo'][] = 'descuento';
+            $data['cargo_motivo'][] = $discount['motivo'];
+            $data['cargo_valor_tipo'][] = 'fijo';
+            $data['cargo_valor'][] = $discount['amount'];
+        }
+
+        return [$customer, $result['plan'], (float) $result['total']];
+    }
+
+    /**
      * Valida el request y arma + emite la venta del POS: SIEMPRE crea el
      * documento_pos (numerado con la resolución 'FV' del turno abierto), y
      * si el cajero marcó "emitir factura electrónica" para esta venta
@@ -953,6 +1028,12 @@ class DocumentoEmitidoController extends Controller
             'cargo_valor' => ['nullable', 'array'],
             'cargo_valor.*' => ['nullable', 'numeric', 'min:0'],
 
+            'loyalty_points_amount' => ['nullable', 'numeric', 'min:0'],
+            'loyalty_redeem_stamps' => ['nullable', 'boolean'],
+            'loyalty_cashback_amount' => ['nullable', 'numeric', 'min:0'],
+            'loyalty_codes' => ['nullable', 'array'],
+            'loyalty_codes.*' => ['nullable', 'string', 'max:20'],
+
             'items' => ['required', 'array', 'min:1'],
             'items.*.codigo' => ['required', 'string', 'max:50'],
             'items.*.codigo_barras' => ['nullable', 'string', 'max:50'],
@@ -983,13 +1064,17 @@ class DocumentoEmitidoController extends Controller
             ->all();
 
         $saleTotal = round(collect($data['items'])->sum(fn (array $item) => $item['cantidad'] * $item['precio_unitario']), 2);
+
+        [$loyaltyCustomer, $loyaltyPlan, $loyaltyDiscountTotal] = $this->resolveLoyaltyPosRedemption($company, $data, $saleTotal);
+
+        $netSaleTotal = round($saleTotal - $loyaltyDiscountTotal, 2);
         $paymentAmounts = array_map(fn ($amount) => round((float) ($amount ?? 0), 2), $data['payment_method_amount'] ?? []);
         $assignedTotal = round(array_sum($paymentAmounts), 2);
 
-        if (! empty($paymentMethodIds) && abs($assignedTotal - $saleTotal) > 0.01) {
+        if (! empty($paymentMethodIds) && abs($assignedTotal - $netSaleTotal) > 0.01) {
             throw new InvalidArgumentException(__('The amounts assigned to the payment methods (:assigned) do not match the sale total (:total).', [
                 'assigned' => number_format($assignedTotal, 2),
-                'total' => number_format($saleTotal, 2),
+                'total' => number_format($netSaleTotal, 2),
             ]));
         }
 
@@ -999,7 +1084,14 @@ class DocumentoEmitidoController extends Controller
         $data['prefix'] = $shift->fvResolution->prefix;
         $data['secuencial'] = 0;
 
-        $documentoPos = $service->issuePosSale($company, ['document' => $this->buildDocumentJson($company, $data)], $shift->fvResolution, $shift);
+        $documentoPos = $service->issuePosSale(
+            $company,
+            ['document' => $this->buildDocumentJson($company, $data)],
+            $shift->fvResolution,
+            $shift,
+            $loyaltyCustomer,
+            $loyaltyPlan,
+        );
 
         $payments = collect($data['payment_method_id'] ?? [])
             ->map(function (?string $id, int $index) use ($paymentMethods, $paymentAmounts) {

@@ -6,12 +6,15 @@ use App\Models\CashShift;
 use App\Models\Company;
 use App\Models\DocumentoEmitido;
 use App\Models\DocumentoPos;
+use App\Models\LoyaltyCustomer;
 use App\Models\Notification;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\Resolution;
 use App\Models\StockMovement;
 use App\Models\ThirdParty;
+use App\Services\Loyalty\LoyaltyAccrualService;
+use App\Services\Loyalty\LoyaltyPosRedemptionService;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Facades\Log;
@@ -246,9 +249,11 @@ class IssueDocumentService
      * @param  array  $request  Mismo shape que espera issue() ({"document": {...}}).
      * @param  Resolution  $resolution  Resolución manual tipo 'FV' del turno.
      * @param  CashShift  $shift  Turno bajo el que se hace la venta (para poder emitirla electrónica después, ver issueElectronic()).
+     * @param  LoyaltyCustomer|null  $loyaltyCustomer  Cliente de fidelización si el cajero canjeó algo (ver DocumentoEmitidoController::resolveLoyaltyPosRedemption()); el descuento ya viene incluido en $request como "cargo_*", esto es solo para poder descontar el saldo real una vez guardada la venta.
+     * @param  array  $loyaltyRedemptionPlan  Qué mecánica canjear y cuánto (shape de LoyaltyPosRedemptionService::preview()).
      * @return DocumentoPos Venta guardada.
      */
-    public function issuePosSale(Company $company, array $request, Resolution $resolution, CashShift $shift): DocumentoPos
+    public function issuePosSale(Company $company, array $request, Resolution $resolution, CashShift $shift, ?LoyaltyCustomer $loyaltyCustomer = null, array $loyaltyRedemptionPlan = []): DocumentoPos
     {
         $payload = $this->mapper->map($company, $request);
 
@@ -285,6 +290,12 @@ class IssueDocumentService
 
         $this->syncProducts($company, $payload['lineas'] ?? []);
         $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, (string) $shift->user_id);
+
+        if ($loyaltyCustomer && ! empty($loyaltyRedemptionPlan)) {
+            app(LoyaltyPosRedemptionService::class)->apply($company, $loyaltyCustomer, $loyaltyRedemptionPlan, (string) $shift->user_id, 'pos', (string) $documento->_id);
+        }
+
+        app(LoyaltyAccrualService::class)->accrueForSale($company, $documento->cliente, (float) $documento->total, 'pos', (string) $documento->_id);
 
         return $documento;
     }
@@ -558,7 +569,9 @@ class IssueDocumentService
      * mismos datos (cliente, líneas, totales) que ya se guardaron en la
      * venta, sin depender de que el caller reconstruya el request. El
      * inventario no se vuelve a descontar (ya se descontó al crear la
-     * venta).
+     * venta), y tampoco se vuelve a acumular fidelización (ya se acumuló
+     * en issuePosSale()): es la misma venta, solo se le agrega la factura
+     * electrónica encima.
      *
      * @param  Company  $company  Empresa emisora.
      * @param  DocumentoPos  $documentoPos  Venta ya creada (talonario).
@@ -579,6 +592,7 @@ class IssueDocumentService
         return $this->buildSignSubmitAndPersist(
             $company, $payload, $tipoDocumento, $resolution, $numeral, (string) $numero, $ambiente, null,
             skipInventoryDiscount: true,
+            skipLoyaltyAccrual: true,
         );
     }
 
@@ -601,6 +615,7 @@ class IssueDocumentService
         ?DocumentoEmitido $existente,
         bool $skipInventoryDiscount = false,
         ?string $userId = null,
+        bool $skipLoyaltyAccrual = false,
     ): DocumentoEmitido {
         $fechaEmision = $this->resolveIssueDateTime($payload);
         $fechaVencimiento = $this->resolveDueDate($payload);
@@ -728,6 +743,10 @@ class IssueDocumentService
 
         if (! $skipInventoryDiscount && ! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
             $this->discountInventory($company, $lineasParaInventario, $numeral, $userId);
+        }
+
+        if (! $skipLoyaltyAccrual && ! $isPending && $isValid && in_array($tipoDocumento, self::FACTURA_CODES, true)) {
+            app(LoyaltyAccrualService::class)->accrueForSale($company, $documento->cliente, (float) $documento->total, 'invoicing', null, (string) $documento->_id);
         }
 
         return $documento;
