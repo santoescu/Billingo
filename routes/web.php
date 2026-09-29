@@ -264,6 +264,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('loyalty/validate-code', [PosLoyaltyController::class, 'validateCode'])->name('loyalty.validate-code');
             Route::post('loyalty/preview-discount', [PosLoyaltyController::class, 'previewDiscount'])->name('loyalty.preview-discount');
             Route::post('shifts', [CashShiftController::class, 'store'])->name('shifts.store');
+            Route::get('shifts/closed-data', [PosController::class, 'closedShiftsData'])->name('shifts.closed-data');
             Route::get('shifts/{shift}', [CashShiftController::class, 'show'])->name('shifts.show');
             Route::post('shifts/{shift}/close', [CashShiftController::class, 'close'])->name('shifts.close');
             Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');

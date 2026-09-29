@@ -1,6 +1,6 @@
 @php
-    // "allowEmptyOption: true" -- acá el <option value=""> inicial ES una opción real (nada
-    // elegido todavía), no solo un placeholder decorativo: sin esto, Preline lo descarta y el
+    // "allowEmptyOption: true": acá el <option value=""> inicial ES una opción real (nada
+    // elegido todavía), no solo un placeholder decorativo. Sin esto, Preline lo descarta y el
     // select queda con la primera resolución de la lista ya elegida "por debajo" aunque el
     // cajero nunca haya tocado el campo, dejando abrir el turno con la resolución equivocada
     // sin avisar.
@@ -200,15 +200,24 @@
             </div>
         @endif
 
-        @if ($isAdmin && $closedShifts->isNotEmpty())
+        @if ($isAdmin)
             <div>
                 <h3 class="mb-3 font-semibold text-gray-800 dark:text-white">{{ __('Closed cash shifts') }}</h3>
+
+                <div class="mb-3 flex flex-wrap items-end gap-3">
+                    <div class="w-64">
+                        <x-date-range-picker name-from="closed_shifts_from" name-to="closed_shifts_to" :label="__('Date range')" :value-from="$closedShiftsDefaultFrom" :value-to="$closedShiftsDefaultTo" :allow-open-end="true" :floating="true" align="left" />
+                    </div>
+                    <button type="button" id="closed-shifts-refresh-btn" class="flex items-center gap-2 py-2 px-3 text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" aria-label="{{ __('Refresh') }}" title="{{ __('Refresh') }}" onclick="loadClosedShiftsTable()">
+                        <svg id="closed-shifts-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    </button>
+                </div>
 
                 <div class="-m-1.5 overflow-x-auto">
                     <div class="p-1.5 min-w-full inline-block align-middle">
                         <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
                             <div class="overflow-hidden">
-                                <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
+                                <table id="closedShiftsTable" class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700">
                                     <thead class="bg-gray-50 dark:bg-neutral-700">
                                         <tr>
                                             <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Cashier') }}</th>
@@ -223,46 +232,17 @@
                                             <th scope="col" class="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Sales') }}</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                                        @foreach ($closedShifts as $closed)
-                                            @php $cs = $closed['shift']; @endphp
-                                            <tr>
-                                                <td class="px-4 py-3 text-sm text-gray-800 dark:text-neutral-200">{{ $cs->user?->name ?? '—' }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $cs->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $cs->closed_at?->setTimezone('America/Bogota')->format('Y-m-d H:i') }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->opening_balance, 2) }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->expected_balance, 2) }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ '$' . number_format((float) $cs->closing_balance, 2) }}</td>
-                                                <td class="px-4 py-3 text-sm {{ (float) $cs->variance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-neutral-400' }}">{{ '$' . number_format((float) $cs->variance, 2) }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">
-                                                    @forelse ($closed['payment_breakdown'] as $row)
-                                                        <div>{{ $row['name'] }}: {{ '$' . number_format((float) $row['amount'], 2) }}</div>
-                                                    @empty
-                                                        —
-                                                    @endforelse
-                                                </td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">
-                                                    @if (empty($closed['products']))
-                                                        —
-                                                    @else
-                                                        <button type="button" class="closed-shift-products-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View products sold') }}" title="{{ __('View products sold') }}" data-products="{{ json_encode($closed['products']) }}">
-                                                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
-                                                                <circle cx="12" cy="12" r="3"></circle>
-                                                            </svg>
-                                                        </button>
-                                                    @endif
-                                                </td>
-                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-neutral-400">{{ $closed['sales_count'] }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
+                                    <tbody></tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                @include('partials.datatable-pagination')
             </div>
+
+            <x-date-range-picker-script />
 
             <div id="closed-shift-products-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="closed-shift-products-modal-label">
                 <div class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
@@ -349,6 +329,82 @@
 
                 function formatMoneyDisplay(value) {
                     return '$' + Number(value ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
+                function renderPaymentBreakdownCell(row) {
+                    if (! row.payment_breakdown || ! row.payment_breakdown.length) return '—';
+
+                    return row.payment_breakdown.map((p) => `<div>${escapeHtml(p.name)}: ${formatMoneyDisplay(p.amount)}</div>`).join('');
+                }
+
+                function renderProductsCell(row) {
+                    if (! row.products || ! row.products.length) return '—';
+
+                    return `
+                        <button type="button" class="closed-shift-products-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View products sold') }}" title="{{ __('View products sold') }}" data-products='${escapeHtml(JSON.stringify(row.products))}'>
+                            <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    `;
+                }
+
+                let closedShiftsTable = null;
+
+                function initClosedShiftsTable() {
+                    closedShiftsTable = initWorkflowDataTable('#closedShiftsTable', '#closed-shifts-search', {
+                        emptyTable: "{{ __('There are no registered :name.', ['name' => __('closed cash shifts')]) }}",
+                        columns: [
+                            { data: 'cashier', className: 'px-4 py-3 text-sm text-gray-800 dark:text-neutral-200' },
+                            { data: 'opened_at', className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400' },
+                            { data: 'closed_at', className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400' },
+                            { data: null, className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => formatMoneyDisplay(row.opening_balance) },
+                            { data: null, className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => formatMoneyDisplay(row.expected_balance) },
+                            { data: null, className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => formatMoneyDisplay(row.closing_balance) },
+                            { data: null, className: 'px-4 py-3 text-sm', render: (data, type, row) => `<span class="${row.variance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-neutral-400'}">${formatMoneyDisplay(row.variance)}</span>` },
+                            { data: null, orderable: false, className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderPaymentBreakdownCell(row) },
+                            { data: null, orderable: false, className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400', render: (data, type, row) => renderProductsCell(row) },
+                            { data: 'sales_count', className: 'px-4 py-3 text-sm text-gray-600 dark:text-neutral-400' },
+                        ],
+                    });
+                    closedShiftsTable.order([]).draw();
+                }
+
+                function loadClosedShiftsTable() {
+                    const table = document.getElementById('closedShiftsTable');
+                    if (! table) return;
+
+                    const refreshBtn = document.getElementById('closed-shifts-refresh-btn');
+                    const refreshIcon = document.getElementById('closed-shifts-refresh-icon');
+                    if (refreshBtn) refreshBtn.disabled = true;
+                    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+                    const params = new URLSearchParams();
+                    const from = document.querySelector('[data-daterange-hidden-from]')?.value;
+                    const to = document.querySelector('[data-daterange-hidden-to]')?.value;
+                    if (from) params.set('from', from);
+                    if (to) params.set('to', to);
+
+                    fetch(`{{ route('pos.shifts.closed-data') }}?${params.toString()}`, { headers: { Accept: 'application/json' } })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (! closedShiftsTable) initClosedShiftsTable();
+                            closedShiftsTable.clear();
+                            closedShiftsTable.rows.add(data.rows);
+                            closedShiftsTable.order([]).draw();
+                        })
+                        .finally(() => {
+                            if (refreshBtn) refreshBtn.disabled = false;
+                            if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                        });
+                }
+
+                window.loadClosedShiftsTable = loadClosedShiftsTable;
+
+                if (document.getElementById('closedShiftsTable')) {
+                    document.addEventListener('DOMContentLoaded', loadClosedShiftsTable);
+                    document.addEventListener('livewire:navigated', loadClosedShiftsTable);
                 }
 
                 window.openAdminCloseShiftModal = function ({ closeUrl, showUrl }) {

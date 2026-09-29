@@ -17,6 +17,7 @@ use App\Models\Warehouse;
 use App\Services\Dian\IssueDocumentService;
 use App\Services\Pos\CashShiftReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use RuntimeException;
@@ -200,7 +201,7 @@ class PosController extends Controller
      * del módulo POS, la lista de TODAS las cajas abiertas de la empresa en
      * este momento -- un cajero cualquiera no ve las cajas de los demás.
      */
-    public function shift(Request $request, DocumentoEmitidoController $documentController, CashShiftReportService $reportService)
+    public function shift(Request $request, DocumentoEmitidoController $documentController)
     {
         $company = $this->currentCompany($request);
 
@@ -212,35 +213,64 @@ class PosController extends Controller
             ? $documentController->resolutionsFor($company, '01')
             : collect();
 
-        $closedShifts = collect();
-
         if ($isAdmin) {
             $openShifts = CashShift::where('company_id', (string) $company->_id)
                 ->open()
                 ->orderBy('opened_at')
                 ->get()
                 ->map(fn (CashShift $s) => $this->shiftSummary($s));
-
-            $closedShifts = CashShift::where('company_id', (string) $company->_id)
-                ->closed()
-                ->orderByDesc('closed_at')
-                ->limit(50)
-                ->get()
-                ->map(function (CashShift $s) use ($reportService) {
-                    $sales = $reportService->salesFor((string) $s->_id);
-
-                    return [
-                        'shift' => $s,
-                        'payment_breakdown' => $reportService->paymentBreakdownFor($sales),
-                        'products' => $reportService->productsSoldFor($sales),
-                        'sales_count' => $sales->count(),
-                    ];
-                });
         } else {
             $openShifts = $shift ? collect([$this->shiftSummary($shift)]) : collect();
         }
 
-        return view('pos.shift', compact('shift', 'isAdmin', 'fvResolutions', 'invoicingResolutions', 'openShifts', 'closedShifts'));
+        $closedShiftsDefaultFrom = now()->startOfMonth()->format('Y-m-d');
+        $closedShiftsDefaultTo = now()->format('Y-m-d');
+
+        return view('pos.shift', compact('shift', 'isAdmin', 'fvResolutions', 'invoicingResolutions', 'openShifts', 'closedShiftsDefaultFrom', 'closedShiftsDefaultTo'));
+    }
+
+    /**
+     * Cajas cerradas de la empresa, filtradas por rango de fecha de cierre
+     * -- carga por AJAX (ver pos.shift.blade.php) en vez de traerlas todas
+     * de una en el primer render, mismo criterio que
+     * DocumentoEmitidoController::data(). Solo para administradores, igual
+     * que el resto de la pestaña "Caja".
+     */
+    public function closedShiftsData(Request $request, CashShiftReportService $reportService)
+    {
+        $company = $this->currentCompany($request);
+        abort_unless(User::hasCompanyAdminAccess($company->membership->role, $company->membership->modules ?? []), 403);
+
+        $query = CashShift::where('company_id', (string) $company->_id)->closed();
+
+        if ($request->filled('from')) {
+            $query->where('closed_at', '>=', Carbon::parse($request->query('from'))->startOfDay());
+        }
+        if ($request->filled('to')) {
+            $query->where('closed_at', '<=', Carbon::parse($request->query('to'))->endOfDay());
+        }
+
+        $shifts = $query->orderByDesc('closed_at')->limit(200)->get();
+
+        $rows = $shifts->map(function (CashShift $s) use ($reportService) {
+            $sales = $reportService->salesFor((string) $s->_id);
+
+            return [
+                'id' => (string) $s->_id,
+                'cashier' => $s->user?->name ?? '—',
+                'opened_at' => $s->opened_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'closed_at' => $s->closed_at?->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+                'opening_balance' => (float) $s->opening_balance,
+                'expected_balance' => (float) $s->expected_balance,
+                'closing_balance' => (float) $s->closing_balance,
+                'variance' => (float) $s->variance,
+                'payment_breakdown' => $reportService->paymentBreakdownFor($sales),
+                'products' => $reportService->productsSoldFor($sales),
+                'sales_count' => $sales->count(),
+            ];
+        });
+
+        return response()->json(['rows' => $rows]);
     }
 
     /**
