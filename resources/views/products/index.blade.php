@@ -607,9 +607,18 @@
                     </div>
                 </div>
 
+                <div id="import-step-progress" class="hidden p-4 space-y-3">
+                    <p class="text-sm text-neutral-800 dark:text-neutral-200">{{ __('Importing products. Keep this window open until it finishes.') }}</p>
+                    <div class="w-full h-3 bg-neutral-200 rounded-full overflow-hidden dark:bg-neutral-700">
+                        <div id="import-progress-bar" class="h-full bg-accent transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="import-progress-text" class="text-xs text-neutral-600 dark:text-neutral-400"></p>
+                </div>
+
                 <div id="import-step-result" class="hidden p-4 space-y-4">
                     <p id="import-result-summary" class="text-sm text-neutral-800 dark:text-neutral-200"></p>
-                    <div class="flex justify-end">
+                    <div class="flex justify-end gap-2">
+                        <button type="button" id="import-report-link" onclick="downloadImportReport(this)" class="hidden inline-flex items-center rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700">{{ __('Download report') }}</button>
                         <flux:button type="button" variant="primary" onclick="window.location.reload()">{{ __('Close') }}</flux:button>
                     </div>
                 </div>
@@ -1400,7 +1409,8 @@
                 ];
                 const existingWarehouseNames = @json($warehouses->pluck('name'));
                 const existingPriceTypeNames = @json($priceTypes->pluck('name'));
-                let importToken = null;
+                let importRows = null;
+                let importReport = null;
 
                 // Mismos encabezados que arma ProductExportController::export() --
                 // si el archivo subido es justo el que se acaba de exportar (o se
@@ -1476,7 +1486,8 @@
                 };
 
                 window.resetImportModal = function () {
-                    importToken = null;
+                    importRows = null;
+                    importReport = null;
                     document.getElementById('import-file-input').value = '';
                     document.getElementById('import-upload-status').classList.add('hidden');
                     document.getElementById('import-step-upload').classList.remove('hidden');
@@ -1533,7 +1544,7 @@
                             return;
                         }
 
-                        importToken = data.token;
+                        importRows = { raw: data.raw_rows, formatted: data.formatted_rows };
                         renderImportMapping(data.headers, data.sample, data.row_count);
 
                         document.getElementById('import-step-upload').classList.add('hidden');
@@ -1628,6 +1639,44 @@
                     row.querySelector('.import-warehouse-name').classList.toggle('hidden', selectEl.value !== 'warehouse_stock');
                 };
 
+                window.downloadImportReport = async function (button) {
+                    if (! importReport) {
+                        return;
+                    }
+
+                    button.disabled = true;
+
+                    try {
+                        const response = await fetch(@json(route('products.import.report')), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            },
+                            body: JSON.stringify(importReport),
+                        });
+
+                        if (! response.ok) {
+                            throw new Error('{{ __('Could not generate the report.') }}');
+                        }
+
+                        const blob = await response.blob();
+                        const disposition = response.headers.get('Content-Disposition') || '';
+                        const match = disposition.match(/filename="([^"]+)"/);
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = match ? match[1] : 'reporte-importacion-productos.pdf';
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        URL.revokeObjectURL(link.href);
+                    } catch (error) {
+                        await window.appConfirmDialog.notify(error.message);
+                    } finally {
+                        button.disabled = false;
+                    }
+                };
+
                 window.submitImport = async function () {
                     const mapping = Array.from(document.querySelectorAll('.import-mapping-row'))
                         .map((row) => {
@@ -1663,38 +1712,99 @@
                     window.appModalProcessing.start('#product-import-modal');
 
                     try {
-                        const response = await fetch(@json(route('products.import')), {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            },
-                            body: JSON.stringify({ token: importToken, mapping, stock_mode: stockMode }),
-                        });
-                        const data = await response.json();
+                        document.getElementById('import-step-mapping').classList.add('hidden');
+                        document.getElementById('import-step-progress').classList.remove('hidden');
 
-                        if (! response.ok) {
-                            await window.appConfirmDialog.notify(data.message || '{{ __('Could not import the file.') }}');
-                            return;
+                        const chunkSize = 200;
+                        const total = importRows.raw.length;
+                        const totals = { created: 0, updated: 0, skipped: 0, skipped_reasons: { no_code: 0, no_description: 0, no_price: 0 } };
+                        const report = [];
+                        let failure = null;
+
+                        const sendChunk = async (start) => {
+                            const response = await fetch(@json(route('products.import.chunk')), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                },
+                                body: JSON.stringify({
+                                    raw_rows: importRows.raw.slice(start, start + chunkSize),
+                                    formatted_rows: importRows.formatted.slice(start, start + chunkSize),
+                                    mapping,
+                                    stock_mode: stockMode,
+                                }),
+                            });
+                            const result = await response.json().catch(() => ({}));
+
+                            if (! response.ok) {
+                                throw new Error(result.message || '{{ __('Could not import the file.') }}');
+                            }
+
+                            return result;
+                        };
+
+                        for (let start = 0; start < total; start += chunkSize) {
+                            const attempts = stockMode === 'overwrite' ? 3 : 1;
+                            let result = null;
+
+                            for (let attempt = 1; attempt <= attempts; attempt++) {
+                                try {
+                                    result = await sendChunk(start);
+                                    break;
+                                } catch (error) {
+                                    if (attempt === attempts) {
+                                        failure = error;
+                                    }
+                                }
+                            }
+
+                            if (! result) {
+                                break;
+                            }
+
+                            totals.created += result.created;
+                            totals.updated += result.updated;
+                            totals.skipped += result.skipped;
+                            Object.keys(totals.skipped_reasons).forEach((key) => totals.skipped_reasons[key] += result.skipped_reasons[key] || 0);
+                            report.push(...result.report);
+
+                            const processed = Math.min(start + chunkSize, total);
+                            const percent = Math.round((processed / total) * 100);
+                            document.getElementById('import-progress-bar').style.width = percent + '%';
+                            document.getElementById('import-progress-text').textContent = processed + ' / ' + total + ' (' + percent + '%)';
                         }
 
-                        let summary = '{{ __('Created') }}: ' + data.created + ' — {{ __('Updated') }}: ' + data.updated + ' — {{ __('Skipped') }}: ' + data.skipped;
+                        document.getElementById('import-step-progress').classList.add('hidden');
 
-                        if (data.skipped > 0 && data.skipped_reasons) {
+                        let summary = '';
+
+                        if (failure) {
+                            summary += '{{ __('The import stopped before finishing') }}: ' + failure.message + '\n';
+                        }
+
+                        summary += '{{ __('Created') }}: ' + totals.created + ' — {{ __('Updated') }}: ' + totals.updated + ' — {{ __('Skipped') }}: ' + totals.skipped;
+
+                        if (totals.skipped > 0) {
                             const reasons = [];
-                            if (data.skipped_reasons.no_code) reasons.push(data.skipped_reasons.no_code + ' {{ __('without a mapped code') }}');
-                            if (data.skipped_reasons.no_description) reasons.push(data.skipped_reasons.no_description + ' {{ __('without a mapped description') }}');
-                            if (data.skipped_reasons.no_price) reasons.push(data.skipped_reasons.no_price + ' {{ __('without any price mapped') }}');
+                            if (totals.skipped_reasons.no_code) reasons.push(totals.skipped_reasons.no_code + ' {{ __('without a mapped code') }}');
+                            if (totals.skipped_reasons.no_description) reasons.push(totals.skipped_reasons.no_description + ' {{ __('without a mapped description') }}');
+                            if (totals.skipped_reasons.no_price) reasons.push(totals.skipped_reasons.no_price + ' {{ __('without any price mapped') }}');
                             if (reasons.length) {
                                 summary += '\n' + '{{ __('Skipped rows') }}: ' + reasons.join(', ');
                             }
                         }
 
+                        importReport = report.length ? { report, created: totals.created, updated: totals.updated } : null;
+                        document.getElementById('import-report-link').classList.toggle('hidden', ! importReport);
+
                         document.getElementById('import-result-summary').textContent = summary;
                         document.getElementById('import-result-summary').classList.add('whitespace-pre-line');
-                        document.getElementById('import-step-mapping').classList.add('hidden');
                         document.getElementById('import-step-result').classList.remove('hidden');
                     } catch (error) {
+                        document.getElementById('import-step-progress').classList.add('hidden');
+                        document.getElementById('import-step-mapping').classList.remove('hidden');
                         await window.appConfirmDialog.notify(error.message || '{{ __('Could not import the file.') }}');
                     } finally {
                         submitBtn.disabled = false;

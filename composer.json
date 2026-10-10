@@ -22,6 +22,8 @@
         "mongodb/laravel-mongodb": "^5.4",
         "phpoffice/phpspreadsheet": "^5.9",
         "robrichards/xmlseclibs": "^3.1",
+        "setasign/fpdf": "^1.9",
+        "setasign/fpdi": "^2.6",
         "zbateson/mail-mime-parser": "^4.0"
     },
     "require-dev": {

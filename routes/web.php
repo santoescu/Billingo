@@ -187,7 +187,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('data', [ProductController::class, 'data'])->name('data');
             Route::post('/', [ProductController::class, 'store'])->name('store');
             Route::post('import/preview', [ProductImportController::class, 'preview'])->name('import.preview');
-            Route::post('import', [ProductImportController::class, 'import'])->name('import');
+            Route::post('import/chunk', [ProductImportController::class, 'chunk'])->name('import.chunk');
+            Route::post('import/report', [ProductImportController::class, 'report'])->name('import.report');
             Route::get('export', [ProductExportController::class, 'export'])->name('export');
             Route::get('{product}', [ProductController::class, 'show'])->name('show');
             Route::put('{product}', [ProductController::class, 'update'])->name('update');

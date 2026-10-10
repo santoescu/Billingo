@@ -2060,5 +2060,20 @@
     "Previous token": "Token anterior",
     "New token generated": "Token nuevo generado",
     "API documentation": "Documentación de la API",
-    "Share this link with whoever builds the integration. It explains every endpoint, no login needed to view it.": "Comparte este link con quien construya la integración. Explica todos los endpoints, no necesita iniciar sesión para verlo."
+    "Share this link with whoever builds the integration. It explains every endpoint, no login needed to view it.": "Comparte este link con quien construya la integración. Explica todos los endpoints, no necesita iniciar sesión para verlo.",
+    "Download PDF report": "Descargar reporte PDF",
+    "Download report": "Descargar reporte",
+    "Product import report": "Reporte de importación de productos",
+    "Created products": "Productos creados",
+    "Updated products": "Productos actualizados",
+    "New product": "Producto nuevo",
+    "Added to stock": "Sumado al stock",
+    "Overwrote stock": "Sobrescribió el stock",
+    "Stock not modified": "Stock sin cambios",
+    "Stock action": "Acción sobre el stock",
+    "Imported quantity": "Cantidad importada",
+    "Final stock": "Stock final",
+    "Importing products. Keep this window open until it finishes.": "Importando productos. Mantén esta ventana abierta hasta que termine.",
+    "The import stopped before finishing": "La importación se detuvo antes de terminar",
+    "Could not generate the report.": "No se pudo generar el reporte."
 }
