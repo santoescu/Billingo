@@ -1650,7 +1650,9 @@
                         return;
                     }
 
+                    const originalLabel = button.textContent;
                     button.disabled = true;
+                    button.textContent = '{{ __('Processing...') }}';
 
                     try {
                         const response = await fetch(@json(route('products.import.report')), {
@@ -1680,6 +1682,7 @@
                         await window.appConfirmDialog.notify(error.message);
                     } finally {
                         button.disabled = false;
+                        button.textContent = originalLabel;
                     }
                 };
 
