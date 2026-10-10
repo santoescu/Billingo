@@ -108,7 +108,12 @@ class ProductImportProcessor
                 continue;
             }
 
-            $product = $existingProducts->get($codigo);
+            $product = $existingProducts->get($codigo)
+                ?? Product::where('company_id', (string) $company->_id)->where('code', $codigo)->first();
+
+            if ($product) {
+                $existingProducts->put($codigo, $product);
+            }
 
             if (! $product && (! $descripcion || empty($prices))) {
                 $skipped++;
@@ -261,7 +266,7 @@ class ProductImportProcessor
                 $productData['tracks_inventory'] ??= false;
                 $productData['stock'] ??= 0;
                 $productData['status'] = 'active';
-                Product::create($productData);
+                $existingProducts->put($codigo, Product::create($productData));
                 $created++;
                 $report[] = [
                     'code' => $codigo,
