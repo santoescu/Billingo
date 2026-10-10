@@ -470,8 +470,9 @@
                         </div>
                     @endif
                 </div>
-                <div class="flex justify-end p-4 border-t border-gray-200 dark:border-neutral-700">
-                    <flux:button type="button" id="product-export-submit-btn" variant="primary" icon="arrow-down-tray" onclick="submitExport()">{{ __('Export') }}</flux:button>
+                <div class="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-neutral-700">
+                    <flux:button type="button" id="product-export-template-btn" icon="document-arrow-down" onclick="submitExport(true)">{{ __('Export template') }}</flux:button>
+                    <flux:button type="button" id="product-export-submit-btn" variant="primary" icon="arrow-down-tray" onclick="submitExport(false)">{{ __('Export products') }}</flux:button>
                 </div>
             </div>
         </div>
@@ -1459,10 +1460,15 @@
                  * de ningún checkbox) y navega ahí -- es una descarga de
                  * archivo, no un fetch, así el navegador maneja el
                  * Content-Disposition sin JS de por medio.
+                 * @param {boolean} template true: descarga solo los encabezados, sin productos.
                  * @returns {void}
                  */
-                window.submitExport = function () {
+                window.submitExport = function (template = false) {
                     const params = new URLSearchParams();
+
+                    if (template) {
+                        params.append('template', '1');
+                    }
 
                     document.querySelectorAll('.export-field-checkbox:checked').forEach((el) => {
                         params.append('fields[]', el.value);

@@ -16,7 +16,8 @@ class ProductExportController extends Controller
      * por tipo de precio, "Bodega: Y" por bodega) -- así el archivo se
      * puede editar y volver a importar directo para actualizar. Código,
      * descripción y código de barras siempre van, sin importar qué otros
-     * campos se hayan seleccionado.
+     * campos se hayan seleccionado. Con "template" exporta solo los
+     * encabezados (plantilla vacía lista para llenar e importar).
      */
     public function export(Request $request)
     {
@@ -29,7 +30,10 @@ class ProductExportController extends Controller
             'price_type_ids.*' => ['string'],
             'warehouse_ids' => ['nullable', 'array'],
             'warehouse_ids.*' => ['string'],
+            'template' => ['nullable', 'boolean'],
         ]);
+
+        $isTemplate = (bool) ($data['template'] ?? false);
 
         $fields = $data['fields'] ?? [];
         $priceTypes = filled($data['price_type_ids'] ?? null)
@@ -64,7 +68,8 @@ class ProductExportController extends Controller
         $sheet->fromArray($headers, null, 'A1');
 
         $rowIndex = 2;
-        foreach ($company->products()->active()->orderBy('code')->get() as $product) {
+        $products = $isTemplate ? collect() : $company->products()->active()->orderBy('code')->get();
+        foreach ($products as $product) {
             $row = [$product->code, $product->description, $product->barcode];
 
             if (in_array('unit_code', $fields, true)) {
@@ -99,7 +104,7 @@ class ProductExportController extends Controller
         }
 
         $writer = new Xlsx($spreadsheet);
-        $filename = 'productos-' . now('America/Bogota')->format('Y-m-d') . '.xlsx';
+        $filename = ($isTemplate ? 'plantilla-productos-' : 'productos-') . now('America/Bogota')->format('Y-m-d') . '.xlsx';
 
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');

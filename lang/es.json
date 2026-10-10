@@ -2075,5 +2075,7 @@
     "Final stock": "Stock final",
     "Importing products. Keep this window open until it finishes.": "Importando productos. Mantén esta ventana abierta hasta que termine.",
     "The import stopped before finishing": "La importación se detuvo antes de terminar",
-    "Could not generate the report.": "No se pudo generar el reporte."
+    "Could not generate the report.": "No se pudo generar el reporte.",
+    "Export template": "Exportar plantilla",
+    "Export products": "Exportar productos"
 }
