@@ -893,6 +893,37 @@ class DocumentoEmitidoController extends Controller
     }
 
     /**
+     * Si el cajero puso un descuento manual a nivel de factura en el POS,
+     * lo agrega a las filas "cargo_*" (igual que el canje de fidelización,
+     * ver resolveLoyaltyPosRedemption()) -- así ambos descuentos se suman
+     * y salen como cargos/descuentos separados del documento. El monto se
+     * recalcula acá, nunca se confía en el que calculó el navegador.
+     *
+     * @param  array  $data  Datos ya validados de la petición (se le agregan cargo_* si aplica).
+     * @param  float  $saleSubtotal  Total de la venta antes de cualquier descuento.
+     * @return float Descuento manual aplicado en pesos, 0 si no hay.
+     */
+    private function applyPosManualDiscount(array &$data, float $saleSubtotal): float
+    {
+        $value = (float) ($data['pos_discount_value'] ?? 0);
+
+        if ($value <= 0 || $saleSubtotal <= 0) {
+            return 0.0;
+        }
+
+        $esPorcentaje = ($data['pos_discount_type'] ?? 'porcentaje') === 'porcentaje';
+        $value = $esPorcentaje ? min($value, 100) : min($value, $saleSubtotal);
+        $amount = $esPorcentaje ? round($saleSubtotal * ($value / 100), 2) : round($value, 2);
+
+        $data['cargo_tipo'][] = 'descuento';
+        $data['cargo_motivo'][] = filled($data['pos_discount_reason'] ?? null) ? $data['pos_discount_reason'] : __('Discount');
+        $data['cargo_valor_tipo'][] = $esPorcentaje ? 'porcentaje' : 'fijo';
+        $data['cargo_valor'][] = $value;
+
+        return $amount;
+    }
+
+    /**
      * Si el cajero pidió canjear algo de fidelización en esta venta,
      * recalcula el descuento en el servidor (nunca confía en un monto que
      * mande el navegador) y lo agrega a las filas "cargo_*" que ya entiende
@@ -1028,6 +1059,10 @@ class DocumentoEmitidoController extends Controller
             'cargo_valor' => ['nullable', 'array'],
             'cargo_valor.*' => ['nullable', 'numeric', 'min:0'],
 
+            'pos_discount_type' => ['nullable', 'string', 'in:porcentaje,fijo'],
+            'pos_discount_value' => ['nullable', 'numeric', 'min:0'],
+            'pos_discount_reason' => ['nullable', 'string', 'max:255'],
+
             'loyalty_points_amount' => ['nullable', 'numeric', 'min:0'],
             'loyalty_redeem_stamps' => ['nullable', 'boolean'],
             'loyalty_cashback_amount' => ['nullable', 'numeric', 'min:0'],
@@ -1063,11 +1098,13 @@ class DocumentoEmitidoController extends Controller
             ->map(fn (?string $id) => $id ? $paymentMethods->get($id)?->dian_payment_means_code : null)
             ->all();
 
-        $saleTotal = round(collect($data['items'])->sum(fn (array $item) => $item['cantidad'] * $item['precio_unitario']), 2);
+        $saleTotal = round($this->calculateLineExtensionSubtotal($data['items']), 2);
 
-        [$loyaltyCustomer, $loyaltyPlan, $loyaltyDiscountTotal] = $this->resolveLoyaltyPosRedemption($company, $data, $saleTotal);
+        $posDiscountTotal = $this->applyPosManualDiscount($data, $saleTotal);
 
-        $netSaleTotal = round($saleTotal - $loyaltyDiscountTotal, 2);
+        [$loyaltyCustomer, $loyaltyPlan, $loyaltyDiscountTotal] = $this->resolveLoyaltyPosRedemption($company, $data, round($saleTotal - $posDiscountTotal, 2));
+
+        $netSaleTotal = round($saleTotal - $posDiscountTotal - $loyaltyDiscountTotal, 2);
         $paymentAmounts = array_map(fn ($amount) => round((float) ($amount ?? 0), 2), $data['payment_method_amount'] ?? []);
         $assignedTotal = round(array_sum($paymentAmounts), 2);
 
@@ -1584,7 +1621,7 @@ class DocumentoEmitidoController extends Controller
 
             $esPorcentaje = ($item['descuento_valor_tipo'] ?? 'porcentaje') === 'porcentaje';
             $descuentoAmount = $esPorcentaje
-                ? $baseAmount * (min((float) $item['descuento_valor'], 100) / 100)
+                ? round($baseAmount * (min((float) $item['descuento_valor'], 100) / 100), 2)
                 : min((float) $item['descuento_valor'], $baseAmount);
 
             return $baseAmount - $descuentoAmount;

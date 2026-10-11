@@ -2077,5 +2077,8 @@
     "The import stopped before finishing": "La importación se detuvo antes de terminar",
     "Could not generate the report.": "No se pudo generar el reporte.",
     "Export template": "Exportar plantilla",
-    "Export products": "Exportar productos"
+    "Export products": "Exportar productos",
+    "Add discount": "Agregar descuento",
+    "Reason (optional)": "Motivo (opcional)",
+    "Line discount": "Descuento de línea"
 }

@@ -35,6 +35,10 @@
 
     $paymentSelectConfig = \App\Support\SelectConfig::basic();
 
+    $iconTriggerConfigArray = json_decode(\App\Support\SelectConfig::iconTrigger(), true);
+    $iconTriggerConfigArray['dropdownClasses'] = 'end-0 ' . str_replace('w-48', 'w-36', $iconTriggerConfigArray['dropdownClasses']);
+    $iconTriggerSelectConfig = json_encode($iconTriggerConfigArray);
+
     $paymentMethodsJs = $paymentMethods->map(fn ($m) => [
         'id' => (string) $m->_id,
         'name' => $m->name,
@@ -142,9 +146,10 @@
 
             <div class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-2.5 py-2.5 border-b border-gray-200 dark:border-neutral-700">
-                    <div class="grid" style="grid-template-columns: 1fr 76px 40px 112px 108px 40px;">
+                    <div class="grid" style="grid-template-columns: 1fr 76px 40px 40px 112px 108px 40px;">
                         <span class="px-2.5 text-xs font-medium text-zinc-500 dark:text-neutral-400 self-center">{{ __('Description') }}</span>
                         <span class="text-xs font-medium text-zinc-500 dark:text-neutral-400 text-center self-center">{{ __('Quantity') }}</span>
+                        <span></span>
                         <span></span>
                         <div class="self-center">
                             @if ($priceTypes->isNotEmpty())
@@ -193,6 +198,34 @@
                         @else
                             <p id="pos-payment-remaining" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
                         @endif
+                    </div>
+
+                    <div id="pos-discount-section">
+                        <button type="button" id="pos-discount-toggle-btn" class="text-xs font-medium text-accent hover:underline focus:outline-hidden">
+                            + {{ __('Add discount') }}
+                        </button>
+                        <div id="pos-discount-fields" class="hidden">
+                            <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Discount') }}</label>
+                            <div class="grid gap-2 items-center" style="grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1.2fr) 32px;">
+                                <select id="pos-discount-type" data-hs-select='{!! $paymentSelectConfig !!}' class="hidden">
+                                    <option value="porcentaje" selected>{{ __('Percentage') }}</option>
+                                    <option value="fijo">{{ __('Fixed amount') }}</option>
+                                </select>
+                                <div class="relative">
+                                    <input type="text" inputmode="decimal" id="pos-discount-value" placeholder="0"
+                                        class="h-10 py-2 px-3 ps-6 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                    <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-2">
+                                        <span id="pos-discount-prefix" class="text-xs text-zinc-500 dark:text-zinc-400">%</span>
+                                    </div>
+                                </div>
+                                <input type="text" id="pos-discount-reason" maxlength="255" placeholder="{{ __('Reason (optional)') }}"
+                                    class="h-10 py-2 px-3 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                <button type="button" id="pos-discount-remove-btn" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-600 focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Remove') }}">
+                                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                            <p id="pos-discount-amount" class="hidden mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"></p>
+                        </div>
                     </div>
 
                     <div id="pos-cash-section" class="hidden grid grid-cols-2 gap-3">
@@ -285,6 +318,7 @@
 
                 const paymentMethods = @json($paymentMethodsJs);
                 const paymentSelectConfigAttr = @json($paymentSelectConfig);
+                const iconTriggerSelectConfigAttr = @json($iconTriggerSelectConfig);
 
                 const quotationId = @json($quotationId ?? null);
                 const quotationPrefill = @json($quotationPrefill ?? null);
@@ -340,6 +374,7 @@
                             ticket.loyalty = ticket.loyalty ?? null;
                             ticket.loyaltyDiscount = ticket.loyaltyDiscount ?? 0;
                             ticket.loyaltySelection = ticket.loyaltySelection ?? { points_amount: 0, redeem_stamps: false, cashback_amount: 0, codes: [] };
+                            ticket.discount = ticket.discount ?? { open: false, type: 'porcentaje', value: '', reason: '' };
                         });
 
                         return parsed;
@@ -383,6 +418,7 @@
                         loyalty: null,
                         loyaltyDiscount: 0,
                         loyaltySelection: { points_amount: 0, redeem_stamps: false, cashback_amount: 0, codes: [] },
+                        discount: { open: false, type: 'porcentaje', value: '', reason: '' },
                     };
                     tickets.push(ticket);
                     return ticket;
@@ -494,6 +530,7 @@
                     }
 
                     renderPaymentLines();
+                    renderDiscountSection();
                     document.getElementById('pos-efectivo-display').value = ticket.efectivoRecibido;
 
                     const warehouseSelect = document.getElementById('pos-warehouse-filter');
@@ -1051,7 +1088,7 @@
                         }).join('');
 
                         row.innerHTML = `
-                            <div class="grid flex-1 min-w-0" style="grid-template-columns: 1fr 76px ${line.availableWarehouses.length > 0 ? '40px' : ''} 112px 108px 40px;">
+                            <div class="grid flex-1 min-w-0" style="grid-template-columns: 1fr 76px ${line.availableWarehouses.length > 0 ? '40px' : ''} 40px 112px 108px 40px;">
                                 <div class="h-9 flex items-center px-2.5 border border-e-0 border-zinc-200 dark:border-white/10 rounded-s-lg bg-white dark:bg-white/10 text-sm text-gray-800 dark:text-white truncate" title="${escapeHtml(line.description)}">
                                     ${escapeHtml(line.description)}
                                 </div>
@@ -1083,6 +1120,37 @@
                                     </div>
                                 ` : ''}
 
+                                <div class="h-9 flex items-center justify-center border border-e-0 border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10">
+                                    ${editSaleId ? '' : `
+                                        <div class="hs-dropdown [--auto-close:false] [--strategy:fixed] [--placement:bottom-right] relative" data-line-discount-dropdown>
+                                            <button type="button" data-line-discount-toggle class="${lineDiscountButtonClasses(lineDiscountAmount(line) > 0)}" title="{{ __('Line discount') }}">
+                                                ${lineDiscountIconHtml(lineDiscountAmount(line) > 0)}
+                                            </button>
+                                            <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden transition-[opacity,margin] duration mt-2 z-50 w-48 bg-white border border-zinc-200 rounded-lg shadow-xl p-2 space-y-1.5 dark:bg-neutral-800 dark:border-neutral-700">
+                                                <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Line discount') }}</label>
+                                                <div class="relative">
+                                                    <input type="text" inputmode="decimal" data-line-discount-display placeholder="0"
+                                                        value="${escapeHtml(discountDisplayFromRaw(line.discount ? line.discount.value : '', line.discount ? line.discount.type : 'porcentaje', line.unit_price * line.qty).display)}"
+                                                        class="h-9 py-1.5 px-3 ps-6 pe-9 block w-full bg-white dark:bg-white/10 border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300 rounded-lg text-sm shadow-xs focus:z-10 focus:outline-hidden focus:ring-2 focus:ring-accent">
+                                                    <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-2">
+                                                        <span data-line-discount-prefix class="text-xs text-zinc-500 dark:text-zinc-400">${line.discount && line.discount.type === 'fijo' ? '$' : '%'}</span>
+                                                    </div>
+                                                    <div class="absolute inset-y-0 end-0 flex items-center pe-0.5">
+                                                        <select data-line-discount-type data-hs-select='${iconTriggerSelectConfigAttr}' class="hidden" title="{{ __('Value type') }}">
+                                                            <option value="porcentaje" ${line.discount && line.discount.type === 'fijo' ? '' : 'selected'}>{{ __('Percentage') }}</option>
+                                                            <option value="fijo" ${line.discount && line.discount.type === 'fijo' ? 'selected' : ''}>{{ __('Fixed amount') }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center justify-between">
+                                                    <p data-line-discount-amount class="text-xs font-semibold text-emerald-600 dark:text-emerald-400"></p>
+                                                    <button type="button" data-line-discount-remove class="text-xs font-medium text-red-600 dark:text-red-400 hover:underline focus:outline-hidden">{{ __('Remove') }}</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `}
+                                </div>
+
                                 <div class="relative h-9">
                                     <input type="text" inputmode="decimal" data-action="price" value="${line.unit_price.toLocaleString('es-CO')}"
                                         ${canEditPrice ? '' : 'readonly title="' + escapeHtml('{{ __('Only an administrator can type a custom price. Pick from the price list instead.') }}') + '"'}
@@ -1103,7 +1171,7 @@
                                 </div>
 
                                 <div class="relative h-9">
-                                    <input type="text" readonly disabled value="${formatMoney(line.unit_price * line.qty)}"
+                                    <input type="text" readonly disabled data-line-subtotal value="${formatMoney(lineNet(line))}"
                                         class="h-9 w-full border border-e-0 border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 text-zinc-800 dark:text-neutral-100 text-sm font-semibold text-end px-2.5 disabled:opacity-100">
                                 </div>
 
@@ -1170,6 +1238,7 @@
                                 if (leftoverQty > 0 && originalWarehouseId) {
                                     cart.push({
                                         ...line,
+                                        discount: { ...ensureLineDiscount(line) },
                                         warehouseId: originalWarehouseId,
                                         warehouseName: originalWarehouseName,
                                         qty: leftoverQty,
@@ -1208,6 +1277,55 @@
                                 renderTickets();
                             });
                         });
+
+                        const lineDiscountDropdown = row.querySelector('[data-line-discount-dropdown]');
+                        if (lineDiscountDropdown) {
+                            const discount = ensureLineDiscount(line);
+                            const toggleBtn = row.querySelector('[data-line-discount-toggle]');
+                            const valueInput = row.querySelector('[data-line-discount-display]');
+                            const amountEl = row.querySelector('[data-line-discount-amount]');
+                            const typeSelect = row.querySelector('[data-line-discount-type]');
+
+                            if (window.HSSelect) {
+                                new HSSelect(typeSelect);
+                            }
+
+                            const refreshLineDiscountUi = () => {
+                                const amount = lineDiscountAmount(line);
+
+                                row.querySelector('[data-line-discount-prefix]').textContent = discount.type === 'porcentaje' ? '%' : '$';
+                                amountEl.textContent = amount > 0 ? '-' + formatMoney(amount) : '';
+                                row.querySelector('[data-line-subtotal]').value = formatMoney(lineNet(line));
+                                toggleBtn.className = lineDiscountButtonClasses(amount > 0);
+                                toggleBtn.innerHTML = lineDiscountIconHtml(amount > 0);
+                            };
+
+                            const onLineDiscountChange = () => {
+                                const capped = capDiscountInput(valueInput.value, discount.type, line.unit_price * line.qty);
+                                valueInput.value = capped.display;
+                                discount.value = capped.raw;
+                                refreshLineDiscountUi();
+                                updateDiscountAmountDisplay();
+                                updateTotal();
+                                saveTicketsToStorage();
+                            };
+
+                            const onLineTypeChange = () => {
+                                discount.type = typeSelect.value;
+                                onLineDiscountChange();
+                            };
+
+                            typeSelect.addEventListener('change', onLineTypeChange);
+                            typeSelect.addEventListener('change.hs.select', onLineTypeChange);
+                            valueInput.addEventListener('input', onLineDiscountChange);
+                            row.querySelector('[data-line-discount-remove]').addEventListener('click', () => {
+                                line.discount = { open: false, type: 'porcentaje', value: '', reason: '' };
+                                renderCart();
+                                saveTicketsToStorage();
+                            });
+
+                            refreshLineDiscountUi();
+                        }
 
                         body.appendChild(row);
                         initDropdowns(row);
@@ -1288,9 +1406,229 @@
 
                 function cartTotal() {
                     const ticket = activeTicket();
-                    const gross = ticket.cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
+                    const gross = cartSubtotal(ticket);
 
-                    return Math.max(gross - (ticket.loyaltyDiscount || 0), 0);
+                    return Math.max(gross - posDiscountAmount(ticket) - (ticket.loyaltyDiscount || 0), 0);
+                }
+
+                /**
+                 * Icono del botón de descuento de línea: uno neutro (el
+                 * porcentaje, sin descuento) y otro "con insignia" en color
+                 * de acento cuando la línea ya tiene un descuento aplicado.
+                 * @param {boolean} active true si la línea tiene descuento.
+                 * @returns {string} SVG del icono.
+                 */
+                function lineDiscountIconHtml(active) {
+                    return active
+                        ? '<svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m15 9-6 6"/><path d="M9 9h.01"/><path d="M15 15h.01"/></svg>'
+                        : '<svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
+                }
+
+                function lineDiscountButtonClasses(active) {
+                    return 'hs-dropdown-toggle size-6 inline-flex items-center justify-center rounded-full focus:outline-hidden ' + (active
+                        ? 'bg-accent text-white'
+                        : 'text-zinc-500 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:bg-white/10');
+                }
+
+                /**
+                 * Descuento propio de la línea (porcentaje o valor fijo
+                 * sobre cantidad x precio), opcional y oculto hasta que el
+                 * cajero lo abre. Mismo redondeo y tope que aplica el
+                 * servidor al armar la línea de la factura.
+                 * @param {object} line Línea del carrito.
+                 * @returns {object} Descuento de la línea ({open, type, value, reason}).
+                 */
+                function ensureLineDiscount(line) {
+                    if (! line.discount) {
+                        line.discount = { open: false, type: 'porcentaje', value: '', reason: '' };
+                    }
+
+                    return line.discount;
+                }
+
+                /**
+                 * Formatea y topa lo que se escribe en un campo de
+                 * descuento, igual que el descuento de línea de facturación
+                 * electrónica: formato colombiano mientras se teclea (punto
+                 * de miles, coma decimal, hasta 2 decimales) y recorte al
+                 * máximo si se pasa -- 100 en porcentaje, la base (valor de
+                 * la línea o subtotal del carrito) en valor fijo -- así el
+                 * campo nunca muestra un valor que luego se ignoraría.
+                 * @param {(string|number)} typed Lo que hay en el campo.
+                 * @param {string} type 'porcentaje' o 'fijo'.
+                 * @param {number} base Base máxima para el valor fijo.
+                 * @returns {Object} Objeto con "raw" (valor real con punto decimal, '' si vacío) y "display" (valor a mostrar).
+                 */
+                function capDiscountInput(typed, type, base) {
+                    const str = String(typed ?? '').replace(/\./g, '');
+                    const commaIndex = str.indexOf(',');
+                    let intPart;
+                    let decPart;
+                    let hasComma;
+
+                    if (commaIndex === -1) {
+                        intPart = str.replace(/\D/g, '');
+                        decPart = '';
+                        hasComma = false;
+                    } else {
+                        intPart = str.slice(0, commaIndex).replace(/\D/g, '');
+                        decPart = str.slice(commaIndex + 1).replace(/\D/g, '').slice(0, 2);
+                        hasComma = true;
+                    }
+
+                    if (! intPart && ! decPart && ! hasComma) {
+                        return { raw: '', display: '' };
+                    }
+
+                    let value = parseFloat(decPart ? `${intPart || '0'}.${decPart}` : (intPart || '0')) || 0;
+                    const cap = type === 'porcentaje' ? 100 : Math.max(Math.round(base * 100) / 100, 0);
+
+                    if (value > cap) {
+                        value = cap;
+                        const [cappedInt, cappedDec] = String(value).split('.');
+                        intPart = cappedInt || '0';
+                        decPart = (cappedDec || '').slice(0, 2);
+                        hasComma = Boolean(cappedDec);
+                    }
+
+                    const formattedInt = Number(intPart || '0').toLocaleString('es-CO');
+
+                    return {
+                        raw: decPart ? `${intPart || '0'}.${decPart}` : (intPart || '0'),
+                        display: hasComma ? `${formattedInt},${decPart}` : formattedInt,
+                    };
+                }
+
+                function discountDisplayFromRaw(raw, type, base) {
+                    return capDiscountInput(String(raw ?? '').replace('.', ','), type, base);
+                }
+
+                function lineDiscountAmount(line) {
+                    const discount = line.discount;
+                    const value = parseFloat(discount && discount.value) || 0;
+                    if (editSaleId || value <= 0) {
+                        return 0;
+                    }
+
+                    const base = line.unit_price * line.qty;
+
+                    return discount.type === 'porcentaje'
+                        ? Math.round(base * Math.min(value, 100)) / 100
+                        : Math.min(value, base);
+                }
+
+                function lineNet(line) {
+                    return line.unit_price * line.qty - lineDiscountAmount(line);
+                }
+
+                /**
+                 * Subtotal del carrito con los descuentos de línea ya
+                 * aplicados -- base sobre la que se calculan el descuento
+                 * de factura y el canje de fidelización.
+                 * @param {object} ticket Pre-cuenta.
+                 * @returns {number} Subtotal en pesos.
+                 */
+                function cartSubtotal(ticket) {
+                    return ticket.cart.reduce((sum, line) => sum + lineNet(line), 0);
+                }
+
+                /**
+                 * Monto en dinero del descuento manual de la pre-cuenta
+                 * (porcentaje o valor fijo sobre el subtotal bruto), con el
+                 * mismo redondeo y tope que aplica el servidor al cobrar.
+                 * @param {object} ticket Pre-cuenta.
+                 * @returns {number} Descuento en pesos, 0 si no hay.
+                 */
+                function posDiscountAmount(ticket) {
+                    const discount = ticket.discount;
+                    const value = parseFloat(discount && discount.value) || 0;
+                    if (editSaleId || value <= 0) {
+                        return 0;
+                    }
+
+                    const gross = cartSubtotal(ticket);
+
+                    return discount.type === 'porcentaje'
+                        ? Math.round(gross * Math.min(value, 100)) / 100
+                        : Math.min(value, gross);
+                }
+
+                /**
+                 * Pinta la sección de descuento de la pre-cuenta activa:
+                 * oculta por defecto, solo se abre si ya tenía un descuento
+                 * o si el cajero la despliega.
+                 * @returns {void}
+                 */
+                function renderDiscountSection() {
+                    const ticket = activeTicket();
+                    const section = document.getElementById('pos-discount-section');
+                    if (! ticket || ! section) {
+                        return;
+                    }
+
+                    section.classList.toggle('hidden', !! editSaleId);
+
+                    const discount = ticket.discount;
+                    document.getElementById('pos-discount-fields').classList.toggle('hidden', ! discount.open);
+                    document.getElementById('pos-discount-toggle-btn').classList.toggle('hidden', discount.open);
+                    const typeSelect = document.getElementById('pos-discount-type');
+                    const typeInstance = window.HSSelect && HSSelect.getInstance(typeSelect);
+                    if (typeInstance) {
+                        typeInstance.setValue(discount.type);
+                    } else {
+                        typeSelect.value = discount.type;
+                    }
+                    document.getElementById('pos-discount-prefix').textContent = discount.type === 'porcentaje' ? '%' : '$';
+                    const ticketValueInput = document.getElementById('pos-discount-value');
+                    const cappedValue = discountDisplayFromRaw(discount.value, discount.type, cartSubtotal(ticket));
+                    ticketValueInput.value = cappedValue.display;
+                    discount.value = cappedValue.raw;
+                    document.getElementById('pos-discount-reason').value = discount.reason;
+                    updateDiscountAmountDisplay();
+                }
+
+                function updateDiscountAmountDisplay() {
+                    const ticket = activeTicket();
+                    const display = document.getElementById('pos-discount-amount');
+                    const amount = ticket ? posDiscountAmount(ticket) : 0;
+
+                    display.textContent = amount > 0 ? '-' + formatMoney(amount) : '';
+                    display.classList.toggle('hidden', amount <= 0);
+                }
+
+                function bindDiscountControls() {
+                    const onChange = () => {
+                        const ticket = activeTicket();
+                        ticket.discount.type = document.getElementById('pos-discount-type').value;
+                        const valueInput = document.getElementById('pos-discount-value');
+                        const capped = capDiscountInput(valueInput.value, ticket.discount.type, cartSubtotal(ticket));
+                        valueInput.value = capped.display;
+                        document.getElementById('pos-discount-prefix').textContent = ticket.discount.type === 'porcentaje' ? '%' : '$';
+                        ticket.discount.value = capped.raw;
+                        ticket.discount.reason = document.getElementById('pos-discount-reason').value;
+                        updateDiscountAmountDisplay();
+                        updateTotal();
+                        saveTicketsToStorage();
+                    };
+
+                    document.getElementById('pos-discount-toggle-btn').addEventListener('click', () => {
+                        activeTicket().discount.open = true;
+                        renderDiscountSection();
+                        document.getElementById('pos-discount-value').focus();
+                        saveTicketsToStorage();
+                    });
+
+                    document.getElementById('pos-discount-remove-btn').addEventListener('click', () => {
+                        activeTicket().discount = { open: false, type: 'porcentaje', value: '', reason: '' };
+                        renderDiscountSection();
+                        updateTotal();
+                        saveTicketsToStorage();
+                    });
+
+                    document.getElementById('pos-discount-type').addEventListener('change', onChange);
+                    document.getElementById('pos-discount-type').addEventListener('change.hs.select', onChange);
+                    document.getElementById('pos-discount-value').addEventListener('input', onChange);
+                    document.getElementById('pos-discount-reason').addEventListener('input', onChange);
                 }
 
                 /**
@@ -1476,7 +1814,7 @@
                     const errorEl = document.getElementById('pos-loyalty-error');
                     errorEl.classList.add('hidden');
 
-                    const gross = ticket.cart.reduce((sum, line) => sum + (line.unit_price * line.qty), 0);
+                    const gross = cartSubtotal(ticket);
                     const selection = ticket.loyaltySelection;
                     const hasSelection = (selection.points_amount || 0) > 0 || selection.redeem_stamps || (selection.cashback_amount || 0) > 0 || selection.codes.length > 0;
 
@@ -1496,7 +1834,7 @@
                         },
                         body: JSON.stringify({
                             identificacion: ticket.client.identificacion,
-                            subtotal: gross,
+                            subtotal: Math.max(gross - posDiscountAmount(ticket), 0),
                             points_amount: selection.points_amount || 0,
                             redeem_stamps: selection.redeem_stamps || false,
                             cashback_amount: selection.cashback_amount || 0,
@@ -1912,7 +2250,22 @@
                         if (line.warehouseId) {
                             body.append(`items[${index}][bodega_id]`, line.warehouseId);
                         }
+                        if (lineDiscountAmount(line) > 0) {
+                            body.append(`items[${index}][descuento_valor_tipo]`, line.discount.type);
+                            body.append(`items[${index}][descuento_valor]`, line.discount.value);
+                            if ((line.discount.reason || '').trim() !== '') {
+                                body.append(`items[${index}][descuento_motivo]`, line.discount.reason.trim());
+                            }
+                        }
                     });
+
+                    if (posDiscountAmount(ticket) > 0) {
+                        body.append('pos_discount_type', ticket.discount.type);
+                        body.append('pos_discount_value', ticket.discount.value);
+                        if (ticket.discount.reason.trim() !== '') {
+                            body.append('pos_discount_reason', ticket.discount.reason.trim());
+                        }
+                    }
 
                     if (loyaltyEnabled && ticket.loyaltyDiscount > 0) {
                         const selection = ticket.loyaltySelection;
@@ -2176,6 +2529,7 @@
                     bindCheckout();
                     bindSellerSelect();
                     bindLoyaltyControls();
+                    bindDiscountControls();
 
                     renderProducts(initialProducts);
                     updatePosCashSectionVisibility();
