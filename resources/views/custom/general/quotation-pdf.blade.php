@@ -99,10 +99,26 @@
             <td class="col-price center">{{ __('Price') }}</td>
             <td class="col-subtotal center">{{ __('Subtotal') }}</td>
         </tr>
+        @php
+        $isAllowance = fn ($cargo) => ($cargo['tipo'] ?? (($cargo['es_descuento'] ?? true) ? 'descuento' : 'cargo')) === 'descuento';
+        $cargoLabel = function ($cargo) {
+            $label = $cargo['motivo'] ?? __('Discount');
+            $percent = (float) ($cargo['porcentaje'] ?? 0);
+
+            return $percent > 0 ? $label . ' (' . rtrim(rtrim(number_format($percent, 2, '.', ''), '0'), '.') . '%)' : $label;
+        };
+    @endphp
         @foreach (($documento->payload['lineas'] ?? []) as $index => $linea)
-            @php $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0); @endphp
+            @php
+                $lineCargos = collect($linea['cargos_descuentos'] ?? []);
+                $lineAllowances = $lineCargos->filter($isAllowance);
+                $lineCharges = $lineCargos->reject($isAllowance);
+                $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0)
+                    - (float) $lineAllowances->sum('amount')
+                    + (float) $lineCharges->sum('amount');
+            @endphp
             <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
-                <td class="col-description">{{ $linea['descripcion'] ?? '' }}</td>
+                <td class="col-description">{{ $linea['descripcion'] ?? '' }}@foreach ($lineAllowances as $lineAllowance)<br><span class="muted" style="font-size: 9px;">{{ $cargoLabel($lineAllowance) }}: -{{ number_format((float) ($lineAllowance['amount'] ?? 0), 2) }}</span>@endforeach</td>
                 @if ($warehousesById->isNotEmpty())
                     <td class="col-warehouse muted">{{ $warehousesById->get($linea['bodega_id'] ?? null)?->name ?? '—' }}</td>
                 @endif
@@ -122,6 +138,12 @@
             <td class="muted">{{ __('Tax') }}</td>
             <td class="end">{{ number_format((float) $documento->tax_total, 2) }}</td>
         </tr>
+        @foreach (collect($documento->payload['cargos_descuentos'] ?? []) as $cargo)
+            <tr>
+                <td class="muted">{{ $isAllowance($cargo) ? $cargoLabel($cargo) : ($cargo['motivo'] ?? __('Charge')) }}</td>
+                <td class="end">{{ $isAllowance($cargo) ? '-' : '' }}{{ number_format((float) ($cargo['amount'] ?? 0), 2) }}</td>
+            </tr>
+        @endforeach
         <tr class="total-row">
             <td>{{ __('Total') }}</td>
             <td class="end">{{ $documento->total_formatted }}</td>

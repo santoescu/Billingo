@@ -156,7 +156,7 @@
                             </tr>
                             <tr>
                                 <td class="meta-label">{{ __('Valid') }}</td>
-                                <td class="meta-value">{{ $documento->resolution->valid_from?->format('Y-m-d') }} — {{ $documento->resolution->valid_to?->format('Y-m-d') }}</td>
+                                <td class="meta-value">{{ $documento->resolution->validFromDate() }} — {{ $documento->resolution->validToDate() }}</td>
                             </tr>
                         @endif
                         <tr>
@@ -198,9 +198,23 @@
             <td class="col-tax center">{{ __('Tax') }}</td>
             <td class="col-subtotal center">{{ __('Subtotal') }}</td>
         </tr>
+        @php
+        $isAllowance = fn ($cargo) => ($cargo['tipo'] ?? (($cargo['es_descuento'] ?? true) ? 'descuento' : 'cargo')) === 'descuento';
+        $cargoLabel = function ($cargo) {
+            $label = $cargo['motivo'] ?? __('Discount');
+            $percent = (float) ($cargo['porcentaje'] ?? 0);
+
+            return $percent > 0 ? $label . ' (' . rtrim(rtrim(number_format($percent, 2, '.', ''), '0'), '.') . '%)' : $label;
+        };
+    @endphp
         @foreach (($documento->payload['lineas'] ?? []) as $index => $linea)
             @php
-                $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0);
+                $lineCargos = collect($linea['cargos_descuentos'] ?? []);
+                $lineAllowances = $lineCargos->filter($isAllowance);
+                $lineCharges = $lineCargos->reject($isAllowance);
+                $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0)
+                    - (float) $lineAllowances->sum('amount')
+                    + (float) $lineCharges->sum('amount');
                 $lineTaxes = collect($linea['impuestos'] ?? [])
                     ->map(function ($impuesto) {
                         $nombre = $impuesto['nombre'] ?? '';
@@ -214,7 +228,7 @@
                     ->implode(', ');
             @endphp
             <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
-                <td class="col-description">{{ $linea['descripcion'] ?? '' }}</td>
+                <td class="col-description">{{ $linea['descripcion'] ?? '' }}@foreach ($lineAllowances as $lineAllowance)<br><span class="muted" style="font-size: 9px;">{{ $cargoLabel($lineAllowance) }}: -{{ number_format((float) ($lineAllowance['amount'] ?? 0), 2) }}</span>@endforeach</td>
                 <td class="col-qty center">{{ rtrim(rtrim(number_format((float) ($linea['cantidad'] ?? 0), 2, '.', ''), '0'), '.') }}</td>
                 <td class="col-price center">{{ number_format((float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
                 <td class="col-tax center muted">{{ $lineTaxes ?: '—' }}</td>
@@ -226,8 +240,8 @@
     @php
         $impuestos = $documento->payload['impuestos'] ?? [];
         $cargosDescuentos = $documento->payload['cargos_descuentos'] ?? [];
-        $allowanceTotal = collect($cargosDescuentos)->where('tipo', 'descuento')->sum('amount');
-        $chargeTotal = collect($cargosDescuentos)->where('tipo', 'cargo')->sum('amount');
+        $allowances = collect($cargosDescuentos)->filter($isAllowance);
+        $charges = collect($cargosDescuentos)->reject($isAllowance);
     @endphp
 
     <table class="totals">
@@ -253,18 +267,18 @@
             <td class="muted">{{ __('Tax') }}</td>
             <td class="end">{{ number_format((float) $documento->tax_total, 2) }}</td>
         </tr>
-        @if ($allowanceTotal > 0)
+        @foreach ($allowances as $allowance)
             <tr>
-                <td class="muted">{{ __('Discount') }}</td>
-                <td class="end">-{{ number_format((float) $allowanceTotal, 2) }}</td>
+                <td class="muted">{{ $cargoLabel($allowance) }}</td>
+                <td class="end">-{{ number_format((float) ($allowance['amount'] ?? 0), 2) }}</td>
             </tr>
-        @endif
-        @if ($chargeTotal > 0)
+        @endforeach
+        @foreach ($charges as $charge)
             <tr>
-                <td class="muted">{{ __('Charge') }}</td>
-                <td class="end">{{ number_format((float) $chargeTotal, 2) }}</td>
+                <td class="muted">{{ $charge['motivo'] ?? __('Charge') }}</td>
+                <td class="end">{{ number_format((float) ($charge['amount'] ?? 0), 2) }}</td>
             </tr>
-        @endif
+        @endforeach
         <tr class="total-row">
             <td>{{ __('Total') }}</td>
             <td class="end">{{ $documento->total_formatted }}</td>
