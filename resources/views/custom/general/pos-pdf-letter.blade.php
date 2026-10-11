@@ -116,9 +116,12 @@
             <td class="col-subtotal center">{{ __('Subtotal') }}</td>
         </tr>
         @foreach (($documento->payload['lineas'] ?? []) as $index => $linea)
-            @php $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0); @endphp
+            @php
+                    $lineDiscounts = collect($linea['cargos_descuentos'] ?? [])->where('tipo', 'descuento');
+                    $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0) - (float) $lineDiscounts->sum('amount');
+                @endphp
             <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
-                <td class="col-description">{{ $linea['descripcion'] ?? '' }}</td>
+                <td class="col-description">{{ $linea['descripcion'] ?? '' }}@foreach ($lineDiscounts as $lineDiscount)<br><span style="font-size: 9px;">{{ $lineDiscount['motivo'] ?? __('Discount') }}: -{{ number_format((float) ($lineDiscount['amount'] ?? 0), 2) }}</span>@endforeach</td>
                 @if ($warehousesById->isNotEmpty())
                     <td class="col-warehouse muted">{{ $warehousesById->get($linea['bodega_id'] ?? null)?->name ?? '—' }}</td>
                 @endif
