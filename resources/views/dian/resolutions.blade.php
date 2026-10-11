@@ -81,7 +81,7 @@
                                         </td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">{{ $resolution->current_number }}</td>
                                         <td class="px-4 py-4 text-sm text-gray-600 dark:text-neutral-400">
-                                            {{ $resolution->valid_from?->format('Y-m-d') }} — {{ $resolution->valid_to?->format('Y-m-d') }}
+                                            {{ $resolution->validFromDate() }} — {{ $resolution->validToDate() }}
                                         </td>
                                         <td class="px-4 py-4 text-sm">
                                             @if ($resolution->isExpired())

@@ -75,6 +75,26 @@ class Resolution extends Model
         });
     }
 
+    /**
+     * Fecha de inicio de vigencia como "Y-m-d" para la DIAN (AuthorizationPeriod).
+     * Se formatea en UTC a propósito: la fecha se guarda como medianoche UTC
+     * (ej. 2019-01-19T00:00Z) y Carbon la entrega en la zona de la app
+     * (America/Bogota, UTC-5), donde esa medianoche cae el día anterior a las
+     * 19:00 -- formatearla ahí mandaba "2019-01-18" y la DIAN rechazaba con
+     * FAB07b/FAB08b porque el rango informado no coincidía con el vigente.
+     *
+     * @return string|null
+     */
+    public function validFromDate(): ?string
+    {
+        return $this->valid_from?->copy()->setTimezone('UTC')->format('Y-m-d');
+    }
+
+    public function validToDate(): ?string
+    {
+        return $this->valid_to?->copy()->setTimezone('UTC')->format('Y-m-d');
+    }
+
     public function isExpired(): bool
     {
         return $this->valid_to && now()->greaterThan($this->valid_to);

@@ -633,8 +633,8 @@ class IssueDocumentService
                 'prefijo' => $resolution->prefix,
                 'rango_desde' => $resolution->range_from,
                 'rango_hasta' => $resolution->range_to,
-                'valido_desde' => $resolution->valid_from?->format('Y-m-d'),
-                'valido_hasta' => $resolution->valid_to?->format('Y-m-d'),
+                'valido_desde' => $resolution->validFromDate(),
+                'valido_hasta' => $resolution->validToDate(),
             ];
         } else {
             $buildPayload['referencias'] = $this->resolveReferencias($company, $payload['referencias'] ?? []);
