@@ -63,6 +63,7 @@ class ProductImportProcessor
         $priceTypeCache = [];
         $warehouseCache = [];
         $report = [];
+        $warehouseNamesById = [];
 
         foreach ($rawRows as $index => $rawRow) {
             $formattedRow = $formattedRows[$index] ?? [];
@@ -144,6 +145,8 @@ class ProductImportProcessor
                         ['company_id' => (string) $company->_id, 'name' => $warehouseName]
                     );
                 }
+
+                $warehouseNamesById[(string) $warehouseCache[$warehouseName]->_id] = $warehouseName;
 
                 $newWarehouseEntries[(string) $warehouseCache[$warehouseName]->_id] = [
                     'warehouse_id' => (string) $warehouseCache[$warehouseName]->_id,
@@ -243,6 +246,7 @@ class ProductImportProcessor
                     'stock_action' => ! $hasInventoryMapping ? 'none' : ($isAddMode ? 'added' : 'overwritten'),
                     'imported_stock' => $isAddMode ? $addedUnassigned + array_sum($addedByWarehouse) : ($hasInventoryMapping ? $unassignedStock + array_sum(array_column($newWarehouseEntries, 'stock')) : null),
                     'final_stock' => $hasInventoryMapping ? (float) $productData['stock'] : (float) ($product->stock ?? 0),
+                    'warehouses' => $this->warehouseReportRows($newWarehouseEntries, $productData['warehouse_stocks'] ?? [], $warehouseNamesById),
                 ];
 
                 if ($isAddMode) {
@@ -275,6 +279,7 @@ class ProductImportProcessor
                     'stock_action' => 'new',
                     'imported_stock' => (float) $productData['stock'],
                     'final_stock' => (float) $productData['stock'],
+                    'warehouses' => $this->warehouseReportRows($newWarehouseEntries, $productData['warehouse_stocks'] ?? [], $warehouseNamesById),
                 ];
             }
         }
@@ -304,13 +309,26 @@ class ProductImportProcessor
     {
         $chunks = array_chunk($report, self::REPORT_ROWS_PER_PDF);
 
-        $render = function (array $rows) use ($company, $created, $updated): string {
+        /**
+         * Las columnas de bodega se calculan sobre TODO el reporte (no por
+         * parte), para que todas las partes del PDF tengan las mismas
+         * columnas; con varias bodegas la hoja pasa a horizontal.
+         */
+        $warehouseNames = collect($report)
+            ->flatMap(fn (array $item) => collect($item['warehouses'] ?? [])->pluck('name'))
+            ->unique()
+            ->values()
+            ->all();
+        $orientation = count($warehouseNames) > 2 ? 'landscape' : 'portrait';
+
+        $render = function (array $rows) use ($company, $created, $updated, $warehouseNames, $orientation): string {
             $pdf = Pdf::loadView('products.import-report-pdf', [
                 'company' => $company,
                 'report' => $rows,
                 'created' => $created,
                 'updated' => $updated,
-            ])->setPaper('letter', 'portrait');
+                'warehouseNames' => $warehouseNames,
+            ])->setPaper('letter', $orientation);
 
             $output = $pdf->output();
             unset($pdf);
@@ -338,6 +356,32 @@ class ProductImportProcessor
         }
 
         return $merged->Output('S');
+    }
+
+    /**
+     * Detalle por bodega para el reporte: solo las bodegas que trae el archivo para ese producto,
+     * con lo importado y el stock en que quedó la bodega (en "sumar" el importado es lo agregado y
+     * el final ya incluye lo que tenía; en "sobrescribir" ambos coinciden).
+     *
+     * @param  array<string, array{warehouse_id: string, stock: float}>  $newEntries  Bodegas que trae el archivo, por id.
+     * @param  array<int, array>  $finalEntries  warehouse_stocks con que quedó el producto.
+     * @param  array<string, string>  $namesById  Nombre por id de bodega.
+     * @return array<int, array{name: string, imported: float, final: float}>
+     */
+    private function warehouseReportRows(array $newEntries, array $finalEntries, array $namesById): array
+    {
+        $finalById = collect($finalEntries)->keyBy('warehouse_id');
+        $rows = [];
+
+        foreach ($newEntries as $warehouseId => $entry) {
+            $rows[] = [
+                'name' => $namesById[$warehouseId] ?? (string) $warehouseId,
+                'imported' => (float) $entry['stock'],
+                'final' => (float) ($finalById[$warehouseId]['stock'] ?? $entry['stock']),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

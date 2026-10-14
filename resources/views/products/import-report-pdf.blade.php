@@ -14,6 +14,8 @@
         .row td { padding: 7px 8px; border-top: 1px solid #e5e7eb; }
         .badge-add { color: #047857; font-weight: bold; }
         .badge-over { color: #b45309; font-weight: bold; }
+        .wh-delta { color: #047857; font-weight: bold; }
+        .wh-final { color: #374151; }
     </style>
 </head>
 <body>
@@ -22,16 +24,19 @@
     <p class="muted">{{ __('Created') }}: {{ $created }} · {{ __('Updated') }}: {{ $updated }}</p>
 
     @foreach (['created' => __('Created products'), 'updated' => __('Updated products')] as $action => $title)
-        @php($items = collect($report)->where('action', $action))
+        @php $items = collect($report)->where('action', $action); @endphp
         @if ($items->isNotEmpty())
             <h2>{{ $title }} ({{ $items->count() }})</h2>
             <table>
                 <tr class="head">
                     <td style="width: 14%;">{{ __('Code') }}</td>
                     <td>{{ __('Description') }}</td>
-                    <td style="width: 20%;">{{ __('Stock action') }}</td>
-                    <td class="end" style="width: 11%;">{{ __('Imported quantity') }}</td>
-                    <td class="end" style="width: 11%;">{{ __('Final stock') }}</td>
+                    <td style="width: 15%;">{{ __('Stock action') }}</td>
+                    @foreach ($warehouseNames as $warehouseName)
+                        <td class="end">{{ $warehouseName }}</td>
+                    @endforeach
+                    <td class="end" style="width: 9%;">{{ __('Imported quantity') }}</td>
+                    <td class="end" style="width: 9%;">{{ __('Final stock') }}</td>
                 </tr>
                 @foreach ($items as $item)
                     <tr class="row">
@@ -45,6 +50,19 @@
                                 @default<span class="muted">{{ __('Stock not modified') }}</span>
                             @endswitch
                         </td>
+                        @foreach ($warehouseNames as $warehouseName)
+                            @php $warehouse = collect($item['warehouses'] ?? [])->firstWhere('name', $warehouseName); @endphp
+                            <td class="end">
+                                @if ($warehouse)
+                                    @if ($item['stock_action'] === 'added')
+                                        <span class="wh-delta">+{{ rtrim(rtrim(number_format($warehouse['imported'], 2, ',', '.'), '0'), ',') }}</span><br>
+                                    @endif
+                                    <span class="wh-final">{{ rtrim(rtrim(number_format($warehouse['final'], 2, ',', '.'), '0'), ',') ?: '0' }}</span>
+                                @else
+                                    <span class="muted">-</span>
+                                @endif
+                            </td>
+                        @endforeach
                         <td class="end">{{ $item['imported_stock'] !== null ? rtrim(rtrim(number_format($item['imported_stock'], 2, ',', '.'), '0'), ',') : '-' }}</td>
                         <td class="end">{{ rtrim(rtrim(number_format($item['final_stock'], 2, ',', '.'), '0'), ',') ?: '0' }}</td>
                     </tr>

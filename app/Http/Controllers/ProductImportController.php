@@ -91,6 +91,10 @@ class ProductImportController extends Controller
             'report.*.stock_action' => ['required', 'string'],
             'report.*.imported_stock' => ['nullable', 'numeric'],
             'report.*.final_stock' => ['required', 'numeric'],
+            'report.*.warehouses' => ['nullable', 'array'],
+            'report.*.warehouses.*.name' => ['required', 'string'],
+            'report.*.warehouses.*.imported' => ['required', 'numeric'],
+            'report.*.warehouses.*.final' => ['required', 'numeric'],
             'created' => ['required', 'integer'],
             'updated' => ['required', 'integer'],
         ]);
