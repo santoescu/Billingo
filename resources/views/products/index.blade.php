@@ -1724,7 +1724,7 @@
                         document.getElementById('import-step-mapping').classList.add('hidden');
                         document.getElementById('import-step-progress').classList.remove('hidden');
 
-                        const chunkSize = 200;
+                        const chunkSize = 50;
                         const total = importRows.raw.length;
                         const totals = { created: 0, updated: 0, skipped: 0, skipped_reasons: { no_code: 0, no_description: 0, no_price: 0 } };
                         const report = [];
