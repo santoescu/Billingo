@@ -1709,6 +1709,9 @@
 
                     if (! ticket.loyalty) {
                         options.innerHTML = '';
+                        notEnrolled.textContent = ticket.client.identificacion === defaultClient.identificacion
+                            ? '{{ __('Select a client to earn loyalty rewards. Sales to the generic consumer do not earn anything.') }}'
+                            : '{{ __('This client is not enrolled in the loyalty program.') }}';
                         notEnrolled.classList.remove('hidden');
                         renderLoyaltyCodes();
                         updateLoyaltyDiscountDisplay();
@@ -1804,12 +1807,24 @@
                     }
                 }
 
+                /**
+                 * Contador de cálculos de descuento de fidelización: cada
+                 * llamada a recalculateLoyaltyDiscount() toma el siguiente
+                 * número, y una respuesta del servidor solo se aplica si
+                 * sigue siendo la última pedida. Sin esto, si el cajero
+                 * quitaba un código mientras una consulta anterior seguía
+                 * en vuelo, esa respuesta vieja llegaba después y volvía a
+                 * poner el descuento que ya se había quitado.
+                 */
+                let loyaltyPreviewRequestId = 0;
+
                 function scheduleLoyaltyPreview() {
                     clearTimeout(loyaltyPreviewTimeout);
                     loyaltyPreviewTimeout = setTimeout(recalculateLoyaltyDiscount, 400);
                 }
 
                 async function recalculateLoyaltyDiscount() {
+                    const requestId = ++loyaltyPreviewRequestId;
                     const ticket = activeTicket();
                     const errorEl = document.getElementById('pos-loyalty-error');
                     errorEl.classList.add('hidden');
@@ -1843,6 +1858,10 @@
                     });
                     const data = await response.json();
 
+                    if (requestId !== loyaltyPreviewRequestId) {
+                        return;
+                    }
+
                     if (! response.ok) {
                         ticket.loyaltyDiscount = 0;
                         errorEl.textContent = data.message || '{{ __('Could not calculate the loyalty discount.') }}';
@@ -1874,7 +1893,7 @@
                                 'Accept': 'application/json',
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ code }),
+                            body: JSON.stringify({ code, identificacion: activeTicket().client.identificacion }),
                         });
                         const data = await response.json();
 
@@ -2196,6 +2215,12 @@
 
                     if (cart.length === 0) {
                         showError('{{ __('Add at least one product to the cart.') }}');
+                        return;
+                    }
+
+                    const typedClient = document.getElementById('pos-client-search').value.trim();
+                    if (typedClient !== (ticket.client.name || '').trim()) {
+                        showError('{{ __('Pick the client from the search results before charging the sale.') }}');
                         return;
                     }
 
