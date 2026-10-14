@@ -74,20 +74,6 @@ class DocumentoPos extends Model
         return $this->belongsTo(DocumentoEmitido::class, 'documento_emitido_id');
     }
 
-    /**
-     * Nombre de la bodega de la que salió cada línea (null si la línea no
-     * tiene una bodega puntual), en el mismo orden que payload.lineas.
-     *
-     * @return array<int, string|null>
-     */
-    public function lineWarehouseNames(): array
-    {
-        $ids = array_map(fn ($linea) => $linea['bodega_id'] ?? null, $this->payload['lineas'] ?? []);
-        $names = Warehouse::namesFor($ids);
-
-        return array_map(fn ($id) => $id ? ($names[$id] ?? null) : null, $ids);
-    }
-
     public function getTotalFormattedAttribute()
     {
         return '$' . number_format((float) $this->total, 2, '.', ',');

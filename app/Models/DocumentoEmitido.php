@@ -71,67 +71,6 @@ class DocumentoEmitido extends Model
         ];
     }
 
-    /**
-     * Nombre de la bodega de la que salió cada línea (null si la línea no
-     * tiene una bodega puntual), en el mismo orden que payload.lineas. Las
-     * facturas nuevas guardan "bodega_id" en la línea; en las anteriores el
-     * cálculo de totales lo descartaba, así que se busca (1) en la venta POS
-     * de la que se emitió, o (2) en los movimientos de kardex de este
-     * documento, por código de producto.
-     *
-     * @return array<int, string|null>
-     */
-    public function lineWarehouseNames(): array
-    {
-        $lineas = $this->payload['lineas'] ?? [];
-        $ids = array_map(fn ($linea) => $linea['bodega_id'] ?? null, $lineas);
-
-        if (! array_filter($ids)) {
-            $pos = DocumentoPos::where('documento_emitido_id', (string) $this->_id)->first();
-
-            if ($pos) {
-                $ids = array_map(fn ($linea) => $linea['bodega_id'] ?? null, $pos->payload['lineas'] ?? []);
-            }
-        }
-
-        if (! array_filter($ids)) {
-            $ids = $this->warehouseIdsFromStockMovements($lineas);
-        }
-
-        $names = Warehouse::namesFor($ids);
-
-        return array_map(fn ($id) => $id ? ($names[$id] ?? null) : null, $ids);
-    }
-
-    /**
-     * @param  array<int, array>  $lineas
-     * @return array<int, string|null> Id de bodega por línea.
-     */
-    private function warehouseIdsFromStockMovements(array $lineas): array
-    {
-        $codes = array_values(array_filter(array_column($lineas, 'codigo')));
-
-        if (empty($codes)) {
-            return array_fill(0, count($lineas), null);
-        }
-
-        $productIdsByCode = Product::where('company_id', (string) $this->company_id)
-            ->whereIn('code', $codes)
-            ->get()
-            ->mapWithKeys(fn (Product $product) => [(string) $product->code => (string) $product->_id])
-            ->all();
-
-        $warehouseByProduct = [];
-        foreach (StockMovement::where('company_id', (string) $this->company_id)->where('reason', 'document:' . $this->numeral)->get() as $movement) {
-            $warehouseByProduct[(string) $movement->product_id] ??= $movement->warehouse_id;
-        }
-
-        return array_map(
-            fn ($linea) => $warehouseByProduct[$productIdsByCode[(string) ($linea['codigo'] ?? '')] ?? ''] ?? null,
-            $lineas
-        );
-    }
-
     public function company()
     {
         return $this->belongsTo(Company::class);

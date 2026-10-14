@@ -38,7 +38,6 @@
         .items-row td { padding: 9px 10px; font-size: 11px; border-top: 1px solid #e5e7eb; }
         .items-row.alt td { background-color: #fafafa; }
         .col-description { width: 40%; }
-        .col-warehouse { width: 14%; }
         .col-qty { width: 12%; }
         .col-price { width: 16%; }
         .col-tax { width: 16%; }
@@ -191,17 +190,9 @@
         </tr>
     </table>
 
-    @php
-        $lineWarehouseNames = $documento->lineWarehouseNames();
-        $hasWarehouses = ! empty(array_filter($lineWarehouseNames));
-    @endphp
-
     <table class="items">
         <tr class="items-head">
             <td class="col-description">{{ __('Description') }}</td>
-            @if ($hasWarehouses)
-                <td class="col-warehouse">{{ __('Warehouse') }}</td>
-            @endif
             <td class="col-qty center">{{ __('Qty') }}</td>
             <td class="col-price center">{{ __('Price') }}</td>
             <td class="col-tax center">{{ __('Tax') }}</td>
@@ -238,9 +229,6 @@
             @endphp
             <tr class="items-row {{ $index % 2 === 1 ? 'alt' : '' }}">
                 <td class="col-description">{{ $linea['descripcion'] ?? '' }}@foreach ($lineAllowances as $lineAllowance)<br><span class="muted" style="font-size: 9px;">{{ $cargoLabel($lineAllowance) }}: -{{ number_format((float) ($lineAllowance['amount'] ?? 0), 2) }}</span>@endforeach</td>
-                @if ($hasWarehouses)
-                    <td class="col-warehouse muted">{{ $lineWarehouseNames[$index] ?? '—' }}</td>
-                @endif
                 <td class="col-qty center">{{ rtrim(rtrim(number_format((float) ($linea['cantidad'] ?? 0), 2, '.', ''), '0'), '.') }}</td>
                 <td class="col-price center">{{ number_format((float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
                 <td class="col-tax center muted">{{ $lineTaxes ?: '—' }}</td>
