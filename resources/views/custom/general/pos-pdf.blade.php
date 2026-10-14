@@ -50,13 +50,14 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (($documento->payload['lineas'] ?? []) as $linea)
+            @php $lineWarehouseNames = $documento->lineWarehouseNames(); @endphp
+            @foreach (($documento->payload['lineas'] ?? []) as $lineIndex => $linea)
                 @php
                     $lineDiscounts = collect($linea['cargos_descuentos'] ?? [])->where('tipo', 'descuento');
                     $lineTotal = (float) ($linea['cantidad'] ?? 0) * (float) ($linea['precio_unitario'] ?? 0) - (float) $lineDiscounts->sum('amount');
                 @endphp
                 <tr>
-                    <td>{{ $linea['descripcion'] ?? '' }}@foreach ($lineDiscounts as $lineDiscount)<br><span style="font-size: 9px;">{{ $lineDiscount['motivo'] ?? __('Discount') }}: -{{ number_format((float) ($lineDiscount['amount'] ?? 0), 2) }}</span>@endforeach</td>
+                    <td>{{ $linea['descripcion'] ?? '' }}@foreach ($lineDiscounts as $lineDiscount)<br><span style="font-size: 9px;">{{ $lineDiscount['motivo'] ?? __('Discount') }}: -{{ number_format((float) ($lineDiscount['amount'] ?? 0), 2) }}</span>@endforeach@if (! empty($lineWarehouseNames[$lineIndex]))<br><span style="font-size: 9px;">{{ __('Warehouse') }}: {{ $lineWarehouseNames[$lineIndex] }}</span>@endif</td>
                     <td class="end">{{ rtrim(rtrim(number_format((float) ($linea['cantidad'] ?? 0), 2, '.', ''), '0'), '.') }}</td>
                     <td class="end">{{ number_format((float) ($linea['precio_unitario'] ?? 0), 2) }}</td>
                     <td class="end">{{ number_format($lineTotal, 2) }}</td>

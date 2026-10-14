@@ -24,6 +24,26 @@ class Warehouse extends Model
     }
 
     /**
+     * Nombres de bodegas por id, en una sola consulta -- para mostrar a qué
+     * bodega salió cada línea de un documento (PDF/recibo).
+     *
+     * @param  array<int, string>  $ids  Ids de bodega (se ignoran los vacíos).
+     * @return array<string, string> Nombre por id de bodega.
+     */
+    public static function namesFor(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        return static::whereIn('_id', $ids)->get()
+            ->mapWithKeys(fn (Warehouse $warehouse) => [(string) $warehouse->_id => $warehouse->name])
+            ->all();
+    }
+
+    /**
      * Productos que tienen stock (aunque sea cero) registrado en esta bodega.
      * No es una FK: "warehouse_stocks" es un arreglo embebido en cada producto
      * (ver Product::stockForWarehouse()), así que se consulta por dot-notation.

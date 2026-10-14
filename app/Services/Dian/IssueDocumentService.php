@@ -662,6 +662,12 @@ class IssueDocumentService
         $payload['lineas'] = $calculoTotales['lineas'];
         $payload['impuestos'] = $calculoTotales['impuestos'];
 
+        foreach ($lineasParaInventario as $index => $lineaCruda) {
+            if (! empty($lineaCruda['bodega_id']) && isset($payload['lineas'][$index])) {
+                $payload['lineas'][$index]['bodega_id'] = $lineaCruda['bodega_id'];
+            }
+        }
+
         $documentoData = [
             'company_id' => (string) $company->_id,
             'tipo_documento' => $tipoDocumento,
