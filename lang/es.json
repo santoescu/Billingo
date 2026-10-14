@@ -2080,5 +2080,8 @@
     "Export products": "Exportar productos",
     "Add discount": "Agregar descuento",
     "Reason (optional)": "Motivo (opcional)",
-    "Line discount": "Descuento de línea"
+    "Line discount": "Descuento de línea",
+    "Select a client to earn loyalty rewards. Sales to the generic consumer do not earn anything.": "Selecciona un cliente para acumular en fidelización. Las ventas a Consumidor final no acumulan nada.",
+    "Pick the client from the search results before charging the sale.": "Elige el cliente de la lista de resultados antes de cobrar la venta.",
+    ":code belongs to another client. Select its owner to redeem it.": ":code pertenece a otro cliente. Selecciona a su dueño para canjearlo."
 }

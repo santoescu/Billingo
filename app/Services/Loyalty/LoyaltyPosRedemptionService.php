@@ -30,6 +30,21 @@ class LoyaltyPosRedemptionService
     }
 
     /**
+     * Un cupón o tarjeta sin cliente asignado es de uso general y lo puede
+     * canjear cualquiera; si tiene dueño (loyalty_customer_id), solo lo
+     * canjea ese cliente -- si no, cualquiera podría gastar el saldo de
+     * otra persona con solo conocer el código.
+     */
+    public function belongsToCustomerOrNobody(LoyaltyInstrument $instrument, ?LoyaltyCustomer $customer): bool
+    {
+        if (empty($instrument->loyalty_customer_id)) {
+            return true;
+        }
+
+        return $customer && (string) $customer->_id === (string) $instrument->loyalty_customer_id;
+    }
+
+    /**
      * Calcula (sin escribir nada) el descuento total y el detalle línea por
      * línea de lo solicitado -- lanza RuntimeException con un mensaje ya
      * traducido si algo no es válido (saldo insuficiente, código no existe,
@@ -111,6 +126,10 @@ class LoyaltyPosRedemptionService
 
             if (! in_array($instrument->type, [LoyaltyInstrument::TYPE_COUPON, LoyaltyInstrument::TYPE_GIFT_CARD], true)) {
                 throw new RuntimeException(__(':code cannot be redeemed as a discount here.', ['code' => $code]));
+            }
+
+            if (! $this->belongsToCustomerOrNobody($instrument, $customer)) {
+                throw new RuntimeException(__(':code belongs to another client. Select its owner to redeem it.', ['code' => $instrument->code]));
             }
 
             $remainingSubtotal = max($saleSubtotal - $runningTotal, 0);

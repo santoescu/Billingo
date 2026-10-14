@@ -78,7 +78,10 @@ class PosLoyaltyController extends Controller
     {
         $company = $this->currentCompany($request);
 
-        $data = $request->validate(['code' => 'required|string']);
+        $data = $request->validate([
+            'code' => 'required|string',
+            'identificacion' => 'nullable|string',
+        ]);
 
         $instrument = LoyaltyInstrument::where('company_id', (string) $company->_id)
             ->where('code', strtoupper(trim($data['code'])))
@@ -90,6 +93,18 @@ class PosLoyaltyController extends Controller
 
         if (! in_array($instrument->type, [LoyaltyInstrument::TYPE_COUPON, LoyaltyInstrument::TYPE_GIFT_CARD], true)) {
             return response()->json(['valid' => false, 'message' => __(':code cannot be redeemed as a discount here.', ['code' => $instrument->code])], 422);
+        }
+
+        $service = app(LoyaltyPosRedemptionService::class);
+        $customer = filled($data['identificacion'] ?? null)
+            ? $service->resolveCustomer($company, $data['identificacion'])
+            : null;
+
+        if (! $service->belongsToCustomerOrNobody($instrument, $customer)) {
+            return response()->json([
+                'valid' => false,
+                'message' => __(':code belongs to another client. Select its owner to redeem it.', ['code' => $instrument->code]),
+            ], 422);
         }
 
         return response()->json([

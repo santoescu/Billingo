@@ -291,7 +291,7 @@ class IssueDocumentService
         $this->syncProducts($company, $payload['lineas'] ?? []);
         $this->discountInventory($company, $payload['lineas'] ?? [], $numeral, (string) $shift->user_id);
 
-        if ($loyaltyCustomer && ! empty($loyaltyRedemptionPlan)) {
+        if (! empty($loyaltyRedemptionPlan)) {
             app(LoyaltyPosRedemptionService::class)->apply($company, $loyaltyCustomer, $loyaltyRedemptionPlan, (string) $shift->user_id, 'pos', (string) $documento->_id);
         }
 
