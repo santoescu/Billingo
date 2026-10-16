@@ -2083,5 +2083,11 @@
     "Line discount": "Descuento de línea",
     "Select a client to earn loyalty rewards. Sales to the generic consumer do not earn anything.": "Selecciona un cliente para acumular en fidelización. Las ventas a Consumidor final no acumulan nada.",
     "Pick the client from the search results before charging the sale.": "Elige el cliente de la lista de resultados antes de cobrar la venta.",
-    ":code belongs to another client. Select its owner to redeem it.": ":code pertenece a otro cliente. Selecciona a su dueño para canjearlo."
+    ":code belongs to another client. Select its owner to redeem it.": ":code pertenece a otro cliente. Selecciona a su dueño para canjearlo.",
+    "Inventory value": "Valor del inventario",
+    "Inventory cost": "Costo del inventario",
+    "Products in stock": "Productos con stock",
+    "Units in stock": "Unidades en stock",
+    "Stock multiplied by the average cost of each product that tracks inventory.": "Stock por el costo promedio de cada producto que controla inventario.",
+    "Total cost": "Costo total"
 }

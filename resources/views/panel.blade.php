@@ -63,6 +63,7 @@
             @livewire('panel.metric-card', $ctx + ['module' => 'cotizaciones'], 'metric-cotizaciones-' . $k)
             @livewire('panel.metric-card', $ctx + ['module' => 'receiving'], 'metric-receiving-' . $k)
             @livewire('panel.utility', $ctx, 'utility-' . $k)
+            @livewire('panel.inventory-value', $ctx, 'inventory-value-' . $k)
             @livewire('panel.low-stock-products', $ctx, 'low-stock-' . $k)
             @livewire('panel.receivables', $ctx, 'receivables-' . $k)
             @livewire('panel.payables', $ctx, 'payables-' . $k)

@@ -718,6 +718,28 @@ class PanelMetricsService
     }
 
     /**
+     * Costo de todo el inventario: stock x costo promedio de cada producto
+     * activo que controla inventario. Solo cuenta stock positivo (un stock
+     * negativo no resta valor al inventario) y es una foto actual, no se
+     * filtra por el periodo elegido en el panel.
+     *
+     * @return array{total_cost: float, products_count: int, units: float}
+     */
+    public function inventoryValue(Company $company): array
+    {
+        $products = $company->products()->active()
+            ->where('tracks_inventory', true)
+            ->where('stock', '>', 0)
+            ->get(['stock', 'average_cost']);
+
+        return [
+            'total_cost' => round((float) $products->sum(fn (Product $product) => round((float) $product->stock * (float) ($product->average_cost ?? 0), 2)), 2),
+            'products_count' => $products->count(),
+            'units' => (float) $products->sum(fn (Product $product) => (float) $product->stock),
+        ];
+    }
+
+    /**
      * Cartera (cuentas por cobrar) -- solo las facturas electrónicas a
      * crédito que aún no se han marcado como pagadas. Foto del saldo
      * actual, no se filtra por el periodo elegido en el panel.
