@@ -190,6 +190,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('import/chunk', [ProductImportController::class, 'chunk'])->name('import.chunk');
             Route::post('import/report', [ProductImportController::class, 'report'])->name('import.report');
             Route::get('export', [ProductExportController::class, 'export'])->name('export');
+            Route::get('inventory-value/pdf', [ProductExportController::class, 'inventoryValuePdf'])->name('inventory-value.pdf');
             Route::get('{product}', [ProductController::class, 'show'])->name('show');
             Route::put('{product}', [ProductController::class, 'update'])->name('update');
             Route::post('{product}/image', [ProductController::class, 'updateImage'])->name('image.update');

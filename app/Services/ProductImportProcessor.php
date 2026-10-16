@@ -8,8 +8,7 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
-use setasign\Fpdi\Fpdi;
-use setasign\Fpdi\PdfParser\StreamReader;
+use App\Support\PdfMerger;
 
 /**
  * Procesa un bloque de filas del Excel según el mapeo de columnas que el usuario definió
@@ -301,7 +300,7 @@ class ProductImportProcessor
      * Arma el reporte final con todas las filas acumuladas por el navegador, en un solo PDF.
      * DomPDF guarda todas las celdas de la tabla en memoria, así que con miles de filas en un solo
      * documento agota la memoria (error fatal que ni siquiera se puede capturar). Por eso se
-     * renderiza en PDFs de REPORT_ROWS_PER_PDF filas y luego se unen con FPDI.
+     * renderiza en PDFs de REPORT_ROWS_PER_PDF filas y luego se unen (ver PdfMerger).
      *
      * @return string Contenido del PDF.
      */
@@ -337,25 +336,7 @@ class ProductImportProcessor
             return $output;
         };
 
-        if (count($chunks) === 1) {
-            return $render($chunks[0]);
-        }
-
-        $merged = new Fpdi();
-        $merged->SetAutoPageBreak(false);
-
-        foreach ($chunks as $rows) {
-            $pageCount = $merged->setSourceFile(StreamReader::createByString($render($rows)));
-
-            for ($page = 1; $page <= $pageCount; $page++) {
-                $template = $merged->importPage($page);
-                $size = $merged->getTemplateSize($template);
-                $merged->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                $merged->useTemplate($template);
-            }
-        }
-
-        return $merged->Output('S');
+        return PdfMerger::merge(array_map($render, $chunks));
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PriceType;
+use App\Support\PdfMerger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -110,6 +112,70 @@ class ProductExportController extends Controller
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /**
+     * PDF del valor del inventario: un renglón por producto que controla
+     * inventario y tiene stock positivo (stock x costo promedio), con los
+     * totales al inicio y al final. Mismo criterio que la pestaña "Valor del
+     * inventario" y la tarjeta del panel. Se renderiza por partes y se unen
+     * (ver PdfMerger) para no agotar la memoria con inventarios grandes.
+     */
+    public function inventoryValuePdf(Request $request)
+    {
+        set_time_limit(300);
+
+        $company = $this->currentCompany($request);
+
+        $items = $company->products()->active()
+            ->where('tracks_inventory', true)
+            ->where('stock', '>', 0)
+            ->get(['code', 'description', 'stock', 'average_cost'])
+            ->map(function ($product) {
+                $stock = (float) $product->stock;
+                $cost = (float) ($product->average_cost ?? 0);
+
+                return [
+                    'code' => (string) $product->code,
+                    'description' => (string) $product->description,
+                    'stock' => $stock,
+                    'average_cost' => $cost,
+                    'total' => round($stock * $cost, 2),
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
+
+        $totals = [
+            'cost' => round((float) $items->sum('total'), 2),
+            'units' => (float) $items->sum('stock'),
+            'products' => $items->count(),
+        ];
+
+        $chunks = $items->chunk(300)->map(fn ($chunk) => $chunk->values()->all())->all() ?: [[]];
+        $lastIndex = count($chunks) - 1;
+
+        $parts = [];
+        foreach ($chunks as $index => $rows) {
+            $pdf = Pdf::loadView('products.inventory-value-pdf', [
+                'company' => $company,
+                'rows' => $rows,
+                'totals' => $totals,
+                'isFirst' => $index === 0,
+                'isLast' => $index === $lastIndex,
+            ])->setPaper('letter', 'portrait');
+
+            $parts[] = $pdf->output();
+            unset($pdf);
+            gc_collect_cycles();
+        }
+
+        $filename = 'valor-inventario-' . now('America/Bogota')->format('Y-m-d') . '.pdf';
+
+        return response(PdfMerger::merge($parts), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
     }
 }
