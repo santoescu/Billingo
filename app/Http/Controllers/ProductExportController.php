@@ -24,6 +24,7 @@ class ProductExportController extends Controller
     public function export(Request $request)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
 
         $data = $request->validate([
             'fields' => ['nullable', 'array'],
@@ -127,6 +128,7 @@ class ProductExportController extends Controller
         set_time_limit(300);
 
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
 
         $items = $company->products()->active()
             ->where('tracks_inventory', true)

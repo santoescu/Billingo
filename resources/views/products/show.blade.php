@@ -77,6 +77,7 @@
                 </div>
             </div>
 
+            @if ($canManage)
             <div id="product-show-kardex" class="border border-gray-200 rounded-lg dark:border-neutral-700">
                 <div class="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
                     <h3 class="font-semibold text-gray-800 dark:text-white">{{ __('Kardex') }}</h3>
@@ -85,6 +86,7 @@
                     <p class="text-sm text-neutral-500 dark:text-neutral-400">{{ __('Loading...') }}</p>
                 </div>
             </div>
+            @endif
         </div>
 
         <div class="flex flex-col gap-6">
@@ -108,10 +110,12 @@
                             <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Total stock') }}</div>
                             <div class="text-gray-800 dark:text-neutral-200">{{ rtrim(rtrim(number_format((float) $product->stock, 2, '.', ','), '0'), '.') }}</div>
                         </div>
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Unit cost') }}</div>
-                            <div class="text-gray-800 dark:text-neutral-200">{{ $product->average_cost_formatted }}</div>
-                        </div>
+                        @if ($canManage)
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Unit cost') }}</div>
+                                <div class="text-gray-800 dark:text-neutral-200">{{ $product->average_cost_formatted }}</div>
+                            </div>
+                        @endif
                         <div>
                             <div class="text-xs text-gray-500 uppercase dark:text-neutral-500">{{ __('Warehouse') }}</div>
                             @if ($warehouseStockRows->isEmpty())
@@ -236,6 +240,9 @@
 
                 async function loadKardex() {
                     const body = document.getElementById('product-kardex-body');
+                    if (! body) {
+                        return;
+                    }
 
                     try {
                         const response = await fetch(@json(route('products.kardex', ['product' => $product->_id])), {

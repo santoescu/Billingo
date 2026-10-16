@@ -11,6 +11,7 @@ class PriceTypeController extends Controller
     public function store(Request $request)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $data = $this->validatedData($request);
         $data['company_id'] = (string) $company->_id;
 
@@ -27,6 +28,7 @@ class PriceTypeController extends Controller
     public function update(Request $request, string $priceType)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $priceType = PriceType::where('company_id', (string) $company->_id)->findOrFail($priceType);
         $priceType->update($this->validatedData($request));
 
@@ -44,6 +46,7 @@ class PriceTypeController extends Controller
         set_time_limit(300);
 
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $priceType = PriceType::where('company_id', (string) $company->_id)->findOrFail($priceType);
         $priceTypeId = (string) $priceType->_id;
 

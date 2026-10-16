@@ -51,6 +51,8 @@ class ProductImportController extends Controller
         set_time_limit(300);
 
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
+        $this->authorizeInventoryManagement($company);
 
         $data = $request->validate([
             'raw_rows' => ['required', 'array', 'max:500'],
@@ -82,6 +84,7 @@ class ProductImportController extends Controller
         set_time_limit(300);
 
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
 
         $data = $request->validate([
             'report' => ['required', 'array'],

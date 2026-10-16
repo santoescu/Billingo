@@ -74,12 +74,14 @@
             <button type="button" id="tab-warehouses-btn" class="inventory-tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200" onclick="showInventoryTab('warehouses')">
                 {{ __('Warehouses') }}
             </button>
+            @if ($canManage)
             <button type="button" id="tab-price-types-btn" class="inventory-tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200" onclick="showInventoryTab('price-types')">
                 {{ __('Price types') }}
             </button>
             <button type="button" id="tab-inventory-value-btn" class="inventory-tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200" onclick="showInventoryTab('inventory-value')">
                 {{ __('Inventory value') }}
             </button>
+            @endif
         </nav>
     </div>
 
@@ -96,6 +98,7 @@
                         <svg id="products-refresh-icon" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                     </button>
 
+                    @if ($canManage)
                     <flux:button id="products-export-btn" variant="filled" icon="arrow-down-tray" onclick="openExportModal()">
                         {{ __('Export to Excel') }}
                     </flux:button>
@@ -105,6 +108,7 @@
                     <flux:button id="new-product-btn" variant="primary" icon="plus" onclick="openProductPanel()">
                         {{ __('New product') }}
                     </flux:button>
+                    @endif
                 </div>
             </div>
 
@@ -129,11 +133,13 @@
     <div id="tab-warehouses" class="hidden">
         
         <div class="flex flex-col gap-6">
-            <div class="flex justify-end">
-                <flux:button id="new-warehouse-btn" variant="primary" icon="plus" onclick="openWarehousePanel()">
-                    {{ __('New warehouse') }}
-                </flux:button>
-            </div>
+            @if ($canManage)
+                <div class="flex justify-end">
+                    <flux:button id="new-warehouse-btn" variant="primary" icon="plus" onclick="openWarehousePanel()">
+                        {{ __('New warehouse') }}
+                    </flux:button>
+                </div>
+            @endif
 
             @if ($warehouses->isEmpty())
                 <section class="flex min-h-[160px] items-center justify-center rounded-lg border border-gray-200 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-800">
@@ -144,6 +150,7 @@
                     @foreach ($warehouses as $warehouse)
                         @php $warehouseProductCount = $warehouseProductsMap->get((string) $warehouse->_id, collect())->count(); @endphp
                         <div class="relative space-y-2 rounded-lg border border-gray-200 bg-white p-4 transition hover:border-gray-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600">
+                            @if ($canManage)
                             <div class="absolute right-3 top-3 flex gap-1">
                                 <button type="button" class="flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('Edit') }}" onclick="event.stopPropagation(); openWarehousePanel({!! Illuminate\Support\Js::from($warehouse) !!})">
                                     <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -159,6 +166,7 @@
                                     </button>
                                 </form>
                             </div>
+                            @endif
 
                             <button type="button" class="w-full space-y-2 pr-14 text-left" onclick="showWarehouseProducts('{{ (string) $warehouse->_id }}', {{ Illuminate\Support\Js::from($warehouse->name) }})">
                                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white">{{ $warehouse->name }}</h2>
@@ -174,6 +182,7 @@
         </div>
     </div>
 
+    @if ($canManage)
     <div id="tab-inventory-value" class="hidden">
         <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
             <div class="py-4 px-4 grid gap-4 sm:grid-cols-3">
@@ -276,6 +285,7 @@
             @endif
         </div>
     </div>
+    @endif
 
     <!-- Modal: precios de un producto -->
     <div id="product-prices-modal" class="hs-overlay hidden size-full fixed top-0 start-0 z-90 overflow-x-hidden overflow-y-auto pointer-events-none" role="dialog" tabindex="-1" aria-labelledby="product-prices-modal-label">
@@ -935,7 +945,8 @@
                 // en vez de destruirla y reconstruirla (ver documents/index.blade.php para el
                 // porqué: destroy() restaura el <tbody> al contenido del primer init).
                 let productsTable = null;
-                const inventoryTabs = ['products', 'warehouses', 'price-types', 'inventory-value'];
+                const canManageInventory = @json($canManage);
+                const inventoryTabs = canManageInventory ? ['products', 'warehouses', 'price-types', 'inventory-value'] : ['products', 'warehouses'];
 
                 window.showInventoryTab = function (tab) {
                     inventoryTabs.forEach((name) => {
@@ -1031,6 +1042,10 @@
                  * @returns {void}
                  */
                 function renderInventoryValue(rows) {
+                    if (! canManageInventory || ! document.getElementById('inventoryValueTable')) {
+                        return;
+                    }
+
                     const items = rows
                         .filter((row) => row.tracks_inventory && Number(row.stock) > 0)
                         .map((row) => ({
@@ -2210,6 +2225,14 @@
                 }
 
                 function renderActionsCell(row) {
+                    if (! canManageInventory) {
+                        return `<div class="flex justify-end gap-1">
+                            <a href="${row.urls.show}" class="product-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" title="{{ __('View') }}">
+                                <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </a>
+                        </div>`;
+                    }
+
                     let html = `<div class="flex justify-end gap-1">
                         <a href="${row.urls.show}" class="product-view-btn flex size-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-accent focus:outline-hidden dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="{{ __('View') }}">
                             <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>

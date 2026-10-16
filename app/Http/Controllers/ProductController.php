@@ -30,7 +30,9 @@ class ProductController extends Controller
         $warehouses = $company->warehouses()->orderBy('name')->get();
         $priceTypes = $this->priceTypesOrDefault($company);
 
-        return view('products.index', compact('products', 'measurementUnits', 'warehouses', 'priceTypes'));
+        $canManage = $this->canManageInventory($company);
+
+        return view('products.index', compact('products', 'measurementUnits', 'warehouses', 'priceTypes', 'canManage'));
     }
 
     /**
@@ -127,6 +129,10 @@ class ProductController extends Controller
             ];
         });
 
+        if (! $this->canManageInventory($company)) {
+            $rows = $rows->map(fn (array $row) => collect($row)->except(['average_cost', 'inventory_cost', 'edit_data'])->all());
+        }
+
         return response()->json([
             'rows' => $rows,
             'product_prices_map' => $productPricesMap,
@@ -148,7 +154,9 @@ class ProductController extends Controller
         $priceTypes = $this->priceTypesOrDefault($company);
         $measurementUnits = MeasurementUnit::orderBy('descripcion')->get();
 
-        return view('products.show', compact('product', 'warehouses', 'priceTypes', 'measurementUnits'));
+        $canManage = $this->canManageInventory($company);
+
+        return view('products.show', compact('product', 'warehouses', 'priceTypes', 'measurementUnits', 'canManage'));
     }
 
     /**
@@ -172,6 +180,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $data = $this->validatedData($request);
         $data['company_id'] = (string) $company->_id;
         $data = array_merge($data, $this->handleImageUpload($request));
@@ -203,6 +212,7 @@ class ProductController extends Controller
     public function update(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
 
         $previousWarehouseStocks = $product->warehouse_stocks ?? [];
@@ -239,6 +249,7 @@ class ProductController extends Controller
     public function updateImage(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
 
         $imageData = $this->handleImageUpload($request);
@@ -272,6 +283,7 @@ class ProductController extends Controller
     public function kardex(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
 
         $movements = $product->stockMovements()->orderByDesc('created_at')->limit(200)->get();
@@ -352,6 +364,7 @@ class ProductController extends Controller
     public function destroy(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
         $product->delete();
 
@@ -381,6 +394,7 @@ class ProductController extends Controller
     public function storeStockEntry(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
 
         abort_unless($product->tracks_inventory, 422, __('This product does not track inventory.'));
@@ -446,6 +460,7 @@ class ProductController extends Controller
     public function correctAverageCost(Request $request, string $product)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $product = Product::where('company_id', (string) $company->_id)->findOrFail($product);
 
         abort_unless($product->tracks_inventory, 422, __('This product does not track inventory.'));

@@ -57,6 +57,26 @@ abstract class Controller
     }
 
     /**
+     * ¿Puede el usuario gestionar el inventario (crear/editar/borrar productos,
+     * bodegas y tipos de precio, ver costos, kardex, importar/exportar)? Mismo
+     * criterio que el resto de la app para "administrar": owner, o
+     * administrador en algún módulo. Un vendedor o cajero solo consulta
+     * productos, bodegas y stock, sin ningún costo.
+     */
+    protected function canManageInventory(Company $company): bool
+    {
+        $membership = $company->membership ?? null;
+
+        return $membership
+            && User::hasCompanyAdminAccess($membership->role, $membership->modules ?? []);
+    }
+
+    protected function authorizeInventoryManagement(Company $company): void
+    {
+        abort_unless($this->canManageInventory($company), 403);
+    }
+
+    /**
      * "Consumidor final" propio de la empresa: se crea una sola vez (la
      * primera venta o cotización que lo necesite) con la identificación
      * genérica que usa el comercio colombiano para mostrador, para que

@@ -11,6 +11,7 @@ class WarehouseController extends Controller
     public function store(Request $request)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $data = $this->validatedData($request);
         $data['company_id'] = (string) $company->_id;
 
@@ -27,6 +28,7 @@ class WarehouseController extends Controller
     public function update(Request $request, string $warehouse)
     {
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $warehouse = Warehouse::where('company_id', (string) $company->_id)->findOrFail($warehouse);
         $warehouse->update($this->validatedData($request));
 
@@ -44,6 +46,7 @@ class WarehouseController extends Controller
         set_time_limit(300);
 
         $company = $this->currentCompany($request);
+        $this->authorizeInventoryManagement($company);
         $warehouse = Warehouse::where('company_id', (string) $company->_id)->findOrFail($warehouse);
         $warehouseId = (string) $warehouse->_id;
 
