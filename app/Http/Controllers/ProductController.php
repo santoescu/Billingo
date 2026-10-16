@@ -117,6 +117,7 @@ class ProductController extends Controller
                 'tracks_inventory' => (bool) $product->tracks_inventory,
                 'stock' => (float) $product->stock,
                 'average_cost' => (float) ($product->average_cost ?? 0),
+                'inventory_cost' => round((float) $product->stock * (float) ($product->average_cost ?? 0), 2),
                 'warehouse_names' => $warehouseNamesFor($product) ?: null,
                 'urls' => [
                     'show' => route('products.show', $product->_id),

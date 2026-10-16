@@ -77,6 +77,9 @@
             <button type="button" id="tab-price-types-btn" class="inventory-tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200" onclick="showInventoryTab('price-types')">
                 {{ __('Price types') }}
             </button>
+            <button type="button" id="tab-inventory-value-btn" class="inventory-tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200" onclick="showInventoryTab('inventory-value')">
+                {{ __('Inventory value') }}
+            </button>
         </nav>
     </div>
 
@@ -168,6 +171,59 @@
                     @endforeach
                 </section>
             @endif
+        </div>
+    </div>
+
+    <div id="tab-inventory-value" class="hidden">
+        <div class="border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <div class="py-4 px-4 grid gap-4 sm:grid-cols-3">
+                <div>
+                    <p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Inventory cost') }}</p>
+                    <p id="inventory-value-total" class="text-xl font-semibold text-gray-800 dark:text-white">$0,00</p>
+                </div>
+                <div>
+                    <p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Products in stock') }}</p>
+                    <p id="inventory-value-products" class="text-xl font-semibold text-gray-800 dark:text-white">0</p>
+                </div>
+                <div>
+                    <p class="text-xs text-zinc-500 dark:text-neutral-400">{{ __('Units in stock') }}</p>
+                    <p id="inventory-value-units" class="text-xl font-semibold text-gray-800 dark:text-white">0</p>
+                </div>
+            </div>
+
+            <div class="py-3 px-4 flex justify-between items-center gap-4">
+                <div class="relative max-w-xs">
+                    <label class="sr-only">{{ __('Search') }}</label>
+                    <flux:input type="text" id="inventory-value-search" icon="magnifying-glass" placeholder="{{ __('Search') }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore />
+                </div>
+
+                <a href="{{ route('products.inventory-value.pdf') }}" target="_blank">
+                    <flux:button variant="filled" icon="arrow-down-tray">{{ __('Export PDF') }}</flux:button>
+                </a>
+            </div>
+
+            <div class="overflow-hidden rounded-b-lg">
+                <table class="w-full table-fixed divide-y divide-gray-200 dark:divide-neutral-700" id="inventoryValueTable">
+                    <thead class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Code') }}</th>
+                            <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Product') }}</th>
+                            <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Stock') }}</th>
+                            <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Average cost') }}</th>
+                            <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">{{ __('Total cost') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700"></tbody>
+                    <tfoot class="bg-gray-50 dark:bg-neutral-700">
+                        <tr>
+                            <th scope="row" colspan="2" class="px-6 py-3 text-start text-sm font-semibold text-gray-800 dark:text-white">{{ __('Totals') }}</th>
+                            <td id="inventory-value-foot-units" class="px-6 py-3 text-end text-sm font-semibold text-gray-800 dark:text-white">0</td>
+                            <td class="px-6 py-3"></td>
+                            <td id="inventory-value-foot-total" class="px-6 py-3 text-end text-sm font-semibold text-gray-800 dark:text-white">$0,00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -879,7 +935,7 @@
                 // en vez de destruirla y reconstruirla (ver documents/index.blade.php para el
                 // porqué: destroy() restaura el <tbody> al contenido del primer init).
                 let productsTable = null;
-                const inventoryTabs = ['products', 'warehouses', 'price-types'];
+                const inventoryTabs = ['products', 'warehouses', 'price-types', 'inventory-value'];
 
                 window.showInventoryTab = function (tab) {
                     inventoryTabs.forEach((name) => {
@@ -960,6 +1016,65 @@
                         HSOverlay.open('#warehouse-products-modal');
                     }
                 };
+
+                let inventoryValueTable = null;
+
+                /**
+                 * Arma la pestaña "Valor del inventario" con los mismos
+                 * productos que ya trajo products.data: solo los que
+                 * controlan inventario y tienen stock positivo (igual
+                 * criterio que la tarjeta del panel), con el costo total de
+                 * cada uno (stock x costo promedio) y los totales de TODO
+                 * el inventario arriba y en el pie de la tabla, no solo de
+                 * la página visible.
+                 * @param {Array} rows Filas de products.data.
+                 * @returns {void}
+                 */
+                function renderInventoryValue(rows) {
+                    const items = rows
+                        .filter((row) => row.tracks_inventory && Number(row.stock) > 0)
+                        .map((row) => ({
+                            code: row.code,
+                            description: row.description,
+                            stock: Number(row.stock),
+                            average_cost: Number(row.average_cost || 0),
+                            total: Number(row.inventory_cost),
+                        }));
+
+                    const totalCost = items.reduce((sum, item) => sum + item.total, 0);
+                    const totalUnits = items.reduce((sum, item) => sum + item.stock, 0);
+                    const unitsLabel = totalUnits.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+
+                    document.getElementById('inventory-value-total').textContent = formatMoneyCop(totalCost);
+                    document.getElementById('inventory-value-products').textContent = items.length.toLocaleString('es-CO');
+                    document.getElementById('inventory-value-units').textContent = unitsLabel;
+                    document.getElementById('inventory-value-foot-units').textContent = unitsLabel;
+                    document.getElementById('inventory-value-foot-total').textContent = formatMoneyCop(totalCost);
+
+                    const numberCell = (field, money) => ({
+                        data: field,
+                        className: 'px-4 py-4 text-end text-sm text-gray-600 dark:text-neutral-400',
+                        render: (value, type) => (type === 'display'
+                            ? (money ? formatMoneyCop(value) : Number(value).toLocaleString('es-CO', { maximumFractionDigits: 2 }))
+                            : value),
+                    });
+
+                    if (! inventoryValueTable) {
+                        inventoryValueTable = initWorkflowDataTable('#inventoryValueTable', '#inventory-value-search', {
+                            columns: [
+                                { data: 'code', className: 'px-4 py-4 text-sm text-gray-800 break-words dark:text-neutral-200' },
+                                { data: 'description', className: 'px-4 py-4 text-sm font-medium text-gray-800 break-words dark:text-neutral-200' },
+                                numberCell('stock', false),
+                                numberCell('average_cost', true),
+                                numberCell('total', true),
+                            ],
+                        });
+                    }
+
+                    inventoryValueTable.clear();
+                    inventoryValueTable.rows.add(items);
+                    inventoryValueTable.order([4, 'desc']).draw();
+                }
 
                 function formatMoneyCop(value) {
                     return '$' + Number(value ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2276,6 +2391,8 @@
                             productsTable.clear();
                             productsTable.rows.add(data.rows);
                             productsTable.draw();
+
+                            renderInventoryValue(data.rows);
 
                             if (window.HSOverlay) HSOverlay.autoInit();
                         })
